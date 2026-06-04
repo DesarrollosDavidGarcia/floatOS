@@ -547,6 +547,16 @@ Cimientos por mí + **7 páginas construidas en paralelo** (un agente por módul
 
 **Pendiente de Fase 1:** app Flutter del conductor, página pública de seguimiento sin login, y script de alta de instancia.
 
+### 2026-06-04 — Repositorio en GitHub + endurecimiento de seguridad ✅
+
+Primer commit del proyecto y publicación en **GitHub** (`DesarrollosDavidGarcia/floatOS`); el `.gitignore` garantiza que `.env` nunca se suba (solo `.env.example`).
+
+**Seguridad (corregido y verificado en vivo):**
+- **Token de seguimiento público criptográficamente seguro:** el `trackingToken` del link público `GET /tracking/:token` pasó de `cuid()` (semi-predecible) a `crypto.randomBytes(24)` URL-safe, cerrando una fuga de PII (ubicación en vivo, nombre del conductor, direcciones). Sin migración SQL (el default de cuid era client-side).
+- **Rate limiting** con `@nestjs/throttler`: baseline global 120/min; login admin y conductor 10/min; refresh 30/min; link público 60/min; la ingesta de GPS exenta (`@SkipThrottle`). `trust proxy=1` para contar por IP real tras Nginx. Verificado en vivo: 10× login → 401 y el 11º → **429**.
+
+> Nota de entorno: el Node global de la máquina es v16 (rompe Prisma 6 con error WASM `externref`); se usa **Node 20 vía nvm** para Prisma y para correr API/web.
+
 ### 2026-06-04 — Expediente formal del conductor (multiagente) ✅
 
 Se amplió el módulo de conductores a un **expediente formal** de 11 secciones, construido con fan-out multiagente (1 agente por sección, sobre un cimiento de schema/tipos hecho a mano) y **verificado con prueba de humo en vivo (12/12 ✅)**.
@@ -572,6 +582,22 @@ Se reemplazaron los dropdowns de **enums fijos** por un **catálogo genérico ad
 **Web:** pantalla **Catálogos** (`/catalogos`, en el sidebar) que administra los 18 grupos. Piezas reutilizables: hook `useCatalogo(grupo)`, `<CatalogoSelect>` (dropdown), `<CatalogoTexto>`/`<CatalogoBadge>` (etiqueta/color desde BD). Se recablearon ~13 dropdowns (expediente, datos/RH —incl. puesto y tipo de sangre que eran texto libre—, flota: tipo de unidad, aseguradora, documentos de unidad).
 
 **Verificado:** `tsc` (API y web) + `nest build` en verde; migración con diff vacío posterior (BD == schema) y datos intactos; smoke en vivo: 18 grupos, alta de item nuevo (201), duplicado (409), y uso del código nuevo en un examen real (201). Páginas `/catalogos`, `/conductores/[id]`, `/flota` sirviendo 200.
+
+### 2026-06-04 — Rediseño UX/UI del panel (multiagente) ✅
+
+Pasada integral de experiencia sobre el panel Next.js, con fan-out multiagente y **piezas compartidas reutilizables**. **Verificado: `tsc` web en verde y páginas 200 en cada bloque.**
+
+**Formularios:**
+- Expediente: alta/edición en **modal compacto** (`ExpedienteFormDialog`, `CamposGrid`, `Campo`) en vez de formularios inline largos.
+- **Validación con feedback visual** consistente (react-hook-form + zod, `mode: onTouched`): asterisco de requerido, **borde rojo** del campo inválido y mensaje del porqué. Helpers en `lib/validacion` (requeridos, rangos numéricos, coherencia de fechas, formatos CURP/RFC/NSS/teléfono). Aplicada a las 11 secciones del expediente y a los formularios de **conductor, unidad, cliente y viaje**.
+
+**Tablas:**
+- Filas de **2 líneas** (valor + subtexto de contexto), **vigencia con badge** (Vigente/Por vencer/Vencido), fechas y montos formateados, "—" en vacíos y conteo de registros. Piezas en `tabla-ui` (`CeldaPrincipal`, `Fecha`, `Vigencia`, `Dinero`, `Conteo`).
+- **Columnas responsivas**: ~3 en móvil, ~5 en mediano, todas en grande (`hidden md/lg:table-cell`). Altura de fila compacta. Consistente en todas las listas y en las 9 tablas del expediente.
+
+**Listas:** `/conductores` enriquecida (avatar de iniciales, nombre→expediente, contacto, licencia, acciones en menú **⋯** con borrado confirmado). Mismo trato en **clientes, flota, viajes y alertas** (multiagente). Barra de filtro + acción en la fila del título; paginación siempre visible.
+
+**Layout / navegación:** **topbar** con campana de **notificaciones** (conectada a `/alertas/vencimientos`: badge con conteo y urgencia, dropdown con próximos) y **menú de perfil** (avatar, nombre/email, cerrar sesión); **sidebar agrupado** por secciones (Operación / Gestión / Sistema); **menú hamburguesa siempre** (sidebar como drawer en todos los tamaños); panel **responsive** (header que apila en móvil, tablas con scroll y columnas adaptativas).
 
 ---
 
