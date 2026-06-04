@@ -35,6 +35,128 @@ enum TipoDocumentoUnidad {
 enum TipoDocumentoConductor {
   LICENCIA_FEDERAL
   EXAMEN_MEDICO
+  INE
+  CURP
+  RFC
+  COMPROBANTE_DOMICILIO
+  CONSTANCIA_SITUACION_FISCAL
+  CONTRATO
+  ALTA_IMSS
+  OTRO
+}
+
+/// Categoría de la Licencia Federal de Conductor (SCT autotransporte federal).
+enum CategoriaLicencia {
+  A
+  B
+  C
+  D
+  E
+  F
+}
+
+/// Tipo de examen del expediente médico (análisis continuo del conductor).
+enum TipoExamenMedico {
+  APTITUD_PSICOFISICA
+  ANTIDOPING
+  EXAMEN_GENERAL
+  VISTA
+  AUDITIVO
+  OTRO
+}
+
+/// Resultado/dictamen de un examen médico o de control de confianza.
+enum ResultadoExamen {
+  APTO
+  NO_APTO
+  CONDICIONADO
+  PENDIENTE
+}
+
+/// Tipo de certificación formal del conductor.
+enum TipoCertificacion {
+  MATERIALES_PELIGROSOS
+  RESIDUOS_PELIGROSOS
+  MANEJO_DEFENSIVO
+  PRIMEROS_AUXILIOS
+  CAAT
+  MERCANCIAS_PELIGROSAS_SCT
+  OTRO
+}
+
+/// Tipo de incidencia registrada en el expediente (positivas y negativas).
+enum TipoIncidencia {
+  ACCIDENTE
+  INFRACCION
+  SANCION
+  FALTA
+  QUEJA
+  RECONOCIMIENTO
+  OTRO
+}
+
+/// Gravedad de una incidencia.
+enum GravedadIncidencia {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+/// Evento en la trayectoria del conductor dentro de la empresa.
+enum TipoEventoLaboral {
+  INGRESO
+  ASCENSO
+  CAMBIO_PUESTO
+  CAMBIO_SALARIO
+  AMONESTACION
+  RECONOCIMIENTO
+  BAJA
+  OTRO
+}
+
+/// Nivel de aptitud del conductor para un tipo de unidad.
+enum NivelAptitud {
+  PRINCIPIANTE
+  INTERMEDIO
+  EXPERTO
+}
+
+/// Tipo de unidad de transporte que el conductor maneja con frecuencia.
+enum TipoUnidadManejo {
+  TRACTOCAMION
+  TORTON
+  RABON
+  THORTON
+  CAMION_3_5
+  CAMIONETA
+  CAJA_SECA
+  CAJA_REFRIGERADA
+  PLATAFORMA
+  TOLVA
+  PIPA
+  FULL
+  OTRO
+}
+
+/// Tipo de evaluación de control de confianza.
+enum TipoControlConfianza {
+  EXAMEN_CONFIANZA
+  ANTECEDENTES_NO_PENALES
+  ESTUDIO_SOCIOECONOMICO
+  POLIGRAFO
+  TOXICOLOGICO
+  OTRO
+}
+
+/// Tipo de ausencia/asistencia registrada.
+enum TipoAusencia {
+  INCAPACIDAD_IMSS
+  VACACIONES
+  PERMISO_CON_GOCE
+  PERMISO_SIN_GOCE
+  FALTA_JUSTIFICADA
+  FALTA_INJUSTIFICADA
   OTRO
 }
 
@@ -77,6 +199,8 @@ model Usuario {
 }
 
 /// Conductor: credenciales separadas para la app Flutter.
+/// Incluye los datos de RH del expediente formal (las secciones detalladas
+/// viven en modelos relacionados: médico, certificaciones, incidencias, etc.).
 model Conductor {
   id               String   @id @default(cuid())
   nombre           String
@@ -88,12 +212,39 @@ model Conductor {
   fotoKey          String?  // objeto en MinIO
   refreshTokenHash String?
   activo           Boolean  @default(true)
+
+  // ── Datos personales / RH (expediente) ──
+  curp                String?            @unique
+  rfc                 String?
+  nss                 String?            // número de seguridad social (IMSS)
+  fechaNacimiento     DateTime?
+  tipoSangre          String?
+  direccion           String?
+  numeroEmpleado      String?            @unique
+  puesto              String?
+  fechaIngreso        DateTime?
+  categoriaLicencia   CategoriaLicencia?
+  // Contacto de emergencia
+  emergenciaNombre    String?
+  emergenciaTelefono  String?
+  emergenciaRelacion  String?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  documentos  DocumentoConductor[]
-  viajes      Viaje[]
-  ubicaciones UbicacionConductor[]
+  documentos        DocumentoConductor[]
+  viajes            Viaje[]
+  ubicaciones       UbicacionConductor[]
+  // ── Secciones del expediente ──
+  examenesMedicos   ExamenMedicoConductor[]
+  certificaciones   CertificacionConductor[]
+  capacitaciones    CapacitacionConductor[]
+  incidencias       IncidenciaConductor[]
+  eventosLaborales  EventoLaboralConductor[]
+  aptitudesUnidad   AptitudUnidadConductor[]
+  controlesConfianza ControlConfianzaConductor[]
+  evaluaciones      EvaluacionDesempenoConductor[]
+  ausencias         AusenciaConductor[]
 
   @@map("conductores")
 }
@@ -154,6 +305,203 @@ model DocumentoConductor {
   @@index([conductorId])
   @@index([fechaVencimiento])
   @@map("documentos_conductor")
+}
+
+// ───────────────── Expediente del conductor ──────────────────────
+
+/// Expediente médico y análisis continuo: cada examen periódico del conductor.
+model ExamenMedicoConductor {
+  id              String           @id @default(cuid())
+  conductorId     String
+  tipo            TipoExamenMedico
+  resultado       ResultadoExamen  @default(PENDIENTE)
+  fechaExamen     DateTime
+  fechaVencimiento DateTime?       // p. ej. aptitud psicofísica vigente 2 años
+  institucion     String?          // clínica / laboratorio
+  medico          String?
+  observaciones   String?
+  archivoKey      String?          // dictamen en MinIO
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@index([fechaVencimiento])
+  @@map("examenes_medicos_conductor")
+}
+
+/// Certificaciones formales (materiales peligrosos, manejo defensivo, etc.).
+model CertificacionConductor {
+  id              String            @id @default(cuid())
+  conductorId     String
+  tipo            TipoCertificacion
+  nombre          String
+  emisor          String?
+  folio           String?
+  fechaEmision    DateTime?
+  fechaVencimiento DateTime?
+  archivoKey      String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@index([fechaVencimiento])
+  @@map("certificaciones_conductor")
+}
+
+/// Capacitaciones / cursos tomados por el conductor.
+model CapacitacionConductor {
+  id            String    @id @default(cuid())
+  conductorId   String
+  nombre        String
+  instructor    String?
+  institucion   String?
+  horas         Int?
+  fechaInicio   DateTime?
+  fechaFin      DateTime?
+  aprobado      Boolean?
+  calificacion  Decimal?  @db.Decimal(5, 2)
+  constanciaKey String?   // constancia en MinIO
+  notas         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@map("capacitaciones_conductor")
+}
+
+/// Incidencias: accidentes, infracciones, sanciones y reconocimientos.
+model IncidenciaConductor {
+  id            String             @id @default(cuid())
+  conductorId   String
+  viajeId       String?            // vínculo opcional al viaje donde ocurrió
+  tipo          TipoIncidencia
+  gravedad      GravedadIncidencia @default(MEDIA)
+  titulo        String
+  descripcion   String?
+  fecha         DateTime
+  lugar         String?
+  costoEstimado Decimal?           @db.Decimal(12, 2)
+  resuelta      Boolean            @default(false)
+  evidenciaKey  String?
+  registradoPor String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  viaje     Viaje?    @relation(fields: [viajeId], references: [id], onDelete: SetNull)
+
+  @@index([conductorId])
+  @@index([viajeId])
+  @@map("incidencias_conductor")
+}
+
+/// Progreso / trayectoria del conductor en la empresa (línea de tiempo).
+model EventoLaboralConductor {
+  id            String            @id @default(cuid())
+  conductorId   String
+  tipo          TipoEventoLaboral
+  titulo        String
+  descripcion   String?
+  puestoNuevo   String?
+  fecha         DateTime
+  registradoPor String?
+  createdAt     DateTime          @default(now())
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@map("eventos_laborales_conductor")
+}
+
+/// Aptitud del conductor por tipo de unidad de transporte (manejo frecuente).
+model AptitudUnidadConductor {
+  id              String           @id @default(cuid())
+  conductorId     String
+  tipoUnidad      TipoUnidadManejo
+  nivel           NivelAptitud     @default(INTERMEDIO)
+  aniosExperiencia Int?
+  notas           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@unique([conductorId, tipoUnidad])
+  @@index([conductorId])
+  @@map("aptitudes_unidad_conductor")
+}
+
+/// Control de confianza y antecedentes.
+model ControlConfianzaConductor {
+  id              String               @id @default(cuid())
+  conductorId     String
+  tipo            TipoControlConfianza
+  resultado       ResultadoExamen      @default(PENDIENTE)
+  institucion     String?
+  folio           String?
+  fechaEvaluacion DateTime
+  fechaVencimiento DateTime?
+  observaciones   String?
+  archivoKey      String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@index([fechaVencimiento])
+  @@map("controles_confianza_conductor")
+}
+
+/// Evaluación de desempeño con KPIs (puntualidad, consumo, telemetría).
+model EvaluacionDesempenoConductor {
+  id                String   @id @default(cuid())
+  conductorId       String
+  periodoInicio     DateTime
+  periodoFin        DateTime
+  // KPIs (0–100 salvo donde se indique)
+  puntuacionGeneral Decimal? @db.Decimal(5, 2)
+  puntualidad       Decimal? @db.Decimal(5, 2)
+  consumoCombustible Decimal? @db.Decimal(6, 2) // km/L promedio
+  cumplimientoRutas Decimal? @db.Decimal(5, 2)
+  incidenciasPeriodo Int?
+  viajesCompletados Int?
+  comentarios       String?
+  evaluadoPor       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@map("evaluaciones_desempeno_conductor")
+}
+
+/// Asistencias / incapacidades / vacaciones.
+model AusenciaConductor {
+  id            String       @id @default(cuid())
+  conductorId   String
+  tipo          TipoAusencia
+  fechaInicio   DateTime
+  fechaFin      DateTime?
+  dias          Int?
+  motivo        String?
+  folioIncapacidad String?   // folio IMSS si aplica
+  autorizadoPor String?
+  documentoKey  String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@map("ausencias_conductor")
 }
 
 // ──────────────────────── Clientes finales ───────────────────────
@@ -219,6 +567,7 @@ model Viaje {
   ubicaciones UbicacionConductor[]
   gastos      GastoViaje[]
   evidencias  EvidenciaViaje[]
+  incidencias IncidenciaConductor[]
   cartaPorte  CartaPorte?
   factura     Factura?
 

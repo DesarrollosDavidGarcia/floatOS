@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { CategoriaLicencia } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { PasswordService } from '../../infrastructure/shared/password.service';
 import {
@@ -19,6 +20,20 @@ export interface ActualizarConductorInput {
   telefono?: string;
   password?: string;
   activo?: boolean;
+  // Campos de Recursos Humanos
+  curp?: string;
+  rfc?: string;
+  nss?: string;
+  fechaNacimiento?: string;
+  tipoSangre?: string;
+  direccion?: string;
+  numeroEmpleado?: string;
+  puesto?: string;
+  fechaIngreso?: string;
+  categoriaLicencia?: CategoriaLicencia;
+  emergenciaNombre?: string;
+  emergenciaTelefono?: string;
+  emergenciaRelacion?: string;
 }
 
 /** Caso de uso: actualizar datos del conductor (re-hashea password si llega). */
@@ -68,6 +83,24 @@ export class ActualizarConductorUseCase {
     if (input.password !== undefined) {
       data.passwordHash = await this.passwordService.hash(input.password);
     }
+    // Campos de Recursos Humanos
+    if (input.curp !== undefined) data.curp = input.curp;
+    if (input.rfc !== undefined) data.rfc = input.rfc;
+    if (input.nss !== undefined) data.nss = input.nss;
+    if (input.fechaNacimiento !== undefined) {
+      data.fechaNacimiento = input.fechaNacimiento ? new Date(input.fechaNacimiento) : null;
+    }
+    if (input.tipoSangre !== undefined) data.tipoSangre = input.tipoSangre;
+    if (input.direccion !== undefined) data.direccion = input.direccion;
+    if (input.numeroEmpleado !== undefined) data.numeroEmpleado = input.numeroEmpleado;
+    if (input.puesto !== undefined) data.puesto = input.puesto;
+    if (input.fechaIngreso !== undefined) {
+      data.fechaIngreso = input.fechaIngreso ? new Date(input.fechaIngreso) : null;
+    }
+    if (input.categoriaLicencia !== undefined) data.categoriaLicencia = input.categoriaLicencia;
+    if (input.emergenciaNombre !== undefined) data.emergenciaNombre = input.emergenciaNombre;
+    if (input.emergenciaTelefono !== undefined) data.emergenciaTelefono = input.emergenciaTelefono;
+    if (input.emergenciaRelacion !== undefined) data.emergenciaRelacion = input.emergenciaRelacion;
 
     const actualizado = await this.prisma.conductor.update({
       where: { id },

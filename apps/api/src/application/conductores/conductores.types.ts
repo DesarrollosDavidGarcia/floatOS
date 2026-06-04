@@ -1,4 +1,4 @@
-import { Conductor } from '@prisma/client';
+import { CategoriaLicencia, Conductor } from '@prisma/client';
 
 /**
  * Representación pública del Conductor: excluye campos sensibles
@@ -15,6 +15,20 @@ export interface ConductorPublico {
   activo: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Campos de Recursos Humanos
+  curp: string | null;
+  rfc: string | null;
+  nss: string | null;
+  fechaNacimiento: Date | null;
+  tipoSangre: string | null;
+  direccion: string | null;
+  numeroEmpleado: string | null;
+  puesto: string | null;
+  fechaIngreso: Date | null;
+  categoriaLicencia: CategoriaLicencia | null;
+  emergenciaNombre: string | null;
+  emergenciaTelefono: string | null;
+  emergenciaRelacion: string | null;
 }
 
 /** Quita passwordHash y refreshTokenHash de un Conductor de Prisma. */

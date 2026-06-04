@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { CategoriaLicencia } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { PasswordService } from '../../infrastructure/shared/password.service';
 import {
@@ -13,6 +14,20 @@ export interface CrearConductorInput {
   email?: string;
   telefono?: string;
   password: string;
+  // Campos de Recursos Humanos
+  curp?: string;
+  rfc?: string;
+  nss?: string;
+  fechaNacimiento?: string;
+  tipoSangre?: string;
+  direccion?: string;
+  numeroEmpleado?: string;
+  puesto?: string;
+  fechaIngreso?: string;
+  categoriaLicencia?: CategoriaLicencia;
+  emergenciaNombre?: string;
+  emergenciaTelefono?: string;
+  emergenciaRelacion?: string;
 }
 
 /** Caso de uso: el admin crea un conductor con credenciales para la app. */
@@ -50,6 +65,20 @@ export class CrearConductorUseCase {
         email: input.email ?? null,
         telefono: input.telefono ?? null,
         passwordHash,
+        // Campos de Recursos Humanos
+        curp: input.curp ?? null,
+        rfc: input.rfc ?? null,
+        nss: input.nss ?? null,
+        fechaNacimiento: input.fechaNacimiento ? new Date(input.fechaNacimiento) : null,
+        tipoSangre: input.tipoSangre ?? null,
+        direccion: input.direccion ?? null,
+        numeroEmpleado: input.numeroEmpleado ?? null,
+        puesto: input.puesto ?? null,
+        fechaIngreso: input.fechaIngreso ? new Date(input.fechaIngreso) : null,
+        categoriaLicencia: input.categoriaLicencia ?? null,
+        emergenciaNombre: input.emergenciaNombre ?? null,
+        emergenciaTelefono: input.emergenciaTelefono ?? null,
+        emergenciaRelacion: input.emergenciaRelacion ?? null,
       },
     });
 

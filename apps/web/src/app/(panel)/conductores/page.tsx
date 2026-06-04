@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText, Pencil, Plus, Route, Trash2 } from 'lucide-react';
+import { FileText, FolderOpen, Pencil, Plus, Route, Trash2 } from 'lucide-react';
 import type { Paginado } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
@@ -141,6 +142,16 @@ export default function ConductoresPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Ver expediente"
+                        asChild
+                      >
+                        <Link href={`/conductores/${c.id}`}>
+                          <FolderOpen className="h-4 w-4" />
+                        </Link>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

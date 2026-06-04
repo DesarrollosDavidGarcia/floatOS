@@ -547,6 +547,20 @@ Cimientos por mí + **7 páginas construidas en paralelo** (un agente por módul
 
 **Pendiente de Fase 1:** app Flutter del conductor, página pública de seguimiento sin login, y script de alta de instancia.
 
+### 2026-06-04 — Expediente formal del conductor (multiagente) ✅
+
+Se amplió el módulo de conductores a un **expediente formal** de 11 secciones, construido con fan-out multiagente (1 agente por sección, sobre un cimiento de schema/tipos hecho a mano) y **verificado con prueba de humo en vivo (12/12 ✅)**.
+
+**Modelo de datos (Prisma):** se extendió `Conductor` con datos de RH (CURP, RFC, NSS, fecha de nacimiento, tipo de sangre, dirección, número de empleado, puesto, fecha de ingreso, categoría de licencia SCT, contacto de emergencia) y se agregaron **9 entidades nuevas** + enums: `ExamenMedicoConductor`, `CertificacionConductor`, `CapacitacionConductor`, `IncidenciaConductor` (vinculable a `Viaje`), `EventoLaboralConductor`, `AptitudUnidadConductor` (único por tipo de unidad), `ControlConfianzaConductor`, `EvaluacionDesempenoConductor`, `AusenciaConductor`. Migración `expediente_conductor` aplicada (sin pérdida de datos).
+
+**Secciones (pestañas del expediente):** Datos/RH · Documentación (enum ampliado: INE, CURP, RFC, comprobante, constancia fiscal, contrato, alta IMSS) · Médico (análisis continuo) · Certificaciones · Capacitaciones · Control de confianza · Aptitud por unidad · Incidencias (incl. reconocimientos) · Evaluaciones con KPIs · Progreso (línea de tiempo) · Ausencias/incapacidades.
+
+**API:** cada sección es un módulo NestJS independiente (`presentation/http/conductores/expediente/<seccion>`) con su use case, DTOs (class-validator) y controller bajo `conductores/:conductorId/...`, protegido con `JwtAuthGuard + AdminGuard`, agrupados en `ExpedienteModule`. **Web:** página `/conductores/[id]` con pestañas (shadcn Tabs), una pestaña CRUD por sección (TanStack Query), enlazada desde la lista de conductores.
+
+**Verificado (en vivo):** `tsc --noEmit` + `nest build` + type-check web en verde; las 10 sub-rutas montadas; prueba de humo: login, PATCH de Datos/RH (persistencia de CURP/puesto/categoría), POST/GET en médico/certificaciones/incidencias/evaluaciones/ausencias, **409** por duplicado de aptitud (unique), **400** por enum inválido y **401** sin token. Página del expediente compila y responde 200.
+
+**Pendiente (follow-up):** integrar los vencimientos de médico/certificaciones/control de confianza al centro de alertas (BullMQ); subida real de archivos (MinIO) para los `*Key`.
+
 ---
 
 ## Riesgos técnicos
