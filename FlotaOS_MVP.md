@@ -449,6 +449,7 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - [ ] Historial de liquidaciones del conductor
 - [ ] Push notifications FCM (si feedback lo justifica)
 - [ ] Panel de administración propio para gestionar instancias de clientes
+- [ ] **Observabilidad — logging estructurado de errores + Seq:** servidor de logs **Seq** (`datalust/seq`) como servicio en `docker-compose` (una instancia compartida o por cliente), e integración en NestJS con un logger estructurado (p. ej. Pino/Winston) + **filtro global de excepciones** que envíe errores y eventos a Seq. Configurable por env (`SEQ_SERVER_URL`/API key) y tolerante a Seq caído (no debe tumbar el sistema, igual que el SMTP). Permite buscar/diagnosticar errores en producción por instancia.
 
 ---
 
