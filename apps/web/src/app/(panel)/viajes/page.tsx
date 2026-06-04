@@ -121,16 +121,16 @@ export default function ViajesPage() {
               <TableHead className="text-xs uppercase text-muted-foreground">
                 Folio / Cliente
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Ruta
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">
                 Conductor
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">
                 Unidad
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Fecha
               </TableHead>
               <TableHead className="text-xs uppercase text-muted-foreground">
@@ -181,7 +181,7 @@ export default function ViajesPage() {
                   </TableCell>
 
                   {/* Ruta: origen → destino */}
-                  <TableCell className="max-w-xs">
+                  <TableCell className="hidden md:table-cell max-w-xs">
                     <div className="flex flex-col gap-0.5 text-sm">
                       <span className="truncate font-medium" title={v.origenDireccion}>
                         {v.origenDireccion}
@@ -194,7 +194,7 @@ export default function ViajesPage() {
                   </TableCell>
 
                   {/* Conductor */}
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {v.conductor ? (
                       <CeldaPrincipal
                         titulo={v.conductor.nombre}
@@ -206,7 +206,7 @@ export default function ViajesPage() {
                   </TableCell>
 
                   {/* Unidad */}
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {v.unidad ? (
                       <CeldaPrincipal
                         titulo={v.unidad.placas}
@@ -218,7 +218,7 @@ export default function ViajesPage() {
                   </TableCell>
 
                   {/* Fecha programada (o creación como fallback) */}
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex flex-col">
                       <Fecha iso={v.fechaProgramada ?? v.createdAt} />
                       {v.fechaProgramada && (

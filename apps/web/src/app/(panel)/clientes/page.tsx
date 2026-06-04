@@ -126,7 +126,7 @@ export default function ClientesPage() {
               <TableHead className="text-xs uppercase text-muted-foreground">
                 Teléfono
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Dirección
               </TableHead>
               <TableHead className="w-[60px] text-right text-xs uppercase text-muted-foreground">
@@ -175,7 +175,7 @@ export default function ClientesPage() {
                   <TableCell>{cliente.contactoTelefono || '—'}</TableCell>
 
                   {/* Dirección */}
-                  <TableCell className="max-w-[200px] truncate">
+                  <TableCell className="hidden md:table-cell max-w-[200px] truncate">
                     {cliente.direccion || '—'}
                   </TableCell>
 

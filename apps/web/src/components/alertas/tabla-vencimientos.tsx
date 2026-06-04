@@ -55,7 +55,7 @@ export function TablaVencimientos({ items }: { items: VencimientoAlerta[] }) {
             <TableHead className="text-xs uppercase text-muted-foreground">
               Tipo
             </TableHead>
-            <TableHead className="text-xs uppercase text-muted-foreground">
+            <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
               Documento
             </TableHead>
             <TableHead className="text-xs uppercase text-muted-foreground">
@@ -94,7 +94,7 @@ export function TablaVencimientos({ items }: { items: VencimientoAlerta[] }) {
               </TableCell>
 
               {/* Documento (catálogo) */}
-              <TableCell>
+              <TableCell className="hidden md:table-cell">
                 <CatalogoTexto
                   grupo={
                     item.tipo === 'unidad'

@@ -361,11 +361,11 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Periodo</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Puntuación</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Puntualidad</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Combustible (km/L)</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Rutas</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Incid.</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Viajes</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Puntualidad</TableHead>
+                <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">Combustible (km/L)</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Rutas</TableHead>
+                <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">Incid.</TableHead>
+                <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">Viajes</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -389,23 +389,23 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
                         '—'
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {toNum(ev.puntualidad) !== undefined
                         ? toNum(ev.puntualidad)!.toFixed(1)
                         : '—'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {toNum(ev.consumoCombustible) !== undefined
                         ? toNum(ev.consumoCombustible)!.toFixed(2)
                         : '—'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {toNum(ev.cumplimientoRutas) !== undefined
                         ? toNum(ev.cumplimientoRutas)!.toFixed(1)
                         : '—'}
                     </TableCell>
-                    <TableCell>{ev.incidenciasPeriodo ?? '—'}</TableCell>
-                    <TableCell>{ev.viajesCompletados ?? '—'}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{ev.incidenciasPeriodo ?? '—'}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{ev.viajesCompletados ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button

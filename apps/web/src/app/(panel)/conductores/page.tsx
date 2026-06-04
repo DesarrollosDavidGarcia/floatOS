@@ -150,10 +150,10 @@ export default function ConductoresPage() {
               <TableHead className="text-xs uppercase text-muted-foreground">
                 Conductor
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Contacto
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">
                 Licencia
               </TableHead>
               <TableHead className="text-xs uppercase text-muted-foreground">
@@ -214,7 +214,7 @@ export default function ConductoresPage() {
                   </TableCell>
 
                   {/* Contacto */}
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex flex-col">
                       <span>{c.telefono ?? '—'}</span>
                       {c.email && (
@@ -226,7 +226,7 @@ export default function ConductoresPage() {
                   </TableCell>
 
                   {/* Licencia */}
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {c.categoriaLicencia ? (
                       <Badge variant="outline">
                         <CatalogoTexto

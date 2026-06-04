@@ -380,8 +380,8 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Curso</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Horas</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Calificación</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Horas</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Calificación</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Aprobado</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
@@ -395,8 +395,8 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
                       subtitulo={unirSub(cap.institucion, cap.instructor)}
                     />
                   </TableCell>
-                  <TableCell>{cap.horas ?? '—'}</TableCell>
-                  <TableCell>{cap.calificacion ?? '—'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{cap.horas ?? '—'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{cap.calificacion ?? '—'}</TableCell>
                   <TableCell>
                     {cap.aprobado === true ? (
                       <Badge variant="default">Sí</Badge>

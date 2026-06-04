@@ -309,8 +309,8 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Examen</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Resultado</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Fecha</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Vigencia</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Fecha</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Vigencia</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -326,10 +326,10 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
                   <TableCell>
                     <CatalogoBadge grupo="RESULTADO_EXAMEN" codigo={examen.resultado} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <Fecha iso={examen.fechaExamen} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <Vigencia iso={examen.fechaVencimiento} />
                   </TableCell>
                   <TableCell className="text-right">

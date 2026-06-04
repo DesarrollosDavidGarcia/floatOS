@@ -273,7 +273,7 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Tipo</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Periodo</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Días</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Días</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -293,7 +293,7 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
                   <TableCell>
                     <RangoFechas inicio={ausencia.fechaInicio} fin={ausencia.fechaFin} />
                   </TableCell>
-                  <TableCell>{ausencia.dias ?? '—'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{ausencia.dias ?? '—'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button

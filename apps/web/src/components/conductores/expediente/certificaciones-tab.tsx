@@ -256,7 +256,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Certificación</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Folio</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Folio</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Vigencia</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
@@ -275,7 +275,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
                       }
                     />
                   </TableCell>
-                  <TableCell>{cert.folio ?? '—'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{cert.folio ?? '—'}</TableCell>
                   <TableCell>
                     <Vigencia iso={cert.fechaVencimiento} />
                   </TableCell>

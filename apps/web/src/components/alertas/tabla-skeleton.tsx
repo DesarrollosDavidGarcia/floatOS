@@ -7,7 +7,7 @@ export function TablaVencimientosSkeleton() {
       <div className="flex h-9 items-center gap-4 border-b px-4">
         <Skeleton className="h-3 w-20" />
         <Skeleton className="h-3 w-12" />
-        <Skeleton className="h-3 w-24" />
+        <Skeleton className="hidden md:table-cell h-3 w-24" />
         <Skeleton className="ml-auto h-3 w-28" />
       </div>
       {/* data rows */}
@@ -21,7 +21,7 @@ export function TablaVencimientosSkeleton() {
           {/* tipo badge */}
           <Skeleton className="h-5 w-20 shrink-0 rounded-full" />
           {/* documento */}
-          <Skeleton className="h-4 w-32 shrink-0" />
+          <Skeleton className="hidden md:table-cell h-4 w-32 shrink-0" />
           {/* vigencia (badge + fecha) */}
           <div className="ml-auto flex flex-col items-end gap-1">
             <Skeleton className="h-5 w-24 rounded-full" />

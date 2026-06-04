@@ -127,13 +127,13 @@ export default function FlotaPage() {
               <TableHead className="text-xs uppercase text-muted-foreground">
                 Unidad
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">
                 Año
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Capacidad (kg)
               </TableHead>
-              <TableHead className="text-xs uppercase text-muted-foreground">
+              <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Aseguradora
               </TableHead>
               <TableHead className="text-xs uppercase text-muted-foreground">
@@ -188,17 +188,17 @@ export default function FlotaPage() {
                   </TableCell>
 
                   {/* Año */}
-                  <TableCell>{u.anio ?? '—'}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{u.anio ?? '—'}</TableCell>
 
                   {/* Capacidad */}
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     {u.capacidadKg != null
                       ? u.capacidadKg.toLocaleString('es-MX')
                       : '—'}
                   </TableCell>
 
                   {/* Aseguradora */}
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     {u.aseguradora ? (
                       <CatalogoTexto grupo="ASEGURADORA" codigo={u.aseguradora} />
                     ) : (

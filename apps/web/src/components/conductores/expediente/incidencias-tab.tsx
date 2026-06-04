@@ -365,9 +365,9 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Incidencia</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Gravedad</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Fecha</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Costo</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Resuelta</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Fecha</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Costo</TableHead>
+                <TableHead className="hidden lg:table-cell text-xs uppercase text-muted-foreground">Resuelta</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -388,9 +388,9 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
                   <TableCell>
                     <CatalogoBadge grupo="GRAVEDAD_INCIDENCIA" codigo={inc.gravedad} />
                   </TableCell>
-                  <TableCell><Fecha iso={inc.fecha} /></TableCell>
-                  <TableCell><Dinero value={inc.costoEstimado} /></TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell"><Fecha iso={inc.fecha} /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Dinero value={inc.costoEstimado} /></TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     <Badge variant={inc.resuelta ? 'outline' : 'secondary'}>
                       {inc.resuelta ? 'Sí' : 'No'}
                     </Badge>

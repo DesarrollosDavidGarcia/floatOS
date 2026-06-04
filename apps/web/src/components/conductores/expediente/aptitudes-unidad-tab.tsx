@@ -262,7 +262,7 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Unidad</TableHead>
                 <TableHead className="text-xs uppercase text-muted-foreground">Nivel</TableHead>
-                <TableHead className="text-xs uppercase text-muted-foreground">Experiencia</TableHead>
+                <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">Experiencia</TableHead>
                 <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -278,7 +278,7 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
                   <TableCell>
                     <CatalogoBadge grupo="NIVEL_APTITUD" codigo={aptitud.nivel} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     {aptitud.aniosExperiencia != null
                       ? `${aptitud.aniosExperiencia} año(s)`
                       : '—'}
