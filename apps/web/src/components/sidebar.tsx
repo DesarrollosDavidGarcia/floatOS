@@ -102,12 +102,3 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     </>
   );
 }
-
-/** Sidebar fijo de escritorio (oculto en móvil; en móvil se usa MobileNav). */
-export function Sidebar() {
-  return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r bg-card md:flex">
-      <SidebarContent />
-    </aside>
-  );
-}

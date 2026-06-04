@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -23,12 +22,9 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
-      </div>
+    <div className="flex min-h-screen flex-col bg-muted/30">
+      <Topbar />
+      <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
     </div>
   );
 }

@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { SidebarContent } from '@/components/sidebar';
 
 /**
- * Navegación móvil: botón hamburguesa (solo < md) que abre el sidebar como un
- * panel deslizante a la izquierda. Se cierra al navegar o tocar el fondo.
+ * Navegación principal: botón hamburguesa (en todos los tamaños) que abre el
+ * sidebar como un panel deslizante a la izquierda. Se cierra al navegar o
+ * tocar el fondo.
  */
 export function MobileNav() {
   const [open, setOpen] = useState(false);
@@ -34,7 +35,6 @@ export function MobileNav() {
       <Button
         variant="ghost"
         size="icon"
-        className="md:hidden"
         onClick={() => setOpen(true)}
         aria-label="Abrir menú"
       >
@@ -42,7 +42,7 @@ export function MobileNav() {
       </Button>
 
       {open && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
           <div
             className="absolute inset-0 bg-black/50 animate-in fade-in"
             onClick={() => setOpen(false)}
