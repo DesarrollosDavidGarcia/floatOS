@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoEventoLaboral } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
@@ -17,20 +16,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 interface EventoLaboral {
   id: string;
   conductorId: string;
-  tipo: TipoEventoLaboral;
+  tipo: string;
   titulo: string;
   descripcion?: string | null;
   puestoNuevo?: string | null;
@@ -38,34 +32,6 @@ interface EventoLaboral {
   registradoPor?: string | null;
   creadoEn: string;
 }
-
-// ── Labels ─────────────────────────────────────────────────────────────────────
-
-const TIPO_EVENTO_LABEL: Record<TipoEventoLaboral, string> = {
-  [TipoEventoLaboral.INGRESO]: 'Ingreso',
-  [TipoEventoLaboral.ASCENSO]: 'Ascenso',
-  [TipoEventoLaboral.CAMBIO_PUESTO]: 'Cambio de puesto',
-  [TipoEventoLaboral.CAMBIO_SALARIO]: 'Cambio de salario',
-  [TipoEventoLaboral.AMONESTACION]: 'Amonestación',
-  [TipoEventoLaboral.RECONOCIMIENTO]: 'Reconocimiento',
-  [TipoEventoLaboral.BAJA]: 'Baja',
-  [TipoEventoLaboral.OTRO]: 'Otro',
-};
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
-
-const TIPO_EVENTO_VARIANT: Record<TipoEventoLaboral, BadgeVariant> = {
-  [TipoEventoLaboral.INGRESO]: 'default',
-  [TipoEventoLaboral.ASCENSO]: 'default',
-  [TipoEventoLaboral.CAMBIO_PUESTO]: 'secondary',
-  [TipoEventoLaboral.CAMBIO_SALARIO]: 'secondary',
-  [TipoEventoLaboral.AMONESTACION]: 'destructive',
-  [TipoEventoLaboral.RECONOCIMIENTO]: 'default',
-  [TipoEventoLaboral.BAJA]: 'destructive',
-  [TipoEventoLaboral.OTRO]: 'outline',
-};
-
-const TIPOS = Object.values(TipoEventoLaboral);
 
 // ── Utils ──────────────────────────────────────────────────────────────────────
 
@@ -77,7 +43,7 @@ function isoADate(iso?: string | null): string {
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoEventoLaboral),
+  tipo: z.string().min(1, 'Requerido'),
   titulo: z.string().min(1, 'El título es obligatorio'),
   fecha: z.string().min(1, 'La fecha es obligatoria'),
   descripcion: z.string().trim().optional(),
@@ -111,7 +77,7 @@ function EventoLaboralForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: evento?.tipo ?? TipoEventoLaboral.INGRESO,
+      tipo: evento?.tipo ?? '',
       titulo: evento?.titulo ?? '',
       fecha: isoADate(evento?.fecha),
       descripcion: evento?.descripcion ?? '',
@@ -122,7 +88,7 @@ function EventoLaboralForm({
 
   useEffect(() => {
     reset({
-      tipo: evento?.tipo ?? TipoEventoLaboral.INGRESO,
+      tipo: evento?.tipo ?? '',
       titulo: evento?.titulo ?? '',
       fecha: isoADate(evento?.fecha),
       descripcion: evento?.descripcion ?? '',
@@ -174,21 +140,15 @@ function EventoLaboralForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_EVENTO_LABORAL"
             value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoEventoLaboral)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_EVENTO_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona…"
+          />
+          {errors.tipo && (
+            <p className="text-sm text-destructive">{errors.tipo.message}</p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="titulo">Título</Label>
@@ -317,8 +277,8 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
                       <time className="text-xs text-muted-foreground whitespace-nowrap">
                         {format(new Date(evento.fecha), 'dd MMM yyyy', { locale: es })}
                       </time>
-                      <Badge variant={TIPO_EVENTO_VARIANT[evento.tipo]}>
-                        {TIPO_EVENTO_LABEL[evento.tipo]}
+                      <Badge variant="secondary">
+                        <CatalogoTexto grupo="TIPO_EVENTO_LABORAL" codigo={evento.tipo} />
                       </Badge>
                     </div>
                     <p className="text-sm font-medium leading-snug">{evento.titulo}</p>

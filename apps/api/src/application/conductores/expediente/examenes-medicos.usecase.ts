@@ -3,12 +3,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ExamenMedicoConductor, Prisma } from '@prisma/client';
-import { TipoExamenMedico, ResultadoExamen } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 
 export interface CrearExamenMedicoInput {
-  tipo: TipoExamenMedico;
-  resultado?: ResultadoExamen;
+  tipo: string;
+  resultado?: string;
   fechaExamen: string;
   fechaVencimiento?: string;
   institucion?: string;
@@ -18,8 +17,8 @@ export interface CrearExamenMedicoInput {
 }
 
 export interface ActualizarExamenMedicoInput {
-  tipo?: TipoExamenMedico;
-  resultado?: ResultadoExamen;
+  tipo?: string;
+  resultado?: string;
   fechaExamen?: string;
   fechaVencimiento?: string;
   institucion?: string;

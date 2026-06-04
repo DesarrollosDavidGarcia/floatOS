@@ -182,6 +182,29 @@ enum EstadoFactura {
   CANCELADA
 }
 
+// ──────────────────────────── Catálogos ──────────────────────────
+
+/// Catálogo genérico autoadministrable. Los campos de "tipo/categoría" del
+/// sistema guardan el `codigo` de un item de su `grupo` (p. ej. grupo
+/// 'TIPO_EXAMEN_MEDICO'). Los estados con lógica de negocio (EstadoViaje,
+/// EstadoCartaPorte, EstadoFactura) siguen como enum. Los enums restantes
+/// quedan como tipos legados sin uso; la fuente de verdad es esta tabla.
+model CatalogoItem {
+  id        String   @id @default(cuid())
+  grupo     String   // p. ej. 'TIPO_EXAMEN_MEDICO', 'CATEGORIA_LICENCIA'
+  codigo    String   // estable; es lo que se guarda en las demás tablas
+  nombre    String   // etiqueta visible
+  orden     Int      @default(0)
+  color     String?  // variante de badge (success, destructive, secondary, outline…)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([grupo, codigo])
+  @@index([grupo])
+  @@map("catalogo_items")
+}
+
 // ──────────────────────────── Usuarios ───────────────────────────
 
 /// Admin del panel web (dueño de la flotilla). Una instancia = un admin (MVP).
@@ -223,7 +246,7 @@ model Conductor {
   numeroEmpleado      String?            @unique
   puesto              String?
   fechaIngreso        DateTime?
-  categoriaLicencia   CategoriaLicencia?
+  categoriaLicencia   String?            // catálogo CATEGORIA_LICENCIA
   // Contacto de emergencia
   emergenciaNombre    String?
   emergenciaTelefono  String?
@@ -274,7 +297,7 @@ model Unidad {
 model DocumentoUnidad {
   id              String              @id @default(cuid())
   unidadId        String
-  tipo            TipoDocumentoUnidad
+  tipo            String              // catálogo TIPO_DOCUMENTO_UNIDAD
   descripcion     String?
   fechaEmision    DateTime?
   fechaVencimiento DateTime
@@ -292,7 +315,7 @@ model DocumentoUnidad {
 model DocumentoConductor {
   id              String                 @id @default(cuid())
   conductorId     String
-  tipo            TipoDocumentoConductor
+  tipo            String                 // catálogo TIPO_DOCUMENTO_CONDUCTOR
   numero          String?
   fechaEmision    DateTime?
   fechaVencimiento DateTime
@@ -313,8 +336,8 @@ model DocumentoConductor {
 model ExamenMedicoConductor {
   id              String           @id @default(cuid())
   conductorId     String
-  tipo            TipoExamenMedico
-  resultado       ResultadoExamen  @default(PENDIENTE)
+  tipo            String           // catálogo TIPO_EXAMEN_MEDICO
+  resultado       String           @default("PENDIENTE") // catálogo RESULTADO_EXAMEN
   fechaExamen     DateTime
   fechaVencimiento DateTime?       // p. ej. aptitud psicofísica vigente 2 años
   institucion     String?          // clínica / laboratorio
@@ -335,7 +358,7 @@ model ExamenMedicoConductor {
 model CertificacionConductor {
   id              String            @id @default(cuid())
   conductorId     String
-  tipo            TipoCertificacion
+  tipo            String            // catálogo TIPO_CERTIFICACION
   nombre          String
   emisor          String?
   folio           String?
@@ -380,8 +403,8 @@ model IncidenciaConductor {
   id            String             @id @default(cuid())
   conductorId   String
   viajeId       String?            // vínculo opcional al viaje donde ocurrió
-  tipo          TipoIncidencia
-  gravedad      GravedadIncidencia @default(MEDIA)
+  tipo          String             // catálogo TIPO_INCIDENCIA
+  gravedad      String             @default("MEDIA") // catálogo GRAVEDAD_INCIDENCIA
   titulo        String
   descripcion   String?
   fecha         DateTime
@@ -405,7 +428,7 @@ model IncidenciaConductor {
 model EventoLaboralConductor {
   id            String            @id @default(cuid())
   conductorId   String
-  tipo          TipoEventoLaboral
+  tipo          String            // catálogo TIPO_EVENTO_LABORAL
   titulo        String
   descripcion   String?
   puestoNuevo   String?
@@ -423,8 +446,8 @@ model EventoLaboralConductor {
 model AptitudUnidadConductor {
   id              String           @id @default(cuid())
   conductorId     String
-  tipoUnidad      TipoUnidadManejo
-  nivel           NivelAptitud     @default(INTERMEDIO)
+  tipoUnidad      String           // catálogo TIPO_UNIDAD_MANEJO
+  nivel           String           @default("INTERMEDIO") // catálogo NIVEL_APTITUD
   aniosExperiencia Int?
   notas           String?
   createdAt       DateTime         @default(now())
@@ -441,8 +464,8 @@ model AptitudUnidadConductor {
 model ControlConfianzaConductor {
   id              String               @id @default(cuid())
   conductorId     String
-  tipo            TipoControlConfianza
-  resultado       ResultadoExamen      @default(PENDIENTE)
+  tipo            String               // catálogo TIPO_CONTROL_CONFIANZA
+  resultado       String               @default("PENDIENTE") // catálogo RESULTADO_EXAMEN
   institucion     String?
   folio           String?
   fechaEvaluacion DateTime
@@ -487,7 +510,7 @@ model EvaluacionDesempenoConductor {
 model AusenciaConductor {
   id            String       @id @default(cuid())
   conductorId   String
-  tipo          TipoAusencia
+  tipo          String       // catálogo TIPO_AUSENCIA
   fechaInicio   DateTime
   fechaFin      DateTime?
   dias          Int?
@@ -616,7 +639,7 @@ model UbicacionConductor {
 model GastoViaje {
   id           String    @id @default(cuid())
   viajeId      String
-  tipo         TipoGasto
+  tipo         String    // catálogo TIPO_GASTO
   monto        Decimal   @db.Decimal(10, 2)
   descripcion  String?
   fotoTicketKey String?  // objeto en MinIO

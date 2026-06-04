@@ -3,12 +3,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ControlConfianzaConductor, Prisma } from '@prisma/client';
-import { TipoControlConfianza, ResultadoExamen } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 
 export interface CrearControlConfianzaInput {
-  tipo: TipoControlConfianza;
-  resultado?: ResultadoExamen;
+  tipo: string;
+  resultado?: string;
   institucion?: string;
   folio?: string;
   fechaEvaluacion: string;
@@ -18,8 +17,8 @@ export interface CrearControlConfianzaInput {
 }
 
 export interface ActualizarControlConfianzaInput {
-  tipo?: TipoControlConfianza;
-  resultado?: ResultadoExamen;
+  tipo?: string;
+  resultado?: string;
   institucion?: string;
   folio?: string;
   fechaEvaluacion?: string;

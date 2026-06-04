@@ -1,4 +1,4 @@
-import type { EstadoViaje, TipoDocumentoConductor } from '@flotaos/shared-types';
+import type { EstadoViaje } from '@flotaos/shared-types';
 
 /** Conductor tal como lo devuelve la API (nunca incluye passwordHash). */
 export interface Conductor {
@@ -18,7 +18,7 @@ export interface Conductor {
 export interface DocumentoConductor {
   id: string;
   conductorId: string;
-  tipo: TipoDocumentoConductor;
+  tipo: string; // catálogo TIPO_DOCUMENTO_CONDUCTOR
   numero: string | null;
   fechaEmision: string | null;
   fechaVencimiento: string;
@@ -53,7 +53,7 @@ export interface ConductorFormPayload {
 
 /** Payload para crear/editar un documento. */
 export interface DocumentoFormPayload {
-  tipo: TipoDocumentoConductor;
+  tipo: string;
   numero?: string;
   fechaEmision?: string;
   fechaVencimiento: string;

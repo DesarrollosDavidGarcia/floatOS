@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoAusencia } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
@@ -18,13 +17,6 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -32,13 +24,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 interface AusenciaConductor {
   id: string;
   conductorId: string;
-  tipo: TipoAusencia;
+  tipo: string;
   fechaInicio: string;
   fechaFin?: string | null;
   dias?: number | null;
@@ -50,32 +44,6 @@ interface AusenciaConductor {
   actualizadoEn: string;
 }
 
-// ── Labels ─────────────────────────────────────────────────────────────────────
-
-const TIPO_AUSENCIA_LABEL: Record<TipoAusencia, string> = {
-  [TipoAusencia.INCAPACIDAD_IMSS]: 'Incapacidad IMSS',
-  [TipoAusencia.VACACIONES]: 'Vacaciones',
-  [TipoAusencia.PERMISO_CON_GOCE]: 'Permiso con goce',
-  [TipoAusencia.PERMISO_SIN_GOCE]: 'Permiso sin goce',
-  [TipoAusencia.FALTA_JUSTIFICADA]: 'Falta justificada',
-  [TipoAusencia.FALTA_INJUSTIFICADA]: 'Falta injustificada',
-  [TipoAusencia.OTRO]: 'Otro',
-};
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
-
-const TIPO_AUSENCIA_VARIANT: Record<TipoAusencia, BadgeVariant> = {
-  [TipoAusencia.INCAPACIDAD_IMSS]: 'destructive',
-  [TipoAusencia.VACACIONES]: 'default',
-  [TipoAusencia.PERMISO_CON_GOCE]: 'secondary',
-  [TipoAusencia.PERMISO_SIN_GOCE]: 'secondary',
-  [TipoAusencia.FALTA_JUSTIFICADA]: 'secondary',
-  [TipoAusencia.FALTA_INJUSTIFICADA]: 'destructive',
-  [TipoAusencia.OTRO]: 'secondary',
-};
-
-const TIPOS = Object.values(TipoAusencia);
-
 // ── Utils ──────────────────────────────────────────────────────────────────────
 
 function isoADate(iso?: string | null): string {
@@ -86,7 +54,7 @@ function isoADate(iso?: string | null): string {
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoAusencia),
+  tipo: z.string().min(1, 'Requerido'),
   fechaInicio: z.string().min(1, 'La fecha de inicio es obligatoria'),
   fechaFin: z.string().optional(),
   dias: z.string().optional(),
@@ -122,7 +90,7 @@ function AusenciaForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: ausencia?.tipo ?? TipoAusencia.VACACIONES,
+      tipo: ausencia?.tipo ?? '',
       fechaInicio: isoADate(ausencia?.fechaInicio),
       fechaFin: isoADate(ausencia?.fechaFin),
       dias: ausencia?.dias != null ? String(ausencia.dias) : '',
@@ -135,7 +103,7 @@ function AusenciaForm({
 
   useEffect(() => {
     reset({
-      tipo: ausencia?.tipo ?? TipoAusencia.VACACIONES,
+      tipo: ausencia?.tipo ?? '',
       fechaInicio: isoADate(ausencia?.fechaInicio),
       fechaFin: isoADate(ausencia?.fechaFin),
       dias: ausencia?.dias != null ? String(ausencia.dias) : '',
@@ -195,21 +163,15 @@ function AusenciaForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_AUSENCIA"
             value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoAusencia)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_AUSENCIA_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona…"
+          />
+          {errors.tipo && (
+            <p className="text-sm text-destructive">{errors.tipo.message}</p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="dias">Días</Label>
@@ -340,8 +302,8 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
               {data.map((ausencia) => (
                 <TableRow key={ausencia.id}>
                   <TableCell>
-                    <Badge variant={TIPO_AUSENCIA_VARIANT[ausencia.tipo]}>
-                      {TIPO_AUSENCIA_LABEL[ausencia.tipo]}
+                    <Badge variant="secondary">
+                      <CatalogoTexto grupo="TIPO_AUSENCIA" codigo={ausencia.tipo} />
                     </Badge>
                   </TableCell>
                   <TableCell>

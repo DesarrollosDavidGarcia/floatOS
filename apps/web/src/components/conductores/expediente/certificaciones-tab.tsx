@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoCertificacion } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
@@ -16,13 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -40,13 +32,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
 interface CertificacionConductor {
   id: string;
   conductorId: string;
-  tipo: TipoCertificacion;
+  tipo: string;
   nombre: string;
   emisor: string | null;
   folio: string | null;
@@ -56,20 +50,6 @@ interface CertificacionConductor {
   createdAt: string;
   updatedAt: string;
 }
-
-// ── etiquetas ──────────────────────────────────────────────────────────────────
-
-const TIPO_CERTIFICACION_LABEL: Record<TipoCertificacion, string> = {
-  [TipoCertificacion.MATERIALES_PELIGROSOS]: 'Materiales peligrosos',
-  [TipoCertificacion.RESIDUOS_PELIGROSOS]: 'Residuos peligrosos',
-  [TipoCertificacion.MANEJO_DEFENSIVO]: 'Manejo defensivo',
-  [TipoCertificacion.PRIMEROS_AUXILIOS]: 'Primeros auxilios',
-  [TipoCertificacion.CAAT]: 'CAAT',
-  [TipoCertificacion.MERCANCIAS_PELIGROSAS_SCT]: 'Mercancías peligrosas SCT',
-  [TipoCertificacion.OTRO]: 'Otro',
-};
-
-const TIPOS = Object.values(TipoCertificacion);
 
 // ── badge de vencimiento ───────────────────────────────────────────────────────
 
@@ -112,7 +92,7 @@ function isoADate(iso?: string | null): string {
 // ── schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoCertificacion),
+  tipo: z.string().min(1, 'Requerido'),
   nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
   emisor: z.string().trim().optional(),
   folio: z.string().trim().optional(),
@@ -146,7 +126,7 @@ function CertificacionForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: certificacion?.tipo ?? TipoCertificacion.OTRO,
+      tipo: certificacion?.tipo ?? '',
       nombre: certificacion?.nombre ?? '',
       emisor: certificacion?.emisor ?? '',
       folio: certificacion?.folio ?? '',
@@ -157,7 +137,7 @@ function CertificacionForm({
 
   useEffect(() => {
     reset({
-      tipo: certificacion?.tipo ?? TipoCertificacion.OTRO,
+      tipo: certificacion?.tipo ?? '',
       nombre: certificacion?.nombre ?? '',
       emisor: certificacion?.emisor ?? '',
       folio: certificacion?.folio ?? '',
@@ -213,21 +193,15 @@ function CertificacionForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_CERTIFICACION"
             value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoCertificacion)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_CERTIFICACION_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona…"
+          />
+          {errors.tipo && (
+            <p className="text-sm text-destructive">{errors.tipo.message}</p>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="nombre">Nombre</Label>
@@ -355,7 +329,9 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
                 const badge = vencimientoBadge(cert.fechaVencimiento);
                 return (
                   <TableRow key={cert.id}>
-                    <TableCell>{TIPO_CERTIFICACION_LABEL[cert.tipo]}</TableCell>
+                    <TableCell>
+                      <CatalogoTexto grupo="TIPO_CERTIFICACION" codigo={cert.tipo} />
+                    </TableCell>
                     <TableCell>{cert.nombre}</TableCell>
                     <TableCell>{cert.emisor ?? '—'}</TableCell>
                     <TableCell>{cert.folio ?? '—'}</TableCell>

@@ -3,11 +3,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventoLaboralConductor, Prisma } from '@prisma/client';
-import { TipoEventoLaboral } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 
 export interface CrearEventoLaboralInput {
-  tipo: TipoEventoLaboral;
+  tipo: string;
   titulo: string;
   descripcion?: string;
   puestoNuevo?: string;
@@ -16,7 +15,7 @@ export interface CrearEventoLaboralInput {
 }
 
 export interface ActualizarEventoLaboralInput {
-  tipo?: TipoEventoLaboral;
+  tipo?: string;
   titulo?: string;
   descripcion?: string;
   puestoNuevo?: string;

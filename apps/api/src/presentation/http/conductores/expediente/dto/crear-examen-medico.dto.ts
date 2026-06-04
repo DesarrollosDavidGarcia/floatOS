@@ -1,17 +1,12 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TipoExamenMedico, ResultadoExamen } from '@flotaos/shared-types';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CrearExamenMedicoDto {
-  @IsEnum(TipoExamenMedico, {
-    message: 'El tipo de examen médico no es válido',
-  })
-  tipo!: TipoExamenMedico;
+  @IsString()
+  tipo!: string;
 
   @IsOptional()
-  @IsEnum(ResultadoExamen, {
-    message: 'El resultado del examen no es válido',
-  })
-  resultado?: ResultadoExamen;
+  @IsString()
+  resultado?: string;
 
   @IsDateString({}, { message: 'La fecha del examen no es válida' })
   fechaExamen!: string;

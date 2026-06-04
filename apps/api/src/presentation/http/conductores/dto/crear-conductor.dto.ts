@@ -1,13 +1,11 @@
 import {
   IsDateString,
   IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
-import { CategoriaLicencia } from '@flotaos/shared-types';
 
 export class CrearConductorDto {
   @IsString()
@@ -73,8 +71,8 @@ export class CrearConductorDto {
   fechaIngreso?: string;
 
   @IsOptional()
-  @IsEnum(CategoriaLicencia)
-  categoriaLicencia?: CategoriaLicencia;
+  @IsString()
+  categoriaLicencia?: string;
 
   @IsOptional()
   @IsString()

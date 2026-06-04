@@ -561,6 +561,18 @@ Se amplió el módulo de conductores a un **expediente formal** de 11 secciones,
 
 **Pendiente (follow-up):** integrar los vencimientos de médico/certificaciones/control de confianza al centro de alertas (BullMQ); subida real de archivos (MinIO) para los `*Key`.
 
+### 2026-06-04 — Catálogos autoadministrables (multiagente) ✅
+
+Se reemplazaron los dropdowns de **enums fijos** por un **catálogo genérico administrable** desde el panel, para que las opciones de tipo/categoría no requieran tocar código. **Verificado en vivo**: agregar una opción y usarla de inmediato en un registro real (201, sin rechazo de validación).
+
+**Datos:** modelo `CatalogoItem` (grupo, codigo, nombre, orden, color, activo; único por grupo+codigo). Migración que convierte ~14 columnas `enum → TEXT` **preservando datos** (`ALTER ... TYPE TEXT USING`, escrita a mano porque el `migrate diff` de Prisma generaba un `DROP/ADD` destructivo). Los **estados con lógica** (`EstadoViaje`, `EstadoCartaPorte`, `EstadoFactura`) siguen como enum. Seed idempotente: **117 items en 18 grupos** (con `color` para resultado/gravedad/nivel).
+
+**API:** `CatalogosModule` — `GET /catalogos/grupos`, `GET /catalogos/:grupo` (con `?soloActivos`), `POST/PATCH/DELETE`, `AdminGuard`, 409 por código duplicado. Los DTOs de los campos afectados pasaron de `@IsEnum` a `@IsString` (clave para aceptar valores nuevos del catálogo).
+
+**Web:** pantalla **Catálogos** (`/catalogos`, en el sidebar) que administra los 18 grupos. Piezas reutilizables: hook `useCatalogo(grupo)`, `<CatalogoSelect>` (dropdown), `<CatalogoTexto>`/`<CatalogoBadge>` (etiqueta/color desde BD). Se recablearon ~13 dropdowns (expediente, datos/RH —incl. puesto y tipo de sangre que eran texto libre—, flota: tipo de unidad, aseguradora, documentos de unidad).
+
+**Verificado:** `tsc` (API y web) + `nest build` en verde; migración con diff vacío posterior (BD == schema) y datos intactos; smoke en vivo: 18 grupos, alta de item nuevo (201), duplicado (409), y uso del código nuevo en un examen real (201). Páginas `/catalogos`, `/conductores/[id]`, `/flota` sirviendo 200.
+
 ---
 
 ## Riesgos técnicos

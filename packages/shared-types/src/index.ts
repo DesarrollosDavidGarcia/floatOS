@@ -173,6 +173,55 @@ export enum EstadoFactura {
   CANCELADA = 'CANCELADA',
 }
 
+// ── Catálogos (autoadministrables) ──
+// Los campos de tipo/categoría guardan el `codigo` de un item del catálogo.
+// Los estados con lógica (EstadoViaje/CartaPorte/Factura) NO son catálogo.
+
+export interface CatalogoItem {
+  id: string;
+  grupo: string;
+  codigo: string;
+  nombre: string;
+  orden: number;
+  color: string | null;
+  activo: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CatalogoGrupoMeta {
+  /** Clave técnica del grupo (lo que se guarda en `CatalogoItem.grupo`). */
+  grupo: string;
+  /** Nombre visible del grupo en la pantalla de Catálogos. */
+  nombre: string;
+  /** Si true, sus items usan el campo `color` (badges configurables). */
+  coloreable?: boolean;
+}
+
+/** Grupos de catálogo administrables desde el panel. */
+export const CATALOGO_GRUPOS: CatalogoGrupoMeta[] = [
+  { grupo: 'TIPO_DOCUMENTO_CONDUCTOR', nombre: 'Tipos de documento (conductor)' },
+  { grupo: 'TIPO_DOCUMENTO_UNIDAD', nombre: 'Tipos de documento (unidad)' },
+  { grupo: 'CATEGORIA_LICENCIA', nombre: 'Categorías de licencia' },
+  { grupo: 'TIPO_EXAMEN_MEDICO', nombre: 'Tipos de examen médico' },
+  { grupo: 'RESULTADO_EXAMEN', nombre: 'Resultados de examen', coloreable: true },
+  { grupo: 'TIPO_CERTIFICACION', nombre: 'Tipos de certificación' },
+  { grupo: 'TIPO_INCIDENCIA', nombre: 'Tipos de incidencia' },
+  { grupo: 'GRAVEDAD_INCIDENCIA', nombre: 'Gravedad de incidencia', coloreable: true },
+  { grupo: 'TIPO_EVENTO_LABORAL', nombre: 'Tipos de evento laboral' },
+  { grupo: 'TIPO_UNIDAD_MANEJO', nombre: 'Tipos de unidad (aptitud)' },
+  { grupo: 'NIVEL_APTITUD', nombre: 'Niveles de aptitud', coloreable: true },
+  { grupo: 'TIPO_CONTROL_CONFIANZA', nombre: 'Tipos de control de confianza' },
+  { grupo: 'TIPO_AUSENCIA', nombre: 'Tipos de ausencia' },
+  { grupo: 'TIPO_GASTO', nombre: 'Tipos de gasto' },
+  { grupo: 'TIPO_UNIDAD', nombre: 'Tipos de unidad (flota)' },
+  { grupo: 'ASEGURADORA', nombre: 'Aseguradoras' },
+  { grupo: 'PUESTO', nombre: 'Puestos' },
+  { grupo: 'TIPO_SANGRE', nombre: 'Tipos de sangre' },
+];
+
+export const CATALOGO_GRUPO_KEYS = CATALOGO_GRUPOS.map((g) => g.grupo);
+
 // ── Eventos de tiempo real (Socket.io) ──
 export const WS_EVENTS = {
   UBICACION_ACTUALIZADA: 'ubicacion:actualizada',

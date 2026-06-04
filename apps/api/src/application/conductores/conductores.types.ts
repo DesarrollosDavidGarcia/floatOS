@@ -1,4 +1,4 @@
-import { CategoriaLicencia, Conductor } from '@prisma/client';
+import { Conductor } from '@prisma/client';
 
 /**
  * Representación pública del Conductor: excluye campos sensibles
@@ -25,7 +25,7 @@ export interface ConductorPublico {
   numeroEmpleado: string | null;
   puesto: string | null;
   fechaIngreso: Date | null;
-  categoriaLicencia: CategoriaLicencia | null;
+  categoriaLicencia: string | null; // catálogo CATEGORIA_LICENCIA
   emergenciaNombre: string | null;
   emergenciaTelefono: string | null;
   emergenciaRelacion: string | null;

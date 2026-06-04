@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoControlConfianza, ResultadoExamen } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
@@ -18,13 +17,6 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -32,14 +24,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto, CatalogoBadge } from '@/components/catalogos/catalogo-badge';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 interface ControlConfianza {
   id: string;
   conductorId: string;
-  tipo: TipoControlConfianza;
-  resultado: ResultadoExamen;
+  tipo: string;
+  resultado: string;
   institucion?: string | null;
   folio?: string | null;
   fechaEvaluacion: string;
@@ -49,36 +43,6 @@ interface ControlConfianza {
   creadoEn: string;
   actualizadoEn: string;
 }
-
-// ── Labels ─────────────────────────────────────────────────────────────────────
-
-const TIPO_CONTROL_LABEL: Record<TipoControlConfianza, string> = {
-  [TipoControlConfianza.EXAMEN_CONFIANZA]: 'Examen de confianza',
-  [TipoControlConfianza.ANTECEDENTES_NO_PENALES]: 'Antecedentes no penales',
-  [TipoControlConfianza.ESTUDIO_SOCIOECONOMICO]: 'Estudio socioeconómico',
-  [TipoControlConfianza.POLIGRAFO]: 'Polígrafo',
-  [TipoControlConfianza.TOXICOLOGICO]: 'Toxicológico',
-  [TipoControlConfianza.OTRO]: 'Otro',
-};
-
-const RESULTADO_LABEL: Record<ResultadoExamen, string> = {
-  [ResultadoExamen.APTO]: 'Apto',
-  [ResultadoExamen.NO_APTO]: 'No apto',
-  [ResultadoExamen.CONDICIONADO]: 'Condicionado',
-  [ResultadoExamen.PENDIENTE]: 'Pendiente',
-};
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
-
-const RESULTADO_VARIANT: Record<ResultadoExamen, BadgeVariant> = {
-  [ResultadoExamen.APTO]: 'default',
-  [ResultadoExamen.NO_APTO]: 'destructive',
-  [ResultadoExamen.CONDICIONADO]: 'secondary',
-  [ResultadoExamen.PENDIENTE]: 'secondary',
-};
-
-const TIPOS = Object.values(TipoControlConfianza);
-const RESULTADOS = Object.values(ResultadoExamen);
 
 // ── Utils ──────────────────────────────────────────────────────────────────────
 
@@ -90,8 +54,8 @@ function isoADate(iso?: string | null): string {
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoControlConfianza),
-  resultado: z.nativeEnum(ResultadoExamen).optional(),
+  tipo: z.string().min(1, 'Requerido'),
+  resultado: z.string().optional(),
   institucion: z.string().trim().optional(),
   folio: z.string().trim().optional(),
   fechaEvaluacion: z.string().min(1, 'La fecha de evaluación es obligatoria'),
@@ -126,8 +90,8 @@ function ControlConfianzaForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: registro?.tipo ?? TipoControlConfianza.EXAMEN_CONFIANZA,
-      resultado: registro?.resultado ?? ResultadoExamen.PENDIENTE,
+      tipo: registro?.tipo ?? '',
+      resultado: registro?.resultado ?? '',
       institucion: registro?.institucion ?? '',
       folio: registro?.folio ?? '',
       fechaEvaluacion: isoADate(registro?.fechaEvaluacion),
@@ -139,8 +103,8 @@ function ControlConfianzaForm({
 
   useEffect(() => {
     reset({
-      tipo: registro?.tipo ?? TipoControlConfianza.EXAMEN_CONFIANZA,
-      resultado: registro?.resultado ?? ResultadoExamen.PENDIENTE,
+      tipo: registro?.tipo ?? '',
+      resultado: registro?.resultado ?? '',
       institucion: registro?.institucion ?? '',
       folio: registro?.folio ?? '',
       fechaEvaluacion: isoADate(registro?.fechaEvaluacion),
@@ -198,39 +162,21 @@ function ControlConfianzaForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_CONTROL_CONFIANZA"
             value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoControlConfianza)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_CONTROL_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona un tipo"
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Resultado</Label>
-          <Select
+          <CatalogoSelect
+            grupo="RESULTADO_EXAMEN"
             value={resultado ?? ''}
-            onValueChange={(v) => setValue('resultado', v as ResultadoExamen)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un resultado" />
-            </SelectTrigger>
-            <SelectContent>
-              {RESULTADOS.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {RESULTADO_LABEL[r]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('resultado', c)}
+            placeholder="Selecciona un resultado"
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="fechaEvaluacion">Fecha de evaluación</Label>
@@ -357,11 +303,11 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
             <TableBody>
               {data.map((registro) => (
                 <TableRow key={registro.id}>
-                  <TableCell>{TIPO_CONTROL_LABEL[registro.tipo]}</TableCell>
                   <TableCell>
-                    <Badge variant={RESULTADO_VARIANT[registro.resultado]}>
-                      {RESULTADO_LABEL[registro.resultado]}
-                    </Badge>
+                    <CatalogoTexto grupo="TIPO_CONTROL_CONFIANZA" codigo={registro.tipo} />
+                  </TableCell>
+                  <TableCell>
+                    <CatalogoBadge grupo="RESULTADO_EXAMEN" codigo={registro.resultado} />
                   </TableCell>
                   <TableCell>
                     {format(new Date(registro.fechaEvaluacion), 'dd MMM yyyy', { locale: es })}

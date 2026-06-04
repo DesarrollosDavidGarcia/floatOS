@@ -5,7 +5,6 @@ import {
 import {
   DocumentoConductor,
   Prisma,
-  TipoDocumentoConductor,
 } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import {
@@ -33,7 +32,7 @@ export interface DocumentoConductorPorVencer extends DocumentoConductor {
 }
 
 export interface CrearDocumentoConductorInput {
-  tipo: TipoDocumentoConductor;
+  tipo: string;
   numero?: string;
   fechaEmision?: string;
   fechaVencimiento: string;
@@ -41,7 +40,7 @@ export interface CrearDocumentoConductorInput {
 }
 
 export interface ActualizarDocumentoConductorInput {
-  tipo?: TipoDocumentoConductor;
+  tipo?: string;
   numero?: string;
   fechaEmision?: string;
   fechaVencimiento?: string;

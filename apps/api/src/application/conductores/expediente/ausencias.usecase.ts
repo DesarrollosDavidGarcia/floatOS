@@ -3,11 +3,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AusenciaConductor, Prisma } from '@prisma/client';
-import { TipoAusencia } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 
 export interface CrearAusenciaInput {
-  tipo: TipoAusencia;
+  tipo: string;
   fechaInicio: string;
   fechaFin?: string;
   dias?: number;
@@ -18,7 +17,7 @@ export interface CrearAusenciaInput {
 }
 
 export interface ActualizarAusenciaInput {
-  tipo?: TipoAusencia;
+  tipo?: string;
   fechaInicio?: string;
   fechaFin?: string;
   dias?: number;

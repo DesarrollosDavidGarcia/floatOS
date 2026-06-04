@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoDocumentoConductor } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
@@ -16,13 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -32,27 +24,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { vencimientoInfo } from '@/components/conductores/documento-utils';
 import type { DocumentoConductor, DocumentoFormPayload } from '@/components/conductores/types';
 
-/** Mapa completo de etiquetas en español para todos los valores del enum. */
-const TIPO_LABEL: Record<TipoDocumentoConductor, string> = {
-  [TipoDocumentoConductor.LICENCIA_FEDERAL]: 'Licencia federal',
-  [TipoDocumentoConductor.EXAMEN_MEDICO]: 'Examen médico',
-  [TipoDocumentoConductor.INE]: 'INE',
-  [TipoDocumentoConductor.CURP]: 'CURP',
-  [TipoDocumentoConductor.RFC]: 'RFC',
-  [TipoDocumentoConductor.COMPROBANTE_DOMICILIO]: 'Comprobante de domicilio',
-  [TipoDocumentoConductor.CONSTANCIA_SITUACION_FISCAL]: 'Constancia de situación fiscal',
-  [TipoDocumentoConductor.CONTRATO]: 'Contrato',
-  [TipoDocumentoConductor.ALTA_IMSS]: 'Alta IMSS',
-  [TipoDocumentoConductor.OTRO]: 'Otro',
-};
-
-const TIPOS = Object.values(TipoDocumentoConductor);
-
 const schema = z.object({
-  tipo: z.nativeEnum(TipoDocumentoConductor),
+  tipo: z.string().min(1, 'Requerido'),
   numero: z.string().trim().optional(),
   fechaEmision: z.string().optional(),
   fechaVencimiento: z.string().min(1, 'La fecha de vencimiento es obligatoria'),
@@ -87,7 +65,7 @@ function DocumentoForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: documento?.tipo ?? TipoDocumentoConductor.LICENCIA_FEDERAL,
+      tipo: documento?.tipo ?? '',
       numero: documento?.numero ?? '',
       fechaEmision: isoADate(documento?.fechaEmision),
       fechaVencimiento: isoADate(documento?.fechaVencimiento),
@@ -96,7 +74,7 @@ function DocumentoForm({
 
   useEffect(() => {
     reset({
-      tipo: documento?.tipo ?? TipoDocumentoConductor.LICENCIA_FEDERAL,
+      tipo: documento?.tipo ?? '',
       numero: documento?.numero ?? '',
       fechaEmision: isoADate(documento?.fechaEmision),
       fechaVencimiento: isoADate(documento?.fechaVencimiento),
@@ -139,21 +117,12 @@ function DocumentoForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_DOCUMENTO_CONDUCTOR"
             value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoDocumentoConductor)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona un tipo"
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="doc-numero">Número</Label>
@@ -263,7 +232,9 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
                 const venc = vencimientoInfo(doc.fechaVencimiento);
                 return (
                   <TableRow key={doc.id}>
-                    <TableCell>{TIPO_LABEL[doc.tipo] ?? doc.tipo}</TableCell>
+                    <TableCell>
+                      <CatalogoTexto grupo="TIPO_DOCUMENTO_CONDUCTOR" codigo={doc.tipo} />
+                    </TableCell>
                     <TableCell>{doc.numero ?? '—'}</TableCell>
                     <TableCell>
                       {format(new Date(doc.fechaVencimiento), 'dd MMM yyyy', { locale: es })}

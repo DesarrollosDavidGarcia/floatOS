@@ -1,5 +1,3 @@
-import { TipoDocumentoUnidad } from '@flotaos/shared-types';
-
 /** Datos de entrada para crear una unidad. */
 export interface CrearUnidadInput {
   placas: string;
@@ -29,7 +27,7 @@ export interface ListarUnidadesInput {
  * Las fechas llegan como string (ISO) y el caso de uso las convierte a Date.
  */
 export interface CrearDocumentoUnidadInput {
-  tipo: TipoDocumentoUnidad;
+  tipo: string;
   descripcion?: string;
   fechaEmision?: string;
   fechaVencimiento: string;
@@ -41,7 +39,7 @@ export interface CrearDocumentoUnidadInput {
  * Las fechas llegan como string (ISO) y el caso de uso las convierte a Date.
  */
 export interface ActualizarDocumentoUnidadInput {
-  tipo?: TipoDocumentoUnidad;
+  tipo?: string;
   descripcion?: string;
   fechaEmision?: string;
   fechaVencimiento?: string;

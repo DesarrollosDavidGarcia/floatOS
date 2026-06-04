@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoExamenMedico, ResultadoExamen } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
@@ -17,13 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoBadge, CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import {
   Table,
   TableBody,
@@ -38,8 +32,8 @@ import {
 interface ExamenMedico {
   id: string;
   conductorId: string;
-  tipo: TipoExamenMedico;
-  resultado: ResultadoExamen;
+  tipo: string;
+  resultado: string;
   fechaExamen: string;
   fechaVencimiento?: string | null;
   institucion?: string | null;
@@ -49,36 +43,6 @@ interface ExamenMedico {
   creadoEn: string;
   actualizadoEn: string;
 }
-
-// ── Labels ─────────────────────────────────────────────────────────────────────
-
-const TIPO_EXAMEN_LABEL: Record<TipoExamenMedico, string> = {
-  [TipoExamenMedico.APTITUD_PSICOFISICA]: 'Aptitud psicofsica',
-  [TipoExamenMedico.ANTIDOPING]: 'Antidoping',
-  [TipoExamenMedico.EXAMEN_GENERAL]: 'Examen general',
-  [TipoExamenMedico.VISTA]: 'Vista',
-  [TipoExamenMedico.AUDITIVO]: 'Auditivo',
-  [TipoExamenMedico.OTRO]: 'Otro',
-};
-
-const RESULTADO_LABEL: Record<ResultadoExamen, string> = {
-  [ResultadoExamen.APTO]: 'Apto',
-  [ResultadoExamen.NO_APTO]: 'No apto',
-  [ResultadoExamen.CONDICIONADO]: 'Condicionado',
-  [ResultadoExamen.PENDIENTE]: 'Pendiente',
-};
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
-
-const RESULTADO_VARIANT: Record<ResultadoExamen, BadgeVariant> = {
-  [ResultadoExamen.APTO]: 'default',
-  [ResultadoExamen.NO_APTO]: 'destructive',
-  [ResultadoExamen.CONDICIONADO]: 'secondary',
-  [ResultadoExamen.PENDIENTE]: 'secondary',
-};
-
-const TIPOS = Object.values(TipoExamenMedico);
-const RESULTADOS = Object.values(ResultadoExamen);
 
 // ── Utils ──────────────────────────────────────────────────────────────────────
 
@@ -90,8 +54,8 @@ function isoADate(iso?: string | null): string {
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoExamenMedico),
-  resultado: z.nativeEnum(ResultadoExamen).optional(),
+  tipo: z.string().min(1, 'Requerido'),
+  resultado: z.string().optional(),
   fechaExamen: z.string().min(1, 'La fecha del examen es obligatoria'),
   fechaVencimiento: z.string().optional(),
   institucion: z.string().trim().optional(),
@@ -126,8 +90,8 @@ function ExamenMedicoForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: examen?.tipo ?? TipoExamenMedico.APTITUD_PSICOFISICA,
-      resultado: examen?.resultado ?? ResultadoExamen.PENDIENTE,
+      tipo: examen?.tipo ?? '',
+      resultado: examen?.resultado ?? '',
       fechaExamen: isoADate(examen?.fechaExamen),
       fechaVencimiento: isoADate(examen?.fechaVencimiento),
       institucion: examen?.institucion ?? '',
@@ -139,8 +103,8 @@ function ExamenMedicoForm({
 
   useEffect(() => {
     reset({
-      tipo: examen?.tipo ?? TipoExamenMedico.APTITUD_PSICOFISICA,
-      resultado: examen?.resultado ?? ResultadoExamen.PENDIENTE,
+      tipo: examen?.tipo ?? '',
+      resultado: examen?.resultado ?? '',
       fechaExamen: isoADate(examen?.fechaExamen),
       fechaVencimiento: isoADate(examen?.fechaVencimiento),
       institucion: examen?.institucion ?? '',
@@ -149,9 +113,6 @@ function ExamenMedicoForm({
       archivoKey: examen?.archivoKey ?? '',
     });
   }, [examen, reset]);
-
-  const tipo = watch('tipo');
-  const resultado = watch('resultado');
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -198,39 +159,21 @@ function ExamenMedicoForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
-            value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoExamenMedico)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_EXAMEN_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CatalogoSelect
+            grupo="TIPO_EXAMEN_MEDICO"
+            value={watch('tipo')}
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona un tipo"
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Resultado</Label>
-          <Select
-            value={resultado ?? ''}
-            onValueChange={(v) => setValue('resultado', v as ResultadoExamen)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un resultado" />
-            </SelectTrigger>
-            <SelectContent>
-              {RESULTADOS.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {RESULTADO_LABEL[r]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CatalogoSelect
+            grupo="RESULTADO_EXAMEN"
+            value={watch('resultado') ?? ''}
+            onChange={(c) => setValue('resultado', c)}
+            placeholder="Selecciona un resultado"
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="fechaExamen">Fecha del examen</Label>
@@ -356,11 +299,11 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
             <TableBody>
               {data.map((examen) => (
                 <TableRow key={examen.id}>
-                  <TableCell>{TIPO_EXAMEN_LABEL[examen.tipo]}</TableCell>
                   <TableCell>
-                    <Badge variant={RESULTADO_VARIANT[examen.resultado]}>
-                      {RESULTADO_LABEL[examen.resultado]}
-                    </Badge>
+                    <CatalogoTexto grupo="TIPO_EXAMEN_MEDICO" codigo={examen.tipo} />
+                  </TableCell>
+                  <TableCell>
+                    <CatalogoBadge grupo="RESULTADO_EXAMEN" codigo={examen.resultado} />
                   </TableCell>
                   <TableCell>
                     {format(new Date(examen.fechaExamen), 'dd MMM yyyy', { locale: es })}

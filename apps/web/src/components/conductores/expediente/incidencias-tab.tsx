@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoIncidencia, GravedadIncidencia } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoBadge, CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,33 +35,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-// ── Etiquetas en español ─────────────────────────────────────────────────────
-
-const TIPO_INCIDENCIA_LABEL: Record<TipoIncidencia, string> = {
-  [TipoIncidencia.ACCIDENTE]: 'Accidente',
-  [TipoIncidencia.INFRACCION]: 'Infracción',
-  [TipoIncidencia.SANCION]: 'Sanción',
-  [TipoIncidencia.FALTA]: 'Falta',
-  [TipoIncidencia.QUEJA]: 'Queja',
-  [TipoIncidencia.RECONOCIMIENTO]: 'Reconocimiento',
-  [TipoIncidencia.OTRO]: 'Otro',
-};
-
-const GRAVEDAD_LABEL: Record<GravedadIncidencia, string> = {
-  [GravedadIncidencia.BAJA]: 'Baja',
-  [GravedadIncidencia.MEDIA]: 'Media',
-  [GravedadIncidencia.ALTA]: 'Alta',
-  [GravedadIncidencia.CRITICA]: 'Crítica',
-};
-
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
 interface Incidencia {
   id: string;
   conductorId: string;
   viajeId: string | null;
-  tipo: TipoIncidencia;
-  gravedad: GravedadIncidencia;
+  tipo: string;
+  gravedad: string;
   titulo: string;
   descripcion: string | null;
   fecha: string;
@@ -74,8 +56,8 @@ interface Incidencia {
 }
 
 interface FormState {
-  tipo: TipoIncidencia;
-  gravedad: GravedadIncidencia;
+  tipo: string;
+  gravedad: string;
   titulo: string;
   descripcion: string;
   fecha: string;
@@ -88,8 +70,8 @@ interface FormState {
 }
 
 const FORM_EMPTY: FormState = {
-  tipo: TipoIncidencia.ACCIDENTE,
-  gravedad: GravedadIncidencia.MEDIA,
+  tipo: '',
+  gravedad: '',
   titulo: '',
   descripcion: '',
   fecha: '',
@@ -100,23 +82,6 @@ const FORM_EMPTY: FormState = {
   registradoPor: '',
   viajeId: '',
 };
-
-// ── Helpers de estilo ────────────────────────────────────────────────────────
-
-function gravedadVariant(
-  g: GravedadIncidencia,
-): 'destructive' | 'secondary' | 'outline' {
-  if (g === GravedadIncidencia.CRITICA || g === GravedadIncidencia.ALTA)
-    return 'destructive';
-  if (g === GravedadIncidencia.MEDIA) return 'secondary';
-  return 'outline';
-}
-
-function tipoVariant(t: TipoIncidencia): string {
-  if (t === TipoIncidencia.RECONOCIMIENTO)
-    return 'bg-green-100 text-green-800 border-green-200';
-  return '';
-}
 
 function isoADate(iso?: string | null): string {
   if (!iso) return '';
@@ -237,41 +202,23 @@ function IncidenciaForm({
         {/* Tipo */}
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_INCIDENCIA"
             value={form.tipo}
-            onValueChange={(v) => set('tipo', v as TipoIncidencia)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(TipoIncidencia).map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_INCIDENCIA_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => set('tipo', c)}
+            placeholder="Selecciona…"
+          />
         </div>
 
         {/* Gravedad */}
         <div className="space-y-1.5">
           <Label>Gravedad</Label>
-          <Select
+          <CatalogoSelect
+            grupo="GRAVEDAD_INCIDENCIA"
             value={form.gravedad}
-            onValueChange={(v) => set('gravedad', v as GravedadIncidencia)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(GravedadIncidencia).map((g) => (
-                <SelectItem key={g} value={g}>
-                  {GRAVEDAD_LABEL[g]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => set('gravedad', c)}
+            placeholder="Selecciona…"
+          />
         </div>
 
         {/* Título */}
@@ -489,22 +436,10 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
               {data.map((inc) => (
                 <TableRow key={inc.id}>
                   <TableCell>
-                    {inc.tipo === TipoIncidencia.RECONOCIMIENTO ? (
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tipoVariant(inc.tipo)}`}
-                      >
-                        {TIPO_INCIDENCIA_LABEL[inc.tipo]}
-                      </span>
-                    ) : (
-                      <span className="text-sm">
-                        {TIPO_INCIDENCIA_LABEL[inc.tipo]}
-                      </span>
-                    )}
+                    <CatalogoTexto grupo="TIPO_INCIDENCIA" codigo={inc.tipo} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={gravedadVariant(inc.gravedad)}>
-                      {GRAVEDAD_LABEL[inc.gravedad]}
-                    </Badge>
+                    <CatalogoBadge grupo="GRAVEDAD_INCIDENCIA" codigo={inc.gravedad} />
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate">
                     {inc.titulo}

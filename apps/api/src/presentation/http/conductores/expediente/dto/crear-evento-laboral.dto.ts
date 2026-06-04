@@ -1,11 +1,8 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TipoEventoLaboral } from '@flotaos/shared-types';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CrearEventoLaboralDto {
-  @IsEnum(TipoEventoLaboral, {
-    message: 'El tipo de evento laboral no es válido',
-  })
-  tipo!: TipoEventoLaboral;
+  @IsString()
+  tipo!: string;
 
   @IsString()
   titulo!: string;

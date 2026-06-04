@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
-import { TipoDocumentoUnidad } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -24,13 +23,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -39,19 +31,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import {
   ESTADO_VENCIMIENTO_BADGE,
   ESTADO_VENCIMIENTO_LABEL,
   estadoVencimiento,
-  TIPO_DOCUMENTO_UNIDAD_LABEL,
   type DocumentoUnidad,
   type Unidad,
 } from './types';
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoDocumentoUnidad, {
-    errorMap: () => ({ message: 'Selecciona el tipo' }),
-  }),
+  tipo: z.string().min(1, 'Selecciona el tipo'),
   descripcion: z.string().trim().optional(),
   fechaEmision: z.string().trim().optional(),
   fechaVencimiento: z.string().trim().min(1, 'La fecha de vencimiento es obligatoria'),
@@ -116,7 +107,7 @@ export function DocumentosDialog({
 
   function abrirNuevo() {
     setEditando(null);
-    reset({ tipo: undefined as unknown as TipoDocumentoUnidad, descripcion: '', fechaEmision: '', fechaVencimiento: '' });
+    reset({ tipo: '', descripcion: '', fechaEmision: '', fechaVencimiento: '' });
     setMostrarForm(true);
   }
 
@@ -219,23 +210,12 @@ export function DocumentosDialog({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Tipo *</Label>
-                <Select
+                <CatalogoSelect
+                  grupo="TIPO_DOCUMENTO_UNIDAD"
                   value={tipoSeleccionado ?? ''}
-                  onValueChange={(v) =>
-                    setValue('tipo', v as TipoDocumentoUnidad, { shouldValidate: true })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona el tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.values(TipoDocumentoUnidad).map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {TIPO_DOCUMENTO_UNIDAD_LABEL[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
+                  placeholder="Selecciona el tipo"
+                />
                 {errors.tipo && (
                   <p className="text-sm text-destructive">{errors.tipo.message}</p>
                 )}
@@ -299,7 +279,7 @@ export function DocumentosDialog({
                   const estado = estadoVencimiento(doc.fechaVencimiento);
                   return (
                     <TableRow key={doc.id}>
-                      <TableCell>{TIPO_DOCUMENTO_UNIDAD_LABEL[doc.tipo]}</TableCell>
+                      <TableCell><CatalogoTexto grupo="TIPO_DOCUMENTO_UNIDAD" codigo={doc.tipo} /></TableCell>
                       <TableCell className="text-muted-foreground">
                         {doc.descripcion || '—'}
                       </TableCell>

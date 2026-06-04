@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, X, Check } from 'lucide-react';
-import { CategoriaLicencia } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -17,13 +16,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -44,7 +38,7 @@ interface ConductorDetalle {
   numeroEmpleado: string | null;
   puesto: string | null;
   fechaIngreso: string | null;
-  categoriaLicencia: CategoriaLicencia | null;
+  categoriaLicencia: string | null;
   emergenciaNombre: string | null;
   emergenciaTelefono: string | null;
   emergenciaRelacion: string | null;
@@ -78,10 +72,6 @@ function displayDate(iso?: string | null): string {
   const d = new Date(iso);
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
-const CATEGORIAS_LICENCIA = Object.values(CategoriaLicencia);
-// Radix Select no admite value="" en un Item; usamos un centinela para "Sin categoría".
-const SIN_CATEGORIA = '__sin_categoria__';
 
 // ── Fila de detalle (modo vista) ───────────────────────────────────────────────
 
@@ -152,8 +142,6 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
       emergenciaRelacion: '',
     },
   });
-
-  const categoriaLicenciaValue = watch('categoriaLicencia');
 
   function iniciarEdicion(conductor: ConductorDetalle) {
     reset({
@@ -269,8 +257,13 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
                 <Input id="fechaNacimiento" type="date" {...register('fechaNacimiento')} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="tipoSangre">Tipo de sangre</Label>
-                <Input id="tipoSangre" placeholder="Ej. O+" {...register('tipoSangre')} />
+                <Label>Tipo de sangre</Label>
+                <CatalogoSelect
+                  grupo="TIPO_SANGRE"
+                  value={watch('tipoSangre')}
+                  onChange={(c) => setValue('tipoSangre', c)}
+                  placeholder="Selecciona…"
+                />
               </div>
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
                 <Label htmlFor="direccion">Dirección</Label>
@@ -312,24 +305,12 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Categoría de licencia</Label>
-                <Select
-                  value={categoriaLicenciaValue || SIN_CATEGORIA}
-                  onValueChange={(v) =>
-                    setValue('categoriaLicencia', v === SIN_CATEGORIA ? '' : v)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
-                    {CATEGORIAS_LICENCIA.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        Categoría {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CatalogoSelect
+                  grupo="CATEGORIA_LICENCIA"
+                  value={watch('categoriaLicencia')}
+                  onChange={(c) => setValue('categoriaLicencia', c)}
+                  placeholder="Sin categoría"
+                />
               </div>
             </div>
           </CardContent>
@@ -349,8 +330,13 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
                 <Input id="numeroEmpleado" {...register('numeroEmpleado')} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="puesto">Puesto</Label>
-                <Input id="puesto" {...register('puesto')} />
+                <Label>Puesto</Label>
+                <CatalogoSelect
+                  grupo="PUESTO"
+                  value={watch('puesto')}
+                  onChange={(c) => setValue('puesto', c)}
+                  placeholder="Selecciona…"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="fechaIngreso">Fecha de ingreso</Label>
@@ -402,7 +388,14 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
       <Seccion title="Datos personales">
         <DetalleItem label="CURP" value={data.curp} />
         <DetalleItem label="Fecha de nacimiento" value={displayDate(data.fechaNacimiento)} />
-        <DetalleItem label="Tipo de sangre" value={data.tipoSangre} />
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground">Tipo de sangre</p>
+          <p className="text-sm font-medium">
+            {data.tipoSangre
+              ? <CatalogoTexto grupo="TIPO_SANGRE" codigo={data.tipoSangre} />
+              : '—'}
+          </p>
+        </div>
         <DetalleItem label="Dirección" value={data.direccion} />
       </Seccion>
 
@@ -412,15 +405,26 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
       </Seccion>
 
       <Seccion title="Licencia federal">
-        <DetalleItem
-          label="Categoría de licencia"
-          value={data.categoriaLicencia ? `Categoría ${data.categoriaLicencia}` : null}
-        />
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground">Categoría de licencia</p>
+          <p className="text-sm font-medium">
+            {data.categoriaLicencia
+              ? <CatalogoTexto grupo="CATEGORIA_LICENCIA" codigo={data.categoriaLicencia} />
+              : '—'}
+          </p>
+        </div>
       </Seccion>
 
       <Seccion title="Empleo">
         <DetalleItem label="No. de empleado" value={data.numeroEmpleado} />
-        <DetalleItem label="Puesto" value={data.puesto} />
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground">Puesto</p>
+          <p className="text-sm font-medium">
+            {data.puesto
+              ? <CatalogoTexto grupo="PUESTO" codigo={data.puesto} />
+              : '—'}
+          </p>
+        </div>
         <DetalleItem label="Fecha de ingreso" value={displayDate(data.fechaIngreso)} />
       </Seccion>
 

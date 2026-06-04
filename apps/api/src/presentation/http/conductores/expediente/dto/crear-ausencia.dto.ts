@@ -1,11 +1,8 @@
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
-import { TipoAusencia } from '@flotaos/shared-types';
+import { IsDateString, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class CrearAusenciaDto {
-  @IsEnum(TipoAusencia, {
-    message: 'El tipo de ausencia no es válido',
-  })
-  tipo!: TipoAusencia;
+  @IsString()
+  tipo!: string;
 
   @IsDateString({}, { message: 'La fecha de inicio no es válida' })
   fechaInicio!: string;

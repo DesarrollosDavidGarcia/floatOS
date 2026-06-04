@@ -1,16 +1,12 @@
 import {
   IsDateString,
-  IsEnum,
   IsOptional,
   IsString,
 } from 'class-validator';
-import { TipoCertificacion } from '@flotaos/shared-types';
 
 export class CrearCertificacionDto {
-  @IsEnum(TipoCertificacion, {
-    message: 'El tipo de certificación no es válido',
-  })
-  tipo!: TipoCertificacion;
+  @IsString()
+  tipo!: string;
 
   @IsString()
   nombre!: string;

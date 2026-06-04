@@ -8,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { TipoDocumentoConductor } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -26,13 +25,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -40,13 +32,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import type { Conductor, DocumentoConductor, DocumentoFormPayload } from './types';
-import { TIPO_DOCUMENTO_LABEL, vencimientoInfo } from './documento-utils';
-
-const TIPOS = Object.values(TipoDocumentoConductor);
+import { vencimientoInfo } from './documento-utils';
 
 const schema = z.object({
-  tipo: z.nativeEnum(TipoDocumentoConductor),
+  tipo: z.string().min(1, 'Requerido'),
   numero: z.string().trim().optional(),
   fechaEmision: z.string().optional(),
   fechaVencimiento: z.string().min(1, 'La fecha de vencimiento es obligatoria'),
@@ -82,7 +74,7 @@ function DocumentoForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: documento?.tipo ?? TipoDocumentoConductor.LICENCIA_FEDERAL,
+      tipo: documento?.tipo ?? '',
       numero: documento?.numero ?? '',
       fechaEmision: isoADate(documento?.fechaEmision),
       fechaVencimiento: isoADate(documento?.fechaVencimiento),
@@ -91,7 +83,7 @@ function DocumentoForm({
 
   useEffect(() => {
     reset({
-      tipo: documento?.tipo ?? TipoDocumentoConductor.LICENCIA_FEDERAL,
+      tipo: documento?.tipo ?? '',
       numero: documento?.numero ?? '',
       fechaEmision: isoADate(documento?.fechaEmision),
       fechaVencimiento: isoADate(documento?.fechaVencimiento),
@@ -134,21 +126,12 @@ function DocumentoForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_DOCUMENTO_CONDUCTOR"
             value={tipo}
-            onValueChange={(v) => setValue('tipo', v as TipoDocumentoConductor)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_DOCUMENTO_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipo', c)}
+            placeholder="Selecciona un tipo"
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="numero">Número</Label>
@@ -286,7 +269,9 @@ export function DocumentosDialog({
                   const venc = vencimientoInfo(doc.fechaVencimiento);
                   return (
                     <TableRow key={doc.id}>
-                      <TableCell>{TIPO_DOCUMENTO_LABEL[doc.tipo]}</TableCell>
+                      <TableCell>
+                        <CatalogoTexto grupo="TIPO_DOCUMENTO_CONDUCTOR" codigo={doc.tipo} />
+                      </TableCell>
                       <TableCell>{doc.numero ?? '—'}</TableCell>
                       <TableCell>
                         {format(new Date(doc.fechaVencimiento), 'dd MMM yyyy', { locale: es })}

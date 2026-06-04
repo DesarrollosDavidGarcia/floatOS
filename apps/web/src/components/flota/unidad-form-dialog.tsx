@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import type { Unidad } from './types';
 
 const schema = z.object({
@@ -73,6 +74,8 @@ export function UnidadFormDialog({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -138,8 +141,13 @@ export function UnidadFormDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="tipo">Tipo *</Label>
-              <Input id="tipo" placeholder="Tractocamión, caja seca…" {...register('tipo')} />
+              <Label>Tipo *</Label>
+              <CatalogoSelect
+                grupo="TIPO_UNIDAD"
+                value={watch('tipo')}
+                onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
+                placeholder="Selecciona el tipo"
+              />
               {errors.tipo && <p className="text-sm text-destructive">{errors.tipo.message}</p>}
             </div>
             <div className="space-y-1.5">
@@ -163,8 +171,13 @@ export function UnidadFormDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="aseguradora">Aseguradora</Label>
-              <Input id="aseguradora" {...register('aseguradora')} />
+              <Label>Aseguradora</Label>
+              <CatalogoSelect
+                grupo="ASEGURADORA"
+                value={watch('aseguradora') ?? ''}
+                onChange={(c) => setValue('aseguradora', c)}
+                placeholder="Selecciona…"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="numeroPoliza">Número de póliza</Label>

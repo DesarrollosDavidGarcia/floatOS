@@ -1,17 +1,12 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TipoControlConfianza, ResultadoExamen } from '@flotaos/shared-types';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CrearControlConfianzaDto {
-  @IsEnum(TipoControlConfianza, {
-    message: 'El tipo de control de confianza no es válido',
-  })
-  tipo!: TipoControlConfianza;
+  @IsString()
+  tipo!: string;
 
   @IsOptional()
-  @IsEnum(ResultadoExamen, {
-    message: 'El resultado del examen no es válido',
-  })
-  resultado?: ResultadoExamen;
+  @IsString()
+  resultado?: string;
 
   @IsOptional()
   @IsString()

@@ -12,6 +12,7 @@ import { ClientesModule } from './presentation/http/clientes/clientes.module';
 import { FlotaModule } from './presentation/http/flota/flota.module';
 import { ConductoresModule } from './presentation/http/conductores/conductores.module';
 import { ExpedienteModule } from './presentation/http/conductores/expediente/expediente.module';
+import { CatalogosModule } from './presentation/http/catalogos/catalogos.module';
 import { ViajesModule } from './presentation/http/viajes/viajes.module';
 import { TrackingModule } from './presentation/ws/tracking/tracking.module';
 import { AlertasModule } from './presentation/http/alertas/alertas.module';
@@ -30,6 +31,7 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     FlotaModule,
     ConductoresModule,
     ExpedienteModule,
+    CatalogosModule,
     ViajesModule,
     TrackingModule,
     AlertasModule,

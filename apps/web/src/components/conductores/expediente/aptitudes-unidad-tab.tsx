@@ -6,21 +6,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { NivelAptitud, TipoUnidadManejo } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -30,65 +21,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { CatalogoBadge, CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
 interface AptitudUnidadConductor {
   id: string;
   conductorId: string;
-  tipoUnidad: TipoUnidadManejo;
-  nivel: NivelAptitud;
+  tipoUnidad: string;
+  nivel: string;
   aniosExperiencia: number | null;
   notas: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-// ── etiquetas ──────────────────────────────────────────────────────────────────
-
-const TIPO_UNIDAD_LABEL: Record<TipoUnidadManejo, string> = {
-  [TipoUnidadManejo.TRACTOCAMION]: 'Tractocamión',
-  [TipoUnidadManejo.TORTON]: 'Tortón',
-  [TipoUnidadManejo.RABON]: 'Rabón',
-  [TipoUnidadManejo.THORTON]: 'Thorton',
-  [TipoUnidadManejo.CAMION_3_5]: 'Camión 3.5 t',
-  [TipoUnidadManejo.CAMIONETA]: 'Camioneta',
-  [TipoUnidadManejo.CAJA_SECA]: 'Caja seca',
-  [TipoUnidadManejo.CAJA_REFRIGERADA]: 'Caja refrigerada',
-  [TipoUnidadManejo.PLATAFORMA]: 'Plataforma',
-  [TipoUnidadManejo.TOLVA]: 'Tolva',
-  [TipoUnidadManejo.PIPA]: 'Pipa',
-  [TipoUnidadManejo.FULL]: 'Full',
-  [TipoUnidadManejo.OTRO]: 'Otro',
-};
-
-const NIVEL_APTITUD_LABEL: Record<NivelAptitud, string> = {
-  [NivelAptitud.PRINCIPIANTE]: 'Principiante',
-  [NivelAptitud.INTERMEDIO]: 'Intermedio',
-  [NivelAptitud.EXPERTO]: 'Experto',
-};
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
-
-function nivelVariant(nivel: NivelAptitud): BadgeVariant {
-  switch (nivel) {
-    case NivelAptitud.EXPERTO:
-      return 'success';
-    case NivelAptitud.INTERMEDIO:
-      return 'secondary';
-    case NivelAptitud.PRINCIPIANTE:
-      return 'outline';
-  }
-}
-
-const TIPOS_UNIDAD = Object.values(TipoUnidadManejo);
-const NIVELES = Object.values(NivelAptitud);
-
 // ── schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipoUnidad: z.nativeEnum(TipoUnidadManejo),
-  nivel: z.nativeEnum(NivelAptitud).optional(),
+  tipoUnidad: z.string().min(1, 'Requerido'),
+  nivel: z.string().optional(),
   aniosExperiencia: z.string().optional(),
   notas: z.string().optional(),
 });
@@ -119,8 +72,8 @@ function AptitudForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipoUnidad: aptitud?.tipoUnidad ?? TipoUnidadManejo.TRACTOCAMION,
-      nivel: aptitud?.nivel ?? NivelAptitud.INTERMEDIO,
+      tipoUnidad: aptitud?.tipoUnidad ?? '',
+      nivel: aptitud?.nivel ?? '',
       aniosExperiencia:
         aptitud?.aniosExperiencia != null
           ? String(aptitud.aniosExperiencia)
@@ -131,8 +84,8 @@ function AptitudForm({
 
   useEffect(() => {
     reset({
-      tipoUnidad: aptitud?.tipoUnidad ?? TipoUnidadManejo.TRACTOCAMION,
-      nivel: aptitud?.nivel ?? NivelAptitud.INTERMEDIO,
+      tipoUnidad: aptitud?.tipoUnidad ?? '',
+      nivel: aptitud?.nivel ?? '',
       aniosExperiencia:
         aptitud?.aniosExperiencia != null
           ? String(aptitud.aniosExperiencia)
@@ -185,42 +138,24 @@ function AptitudForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Tipo de unidad</Label>
-          <Select
+          <CatalogoSelect
+            grupo="TIPO_UNIDAD_MANEJO"
             value={tipoUnidad}
-            onValueChange={(v) => setValue('tipoUnidad', v as TipoUnidadManejo)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {TIPOS_UNIDAD.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TIPO_UNIDAD_LABEL[t]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(c) => setValue('tipoUnidad', c)}
+            placeholder="Selecciona un tipo"
+          />
           {errors.tipoUnidad && (
             <p className="text-sm text-destructive">{errors.tipoUnidad.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
           <Label>Nivel</Label>
-          <Select
-            value={nivel ?? NivelAptitud.INTERMEDIO}
-            onValueChange={(v) => setValue('nivel', v as NivelAptitud)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un nivel" />
-            </SelectTrigger>
-            <SelectContent>
-              {NIVELES.map((n) => (
-                <SelectItem key={n} value={n}>
-                  {NIVEL_APTITUD_LABEL[n]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CatalogoSelect
+            grupo="NIVEL_APTITUD"
+            value={nivel ?? ''}
+            onChange={(c) => setValue('nivel', c)}
+            placeholder="Selecciona un nivel"
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="aniosExperiencia">Años de experiencia</Label>
@@ -334,11 +269,11 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
             <TableBody>
               {data.map((aptitud) => (
                 <TableRow key={aptitud.id}>
-                  <TableCell>{TIPO_UNIDAD_LABEL[aptitud.tipoUnidad]}</TableCell>
                   <TableCell>
-                    <Badge variant={nivelVariant(aptitud.nivel)}>
-                      {NIVEL_APTITUD_LABEL[aptitud.nivel]}
-                    </Badge>
+                    <CatalogoTexto grupo="TIPO_UNIDAD_MANEJO" codigo={aptitud.tipoUnidad} />
+                  </TableCell>
+                  <TableCell>
+                    <CatalogoBadge grupo="NIVEL_APTITUD" codigo={aptitud.nivel} />
                   </TableCell>
                   <TableCell>
                     {aptitud.aniosExperiencia != null

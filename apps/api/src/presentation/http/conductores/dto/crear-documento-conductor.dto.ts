@@ -1,11 +1,8 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TipoDocumentoConductor } from '@flotaos/shared-types';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CrearDocumentoConductorDto {
-  @IsEnum(TipoDocumentoConductor, {
-    message: 'El tipo de documento no es válido',
-  })
-  tipo!: TipoDocumentoConductor;
+  @IsString()
+  tipo!: string;
 
   @IsOptional()
   @IsString()

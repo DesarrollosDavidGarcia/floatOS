@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { IncidenciaConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { TipoIncidencia, GravedadIncidencia } from '@flotaos/shared-types';
 
 export interface CrearIncidenciaInput {
-  tipo: TipoIncidencia;
-  gravedad?: GravedadIncidencia;
+  tipo: string;
+  gravedad?: string;
   titulo: string;
   descripcion?: string;
   fecha: string;
@@ -18,8 +17,8 @@ export interface CrearIncidenciaInput {
 }
 
 export interface ActualizarIncidenciaInput {
-  tipo?: TipoIncidencia;
-  gravedad?: GravedadIncidencia;
+  tipo?: string;
+  gravedad?: string;
   titulo?: string;
   descripcion?: string;
   fecha?: string;

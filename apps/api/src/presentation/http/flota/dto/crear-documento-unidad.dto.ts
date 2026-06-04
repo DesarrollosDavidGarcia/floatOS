@@ -1,12 +1,9 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
-import { TipoDocumentoUnidad } from '@flotaos/shared-types';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 /** Datos para registrar un documento de una unidad. */
 export class CrearDocumentoUnidadDto {
-  @IsEnum(TipoDocumentoUnidad, {
-    message: 'El tipo de documento no es válido',
-  })
-  tipo!: TipoDocumentoUnidad;
+  @IsString()
+  tipo!: string;
 
   @IsOptional()
   @IsString()

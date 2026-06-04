@@ -10,6 +10,7 @@ import {
   Users,
   Building2,
   BellRing,
+  ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,7 @@ const NAV = [
   { href: '/conductores', label: 'Conductores', icon: Users },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
   { href: '/alertas', label: 'Alertas', icon: BellRing },
+  { href: '/catalogos', label: 'Catálogos', icon: ListChecks },
 ];
 
 export function Sidebar() {

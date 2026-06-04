@@ -1,5 +1,4 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { CategoriaLicencia } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { PasswordService } from '../../infrastructure/shared/password.service';
 import {
@@ -24,7 +23,7 @@ export interface CrearConductorInput {
   numeroEmpleado?: string;
   puesto?: string;
   fechaIngreso?: string;
-  categoriaLicencia?: CategoriaLicencia;
+  categoriaLicencia?: string;
   emergenciaNombre?: string;
   emergenciaTelefono?: string;
   emergenciaRelacion?: string;

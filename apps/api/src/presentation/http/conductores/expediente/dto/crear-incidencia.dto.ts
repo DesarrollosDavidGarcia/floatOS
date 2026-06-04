@@ -1,20 +1,18 @@
 import {
   IsBoolean,
   IsDateString,
-  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
 } from 'class-validator';
-import { TipoIncidencia, GravedadIncidencia } from '@flotaos/shared-types';
 
 export class CrearIncidenciaDto {
-  @IsEnum(TipoIncidencia, { message: 'El tipo de incidencia no es válido' })
-  tipo!: TipoIncidencia;
+  @IsString()
+  tipo!: string;
 
   @IsOptional()
-  @IsEnum(GravedadIncidencia, { message: 'La gravedad no es válida' })
-  gravedad?: GravedadIncidencia;
+  @IsString()
+  gravedad?: string;
 
   @IsString()
   titulo!: string;
