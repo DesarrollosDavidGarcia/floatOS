@@ -1,0 +1,338 @@
+// FlotaOS — Modelo de datos (Prisma)
+// Despliegue instancia-por-cliente: SIN tenantId, la BD ya está aislada por diseño.
+// PostGIS está habilitado en la BD (ver postgres/init.sql); para el MVP las
+// coordenadas se guardan como Float y las geocercas se calculan en aplicación.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum EstadoViaje {
+  ASIGNADO
+  ACEPTADO
+  EN_CAMINO_ORIGEN
+  CARGANDO
+  EN_TRANSITO
+  ENTREGADO
+  FACTURADO
+  CANCELADO
+}
+
+enum TipoDocumentoUnidad {
+  VERIFICACION
+  SEGURO
+  TARJETA_CIRCULACION
+  OTRO
+}
+
+enum TipoDocumentoConductor {
+  LICENCIA_FEDERAL
+  EXAMEN_MEDICO
+  OTRO
+}
+
+enum TipoGasto {
+  COMBUSTIBLE
+  CASETA
+  VIATICOS
+  OTRO
+}
+
+enum EstadoCartaPorte {
+  BORRADOR
+  PENDIENTE_TIMBRAR
+  TIMBRADO
+  CANCELADO
+}
+
+enum EstadoFactura {
+  BORRADOR
+  ENVIADA
+  PAGADA
+  VENCIDA
+  CANCELADA
+}
+
+// ──────────────────────────── Usuarios ───────────────────────────
+
+/// Admin del panel web (dueño de la flotilla). Una instancia = un admin (MVP).
+model Usuario {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  nombre           String
+  activo           Boolean  @default(true)
+  refreshTokenHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+/// Conductor: credenciales separadas para la app Flutter.
+model Conductor {
+  id               String   @id @default(cuid())
+  nombre           String
+  apellidos        String?
+  usuario          String   @unique // login de la app
+  email            String?  @unique
+  passwordHash     String
+  telefono         String?
+  fotoKey          String?  // objeto en MinIO
+  refreshTokenHash String?
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  documentos  DocumentoConductor[]
+  viajes      Viaje[]
+  ubicaciones UbicacionConductor[]
+
+  @@map("conductores")
+}
+
+// ───────────────────────────── Flota ─────────────────────────────
+
+model Unidad {
+  id            String   @id @default(cuid())
+  placas        String   @unique
+  tipo          String   // tractocamión, camión, camioneta, etc.
+  marca         String?
+  modelo        String?
+  anio          Int?
+  capacidadKg   Decimal? @db.Decimal(10, 2)
+  aseguradora   String?
+  numeroPoliza  String?
+  activo        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  documentos DocumentoUnidad[]
+  viajes     Viaje[]
+
+  @@map("unidades")
+}
+
+model DocumentoUnidad {
+  id              String              @id @default(cuid())
+  unidadId        String
+  tipo            TipoDocumentoUnidad
+  descripcion     String?
+  fechaEmision    DateTime?
+  fechaVencimiento DateTime
+  archivoKey      String?             // objeto en MinIO
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  unidad Unidad @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+
+  @@index([unidadId])
+  @@index([fechaVencimiento])
+  @@map("documentos_unidad")
+}
+
+model DocumentoConductor {
+  id              String                 @id @default(cuid())
+  conductorId     String
+  tipo            TipoDocumentoConductor
+  numero          String?
+  fechaEmision    DateTime?
+  fechaVencimiento DateTime
+  archivoKey      String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@index([fechaVencimiento])
+  @@map("documentos_conductor")
+}
+
+// ──────────────────────── Clientes finales ───────────────────────
+
+/// Cliente del transportista (a quien se le presta el servicio de viaje).
+model Cliente {
+  id               String   @id @default(cuid())
+  razonSocial      String
+  rfc              String?
+  contactoNombre   String?
+  contactoTelefono String?
+  contactoEmail    String?
+  direccion        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  viajes Viaje[]
+
+  @@map("clientes")
+}
+
+// ───────────────────────────── Viajes ────────────────────────────
+
+/// Aggregate root del dominio.
+model Viaje {
+  id            String      @id @default(cuid())
+  folio         Int         @unique @default(autoincrement())
+  clienteId     String
+  unidadId      String?
+  conductorId   String?
+
+  // Origen / destino
+  origenDireccion  String
+  origenLat        Float?
+  origenLng        Float?
+  destinoDireccion String
+  destinoLat       Float?
+  destinoLng       Float?
+
+  // Carga
+  tipoCarga        String
+  descripcionCarga String?
+  pesoKg           Decimal? @db.Decimal(10, 2)
+  dimensiones      String?
+
+  estado        EstadoViaje @default(ASIGNADO)
+  trackingToken String      @unique @default(cuid()) // link público de seguimiento
+
+  fechaProgramada DateTime?
+  fechaInicio     DateTime?
+  fechaEntrega    DateTime?
+  odometroInicial Int?
+  odometroFinal   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente   Cliente    @relation(fields: [clienteId], references: [id])
+  unidad    Unidad?    @relation(fields: [unidadId], references: [id])
+  conductor Conductor? @relation(fields: [conductorId], references: [id])
+
+  historial   HistorialEstadoViaje[]
+  ubicaciones UbicacionConductor[]
+  gastos      GastoViaje[]
+  evidencias  EvidenciaViaje[]
+  cartaPorte  CartaPorte?
+  factura     Factura?
+
+  @@index([clienteId])
+  @@index([unidadId])
+  @@index([conductorId])
+  @@index([estado])
+  @@map("viajes")
+}
+
+model HistorialEstadoViaje {
+  id             String       @id @default(cuid())
+  viajeId        String
+  estadoAnterior EstadoViaje?
+  estadoNuevo    EstadoViaje
+  nota           String?
+  registradoPor  String?      // id de usuario o conductor
+  createdAt      DateTime     @default(now())
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@map("historial_estado_viaje")
+}
+
+model UbicacionConductor {
+  id          String   @id @default(cuid())
+  viajeId     String
+  conductorId String
+  lat         Float
+  lng         Float
+  velocidad   Float?
+  rumbo       Float?
+  precision   Float?
+  capturadoEn DateTime // timestamp del dispositivo
+  createdAt   DateTime @default(now())
+
+  viaje     Viaje     @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@index([viajeId, capturadoEn])
+  @@map("ubicaciones_conductor")
+}
+
+model GastoViaje {
+  id           String    @id @default(cuid())
+  viajeId      String
+  tipo         TipoGasto
+  monto        Decimal   @db.Decimal(10, 2)
+  descripcion  String?
+  fotoTicketKey String?  // objeto en MinIO
+  createdAt    DateTime  @default(now())
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@map("gastos_viaje")
+}
+
+/// POD — prueba de entrega.
+model EvidenciaViaje {
+  id            String   @id @default(cuid())
+  viajeId       String
+  fotoKey       String?  // foto de mercancía
+  firmaKey      String?  // firma digital del receptor
+  receptorNombre String?
+  lat           Float?
+  lng           Float?
+  capturadoEn   DateTime
+  createdAt     DateTime @default(now())
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@map("evidencias_viaje")
+}
+
+// ──────────────────── Fiscal: Carta Porte / Factura (Fase 2) ───────
+
+model CartaPorte {
+  id            String           @id @default(cuid())
+  viajeId       String           @unique
+  estado        EstadoCartaPorte @default(BORRADOR)
+  uuid          String?          // UUID del timbre (SAT)
+  xmlKey        String?
+  pdfKey        String?
+  fechaTimbrado DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  viaje   Viaje    @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  factura Factura?
+
+  @@map("cartas_porte")
+}
+
+model Factura {
+  id              String        @id @default(cuid())
+  viajeId         String        @unique
+  cartaPorteId    String?       @unique
+  folio           Int           @unique @default(autoincrement())
+  estado          EstadoFactura @default(BORRADOR)
+  subtotal        Decimal       @db.Decimal(12, 2)
+  total           Decimal       @db.Decimal(12, 2)
+  moneda          String        @default("MXN")
+  fechaEmision    DateTime?
+  fechaVencimiento DateTime?
+  fechaPago       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  viaje      Viaje       @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  cartaPorte CartaPorte? @relation(fields: [cartaPorteId], references: [id])
+
+  @@map("facturas")
+}

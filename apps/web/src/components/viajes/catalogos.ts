@@ -1,0 +1,68 @@
+'use client';
+
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import type { OpcionCatalogo } from './types';
+
+interface ClienteApi {
+  id: string;
+  nombre: string;
+}
+interface UnidadApi {
+  id: string;
+  placas: string;
+  marca?: string | null;
+  modelo?: string | null;
+}
+interface ConductorApi {
+  id: string;
+  nombre: string;
+}
+
+interface PaginadoApi<T> {
+  data: T[];
+}
+
+/** Catálogo de clientes para selects (carga hasta 100). */
+export function useClientesCatalogo() {
+  return useQuery<OpcionCatalogo[]>({
+    queryKey: ['catalogo', 'clientes'],
+    queryFn: async () => {
+      const { data } = await api.get<PaginadoApi<ClienteApi>>('/clientes', {
+        params: { pageSize: 100 },
+      });
+      return data.data.map((c) => ({ id: c.id, label: c.nombre }));
+    },
+  });
+}
+
+/** Catálogo de unidades para selects. */
+export function useUnidadesCatalogo() {
+  return useQuery<OpcionCatalogo[]>({
+    queryKey: ['catalogo', 'unidades'],
+    queryFn: async () => {
+      const { data } = await api.get<PaginadoApi<UnidadApi>>('/unidades', {
+        params: { pageSize: 100 },
+      });
+      return data.data.map((u) => ({
+        id: u.id,
+        label: [u.placas, [u.marca, u.modelo].filter(Boolean).join(' ')]
+          .filter(Boolean)
+          .join(' · '),
+      }));
+    },
+  });
+}
+
+/** Catálogo de conductores para selects. */
+export function useConductoresCatalogo() {
+  return useQuery<OpcionCatalogo[]>({
+    queryKey: ['catalogo', 'conductores'],
+    queryFn: async () => {
+      const { data } = await api.get<PaginadoApi<ConductorApi>>('/conductores', {
+        params: { pageSize: 100 },
+      });
+      return data.data.map((c) => ({ id: c.id, label: c.nombre }));
+    },
+  });
+}

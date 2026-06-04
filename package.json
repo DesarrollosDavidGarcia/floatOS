@@ -1,0 +1,26 @@
+{
+  "name": "flotaos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FlotaOS — SaaS de gestión operativa y fiscal para transportistas (México)",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "packages/shared-types"
+  ],
+  "scripts": {
+    "build:types": "npm run build --workspace @flotaos/shared-types",
+    "dev:api": "npm run start:dev --workspace @flotaos/api",
+    "dev:web": "npm run dev --workspace @flotaos/web",
+    "build:api": "npm run build --workspace @flotaos/api",
+    "build:web": "npm run build --workspace @flotaos/web",
+    "prisma:generate": "npm run prisma:generate --workspace @flotaos/api",
+    "prisma:migrate": "npm run prisma:migrate --workspace @flotaos/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,27 @@
+# Desarrollo local: expone los servicios de datos al host para correr api/web
+# fuera de Docker con hot reload. Se aplica automáticamente con `docker compose up`.
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # En desarrollo levantamos solo los servicios de datos (postgres, redis, minio).
+  # api y web se corren con `npm run dev:api` / `npm run dev:web` en el host.
+  api:
+    profiles: ["full"]
+
+  web:
+    profiles: ["full"]
+
+  nginx:
+    profiles: ["full"]
