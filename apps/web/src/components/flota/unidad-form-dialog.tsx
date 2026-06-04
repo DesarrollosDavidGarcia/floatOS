@@ -9,7 +9,6 @@ import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -19,28 +18,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
+import { textoRequerido, seleccionRequerida, numeroOpcional } from '@/lib/validacion';
 import type { Unidad } from './types';
 
 const schema = z.object({
-  placas: z.string().trim().min(1, 'Las placas son obligatorias'),
-  tipo: z.string().trim().min(1, 'El tipo es obligatorio'),
-  marca: z.string().trim().optional(),
-  modelo: z.string().trim().optional(),
-  anio: z
-    .string()
-    .trim()
-    .optional()
-    .refine((v) => !v || (/^\d{4}$/.test(v) && Number(v) >= 1900 && Number(v) <= 2100), {
-      message: 'Año inválido',
-    }),
-  capacidadKg: z
-    .string()
-    .trim()
-    .optional()
-    .refine((v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0), {
-      message: 'Capacidad inválida',
-    }),
-  aseguradora: z.string().trim().optional(),
+  placas:       textoRequerido('Las placas son obligatorias'),
+  tipo:         seleccionRequerida('Selecciona el tipo de unidad'),
+  marca:        z.string().trim().optional(),
+  modelo:       z.string().trim().optional(),
+  anio:         numeroOpcional({ min: 1950, max: 2100, entero: true }),
+  capacidadKg:  numeroOpcional({ min: 0 }),
+  aseguradora:  z.string().trim().optional(),
   numeroPoliza: z.string().trim().optional(),
 });
 
@@ -48,13 +37,13 @@ type FormValues = z.infer<typeof schema>;
 
 function toDefaults(unidad?: Unidad | null): FormValues {
   return {
-    placas: unidad?.placas ?? '',
-    tipo: unidad?.tipo ?? '',
-    marca: unidad?.marca ?? '',
-    modelo: unidad?.modelo ?? '',
-    anio: unidad?.anio != null ? String(unidad.anio) : '',
-    capacidadKg: unidad?.capacidadKg != null ? String(unidad.capacidadKg) : '',
-    aseguradora: unidad?.aseguradora ?? '',
+    placas:       unidad?.placas ?? '',
+    tipo:         unidad?.tipo ?? '',
+    marca:        unidad?.marca ?? '',
+    modelo:       unidad?.modelo ?? '',
+    anio:         unidad?.anio != null ? String(unidad.anio) : '',
+    capacidadKg:  unidad?.capacidadKg != null ? String(unidad.capacidadKg) : '',
+    aseguradora:  unidad?.aseguradora ?? '',
     numeroPoliza: unidad?.numeroPoliza ?? '',
   };
 }
@@ -80,6 +69,7 @@ export function UnidadFormDialog({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: toDefaults(unidad),
+    mode: 'onTouched',
   });
 
   // Reinicia el formulario cuando cambia la unidad o se abre el diálogo.
@@ -93,13 +83,13 @@ export function UnidadFormDialog({
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload = {
-        placas: values.placas,
-        tipo: values.tipo,
-        marca: values.marca || undefined,
-        modelo: values.modelo || undefined,
-        anio: values.anio ? Number(values.anio) : undefined,
-        capacidadKg: values.capacidadKg ? Number(values.capacidadKg) : undefined,
-        aseguradora: values.aseguradora || undefined,
+        placas:       values.placas,
+        tipo:         values.tipo,
+        marca:        values.marca || undefined,
+        modelo:       values.modelo || undefined,
+        anio:         values.anio ? Number(values.anio) : undefined,
+        capacidadKg:  values.capacidadKg ? Number(values.capacidadKg) : undefined,
+        aseguradora:  values.aseguradora || undefined,
         numeroPoliza: values.numeroPoliza || undefined,
       };
       if (editando && unidad) {
@@ -132,58 +122,82 @@ export function UnidadFormDialog({
           onSubmit={handleSubmit((values) => mutation.mutate(values))}
           className="space-y-4"
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="placas">Placas *</Label>
+          <CamposGrid cols={2}>
+            <Campo
+              label="Placas"
+              htmlFor="placas"
+              required
+              error={errors.placas?.message}
+            >
               <Input id="placas" {...register('placas')} />
-              {errors.placas && (
-                <p className="text-sm text-destructive">{errors.placas.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tipo *</Label>
+            </Campo>
+
+            <Campo
+              label="Tipo"
+              required
+              error={errors.tipo?.message}
+            >
               <CatalogoSelect
                 grupo="TIPO_UNIDAD"
                 value={watch('tipo')}
                 onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
                 placeholder="Selecciona el tipo"
               />
-              {errors.tipo && <p className="text-sm text-destructive">{errors.tipo.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="marca">Marca</Label>
+            </Campo>
+
+            <Campo
+              label="Marca"
+              htmlFor="marca"
+              error={errors.marca?.message}
+            >
               <Input id="marca" {...register('marca')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="modelo">Modelo</Label>
+            </Campo>
+
+            <Campo
+              label="Modelo"
+              htmlFor="modelo"
+              error={errors.modelo?.message}
+            >
               <Input id="modelo" {...register('modelo')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="anio">Año</Label>
+            </Campo>
+
+            <Campo
+              label="Año"
+              htmlFor="anio"
+              error={errors.anio?.message}
+            >
               <Input id="anio" inputMode="numeric" {...register('anio')} />
-              {errors.anio && <p className="text-sm text-destructive">{errors.anio.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="capacidadKg">Capacidad (kg)</Label>
+            </Campo>
+
+            <Campo
+              label="Capacidad (kg)"
+              htmlFor="capacidadKg"
+              error={errors.capacidadKg?.message}
+            >
               <Input id="capacidadKg" inputMode="numeric" {...register('capacidadKg')} />
-              {errors.capacidadKg && (
-                <p className="text-sm text-destructive">{errors.capacidadKg.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Aseguradora</Label>
+            </Campo>
+
+            <Campo
+              label="Aseguradora"
+              error={errors.aseguradora?.message}
+            >
               <CatalogoSelect
                 grupo="ASEGURADORA"
                 value={watch('aseguradora') ?? ''}
-                onChange={(c) => setValue('aseguradora', c)}
+                onChange={(c) => setValue('aseguradora', c, { shouldValidate: true })}
                 placeholder="Selecciona…"
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="numeroPoliza">Número de póliza</Label>
+            </Campo>
+
+            <Campo
+              label="Número de póliza"
+              htmlFor="numeroPoliza"
+              error={errors.numeroPoliza?.message}
+            >
               <Input id="numeroPoliza" {...register('numeroPoliza')} />
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
+
           <DialogFooter>
             <Button
               type="button"

@@ -11,7 +11,6 @@ import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
+import { textoRequerido, seleccionRequerida, numeroOpcional } from '@/lib/validacion';
 import {
   useClientesCatalogo,
   useConductoresCatalogo,
@@ -38,12 +39,12 @@ import type { CrearViajePayload, Viaje } from './types';
 const NINGUNO = '__ninguno__';
 
 const schema = z.object({
-  clienteId: z.string().min(1, 'Selecciona un cliente'),
-  origenDireccion: z.string().min(1, 'Requerido'),
-  destinoDireccion: z.string().min(1, 'Requerido'),
-  tipoCarga: z.string().min(1, 'Requerido'),
+  clienteId: seleccionRequerida('Selecciona un cliente'),
+  origenDireccion: textoRequerido('El origen es obligatorio'),
+  destinoDireccion: textoRequerido('El destino es obligatorio'),
+  tipoCarga: textoRequerido('El tipo de carga es obligatorio'),
   descripcionCarga: z.string().optional(),
-  pesoKg: z.string().optional(),
+  pesoKg: numeroOpcional({ min: 0 }),
   dimensiones: z.string().optional(),
   fechaProgramada: z.string().optional(),
   unidadId: z.string().optional(),
@@ -70,6 +71,7 @@ export function CrearViajeDialog() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       clienteId: '',
       origenDireccion: '',
@@ -141,74 +143,101 @@ export function CrearViajeDialog() {
         </DialogHeader>
 
         <form onSubmit={handleSubmit((v) => crear.mutate(v))} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="clienteId">Cliente *</Label>
-            <Select value={clienteId} onValueChange={(v) => setValue('clienteId', v, { shouldValidate: true })}>
-              <SelectTrigger id="clienteId">
-                <SelectValue placeholder={clientes.isLoading ? 'Cargando…' : 'Selecciona un cliente'} />
-              </SelectTrigger>
-              <SelectContent>
-                {(clientes.data ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.clienteId && <p className="text-sm text-destructive">{errors.clienteId.message}</p>}
-          </div>
+          {/* Cliente */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Cliente"
+              htmlFor="clienteId"
+              required
+              error={errors.clienteId?.message}
+              full
+            >
+              <Select
+                value={clienteId}
+                onValueChange={(v) => setValue('clienteId', v, { shouldValidate: true })}
+              >
+                <SelectTrigger id="clienteId">
+                  <SelectValue placeholder={clientes.isLoading ? 'Cargando…' : 'Selecciona un cliente'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(clientes.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Campo>
+          </CamposGrid>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="origenDireccion">Origen *</Label>
+          {/* Origen / Destino */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Origen"
+              htmlFor="origenDireccion"
+              required
+              error={errors.origenDireccion?.message}
+              full
+            >
               <Input id="origenDireccion" {...register('origenDireccion')} />
-              {errors.origenDireccion && (
-                <p className="text-sm text-destructive">{errors.origenDireccion.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="destinoDireccion">Destino *</Label>
+            </Campo>
+            <Campo
+              label="Destino"
+              htmlFor="destinoDireccion"
+              required
+              error={errors.destinoDireccion?.message}
+              full
+            >
               <Input id="destinoDireccion" {...register('destinoDireccion')} />
-              {errors.destinoDireccion && (
-                <p className="text-sm text-destructive">{errors.destinoDireccion.message}</p>
-              )}
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="tipoCarga">Tipo de carga *</Label>
+          {/* Tipo de carga / Peso */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Tipo de carga"
+              htmlFor="tipoCarga"
+              required
+              error={errors.tipoCarga?.message}
+            >
               <Input id="tipoCarga" {...register('tipoCarga')} />
-              {errors.tipoCarga && <p className="text-sm text-destructive">{errors.tipoCarga.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pesoKg">Peso (kg)</Label>
+            </Campo>
+            <Campo
+              label="Peso (kg)"
+              htmlFor="pesoKg"
+              error={errors.pesoKg?.message}
+            >
               <Input id="pesoKg" type="number" step="any" min="0" {...register('pesoKg')} />
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="descripcionCarga">Descripción de la carga</Label>
-            <Input id="descripcionCarga" {...register('descripcionCarga')} />
-          </div>
+          {/* Descripción */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Descripción de la carga"
+              htmlFor="descripcionCarga"
+              full
+            >
+              <Input id="descripcionCarga" {...register('descripcionCarga')} />
+            </Campo>
+          </CamposGrid>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="dimensiones">Dimensiones</Label>
+          {/* Dimensiones / Fecha */}
+          <CamposGrid cols={2}>
+            <Campo label="Dimensiones" htmlFor="dimensiones">
               <Input id="dimensiones" placeholder="Ej. 2x2x4 m" {...register('dimensiones')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fechaProgramada">Fecha programada</Label>
+            </Campo>
+            <Campo label="Fecha programada" htmlFor="fechaProgramada">
               <Input id="fechaProgramada" type="datetime-local" {...register('fechaProgramada')} />
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="unidadId">Unidad</Label>
+          {/* Unidad / Conductor */}
+          <CamposGrid cols={2}>
+            <Campo label="Unidad" htmlFor="unidadId">
               <Select
                 value={unidadId}
-                onValueChange={(v) => setValue('unidadId', v)}
+                onValueChange={(v) => setValue('unidadId', v, { shouldValidate: true })}
               >
                 <SelectTrigger id="unidadId">
                   <SelectValue placeholder={unidades.isLoading ? 'Cargando…' : 'Sin asignar'} />
@@ -222,12 +251,11 @@ export function CrearViajeDialog() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="conductorId">Conductor</Label>
+            </Campo>
+            <Campo label="Conductor" htmlFor="conductorId">
               <Select
                 value={conductorId}
-                onValueChange={(v) => setValue('conductorId', v)}
+                onValueChange={(v) => setValue('conductorId', v, { shouldValidate: true })}
               >
                 <SelectTrigger id="conductorId">
                   <SelectValue placeholder={conductores.isLoading ? 'Cargando…' : 'Sin asignar'} />
@@ -241,8 +269,8 @@ export function CrearViajeDialog() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={crear.isPending}>

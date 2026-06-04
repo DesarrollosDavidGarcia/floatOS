@@ -10,7 +10,6 @@ import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -20,14 +19,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
+import { textoRequerido, numeroOpcional } from '@/lib/validacion';
 import type { Viaje } from './types';
 
 const schema = z.object({
-  origenDireccion: z.string().min(1, 'Requerido'),
-  destinoDireccion: z.string().min(1, 'Requerido'),
-  tipoCarga: z.string().min(1, 'Requerido'),
+  origenDireccion: textoRequerido('El origen es obligatorio'),
+  destinoDireccion: textoRequerido('El destino es obligatorio'),
+  tipoCarga: textoRequerido('El tipo de carga es obligatorio'),
   descripcionCarga: z.string().optional(),
-  pesoKg: z.string().optional(),
+  pesoKg: numeroOpcional({ min: 0 }),
   dimensiones: z.string().optional(),
   fechaProgramada: z.string().optional(),
 });
@@ -54,6 +55,7 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
   });
 
   useEffect(() => {
@@ -110,52 +112,67 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit((v) => mutar.mutate(v))} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-origen">Origen *</Label>
+          {/* Origen / Destino */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Origen"
+              htmlFor="edit-origen"
+              required
+              error={errors.origenDireccion?.message}
+              full
+            >
               <Input id="edit-origen" {...register('origenDireccion')} />
-              {errors.origenDireccion && (
-                <p className="text-sm text-destructive">{errors.origenDireccion.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-destino">Destino *</Label>
+            </Campo>
+            <Campo
+              label="Destino"
+              htmlFor="edit-destino"
+              required
+              error={errors.destinoDireccion?.message}
+              full
+            >
               <Input id="edit-destino" {...register('destinoDireccion')} />
-              {errors.destinoDireccion && (
-                <p className="text-sm text-destructive">{errors.destinoDireccion.message}</p>
-              )}
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-tipoCarga">Tipo de carga *</Label>
+          {/* Tipo de carga / Peso */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Tipo de carga"
+              htmlFor="edit-tipoCarga"
+              required
+              error={errors.tipoCarga?.message}
+            >
               <Input id="edit-tipoCarga" {...register('tipoCarga')} />
-              {errors.tipoCarga && (
-                <p className="text-sm text-destructive">{errors.tipoCarga.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-pesoKg">Peso (kg)</Label>
+            </Campo>
+            <Campo
+              label="Peso (kg)"
+              htmlFor="edit-pesoKg"
+              error={errors.pesoKg?.message}
+            >
               <Input id="edit-pesoKg" type="number" step="any" min="0" {...register('pesoKg')} />
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-descripcion">Descripción de la carga</Label>
-            <Input id="edit-descripcion" {...register('descripcionCarga')} />
-          </div>
+          {/* Descripción */}
+          <CamposGrid cols={2}>
+            <Campo
+              label="Descripción de la carga"
+              htmlFor="edit-descripcion"
+              full
+            >
+              <Input id="edit-descripcion" {...register('descripcionCarga')} />
+            </Campo>
+          </CamposGrid>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-dimensiones">Dimensiones</Label>
+          {/* Dimensiones / Fecha */}
+          <CamposGrid cols={2}>
+            <Campo label="Dimensiones" htmlFor="edit-dimensiones">
               <Input id="edit-dimensiones" {...register('dimensiones')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-fecha">Fecha programada</Label>
+            </Campo>
+            <Campo label="Fecha programada" htmlFor="edit-fecha">
               <Input id="edit-fecha" type="datetime-local" {...register('fechaProgramada')} />
-            </div>
-          </div>
+            </Campo>
+          </CamposGrid>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={mutar.isPending}>

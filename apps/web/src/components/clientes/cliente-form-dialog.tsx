@@ -17,33 +17,31 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
+import { textoRequerido } from '@/lib/validacion';
 import type { Cliente } from '@/app/(panel)/clientes/tipos';
 
-const opcional = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max, `Máximo ${max} caracteres`)
-    .optional()
-    .or(z.literal(''));
-
 const schema = z.object({
-  razonSocial: z
+  razonSocial: textoRequerido('La razón social es obligatoria').max(200, 'Máximo 200 caracteres'),
+  rfc: z
     .string()
     .trim()
-    .min(1, 'La razón social es requerida')
-    .max(200, 'Máximo 200 caracteres'),
-  rfc: opcional(20),
-  contactoNombre: opcional(120),
-  contactoTelefono: opcional(40),
-  contactoEmail: z
-    .string()
-    .trim()
-    .email('Correo no válido')
     .optional()
-    .or(z.literal('')),
-  direccion: opcional(300),
+    .refine(
+      (v) => !v || /^[A-ZÑ&0-9]{12,13}$/i.test(v),
+      'El RFC debe tener 12 o 13 caracteres',
+    ),
+  contactoNombre: z.string().trim().optional().or(z.literal('')),
+  contactoTelefono: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (v) => !v || /^\d{10}$/.test(v.replace(/\D/g, '')),
+      'El teléfono debe tener 10 dígitos',
+    ),
+  contactoEmail: z.string().trim().email('Correo inválido').optional().or(z.literal('')),
+  direccion: z.string().trim().optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -99,6 +97,7 @@ export function ClienteFormDialog({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: VACIO,
+    mode: 'onTouched',
   });
 
   // Rellena el formulario al abrir (crear -> vacío, editar -> datos).
@@ -152,57 +151,43 @@ export function ClienteFormDialog({
         <form
           id="cliente-form"
           onSubmit={handleSubmit((values) => mutation.mutate(values))}
-          className="space-y-4"
+          className="space-y-3"
         >
-          <div className="space-y-1.5">
-            <Label htmlFor="razonSocial">Razón social *</Label>
-            <Input id="razonSocial" {...register('razonSocial')} autoFocus />
-            {errors.razonSocial ? (
-              <p className="text-sm text-destructive">{errors.razonSocial.message}</p>
-            ) : null}
-          </div>
+          <CamposGrid cols={2}>
+            <Campo
+              label="Razón social"
+              htmlFor="razonSocial"
+              required
+              error={errors.razonSocial?.message}
+              full
+            >
+              <Input id="razonSocial" {...register('razonSocial')} autoFocus />
+            </Campo>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="rfc">RFC</Label>
+            <Campo label="RFC" htmlFor="rfc" error={errors.rfc?.message}>
               <Input id="rfc" {...register('rfc')} />
-              {errors.rfc ? (
-                <p className="text-sm text-destructive">{errors.rfc.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="contactoNombre">Nombre de contacto</Label>
+            </Campo>
+
+            <Campo
+              label="Nombre de contacto"
+              htmlFor="contactoNombre"
+              error={errors.contactoNombre?.message}
+            >
               <Input id="contactoNombre" {...register('contactoNombre')} />
-              {errors.contactoNombre ? (
-                <p className="text-sm text-destructive">{errors.contactoNombre.message}</p>
-              ) : null}
-            </div>
-          </div>
+            </Campo>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="contactoTelefono">Teléfono</Label>
+            <Campo label="Teléfono" htmlFor="contactoTelefono" error={errors.contactoTelefono?.message}>
               <Input id="contactoTelefono" {...register('contactoTelefono')} />
-              {errors.contactoTelefono ? (
-                <p className="text-sm text-destructive">{errors.contactoTelefono.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="contactoEmail">Correo</Label>
-              <Input id="contactoEmail" type="email" {...register('contactoEmail')} />
-              {errors.contactoEmail ? (
-                <p className="text-sm text-destructive">{errors.contactoEmail.message}</p>
-              ) : null}
-            </div>
-          </div>
+            </Campo>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="direccion">Dirección</Label>
-            <Input id="direccion" {...register('direccion')} />
-            {errors.direccion ? (
-              <p className="text-sm text-destructive">{errors.direccion.message}</p>
-            ) : null}
-          </div>
+            <Campo label="Correo" htmlFor="contactoEmail" error={errors.contactoEmail?.message}>
+              <Input id="contactoEmail" type="email" {...register('contactoEmail')} />
+            </Campo>
+
+            <Campo label="Dirección" htmlFor="direccion" error={errors.direccion?.message} full>
+              <Input id="direccion" {...register('direccion')} />
+            </Campo>
+          </CamposGrid>
         </form>
 
         <DialogFooter>

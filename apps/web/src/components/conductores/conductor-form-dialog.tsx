@@ -9,7 +9,6 @@ import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
 import type { Conductor, ConductorFormPayload } from './types';
 
 const baseSchema = {
@@ -75,6 +75,7 @@ export function ConductorFormDialog({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(buildSchema(esEdicion)),
+    mode: 'onTouched',
     defaultValues: {
       nombre: '',
       apellidos: '',
@@ -141,65 +142,71 @@ export function ConductorFormDialog({
           onSubmit={handleSubmit((values) => mutation.mutate(values))}
           className="space-y-4"
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="nombre">Nombre</Label>
+          <CamposGrid cols={2}>
+            <Campo
+              label="Nombre"
+              htmlFor="nombre"
+              required
+              error={errors.nombre?.message}
+            >
               <Input id="nombre" {...register('nombre')} />
-              {errors.nombre && (
-                <p className="text-sm text-destructive">{errors.nombre.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="apellidos">Apellidos</Label>
+            </Campo>
+
+            <Campo
+              label="Apellidos"
+              htmlFor="apellidos"
+              error={errors.apellidos?.message}
+            >
               <Input id="apellidos" {...register('apellidos')} />
-              {errors.apellidos && (
-                <p className="text-sm text-destructive">{errors.apellidos.message}</p>
-              )}
-            </div>
-          </div>
+            </Campo>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="usuario">Usuario</Label>
+            <Campo
+              label="Usuario"
+              htmlFor="usuario"
+              required
+              error={errors.usuario?.message}
+            >
               <Input id="usuario" autoComplete="off" {...register('usuario')} />
-              {errors.usuario && (
-                <p className="text-sm text-destructive">{errors.usuario.message}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="telefono">Teléfono</Label>
+            </Campo>
+
+            <Campo
+              label="Teléfono"
+              htmlFor="telefono"
+              error={errors.telefono?.message}
+            >
               <Input id="telefono" {...register('telefono')} />
-              {errors.telefono && (
-                <p className="text-sm text-destructive">{errors.telefono.message}</p>
-              )}
-            </div>
-          </div>
+            </Campo>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" {...register('email')} />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            )}
-          </div>
+            <Campo
+              label="Email"
+              htmlFor="email"
+              full
+              error={errors.email?.message}
+            >
+              <Input id="email" type="email" {...register('email')} />
+            </Campo>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              {...register('password')}
-            />
-            {esEdicion && (
-              <p className="text-xs text-muted-foreground">
-                Dejar vacío para no cambiar.
-              </p>
-            )}
-            {errors.password && (
-              <p className="text-sm text-destructive">{errors.password.message}</p>
-            )}
-          </div>
+            <Campo
+              label="Contraseña"
+              htmlFor="password"
+              required={!esEdicion}
+              full
+              error={errors.password?.message}
+            >
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                {...register('password')}
+              />
+            </Campo>
+          </CamposGrid>
+
+          {esEdicion && (
+            <p className="text-xs text-muted-foreground">
+              Dejar vacío para no cambiar.
+            </p>
+          )}
 
           <DialogFooter>
             <Button
