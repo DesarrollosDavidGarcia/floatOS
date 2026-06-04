@@ -1,10 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Detrás de Nginx: confiar en el primer proxy para que el rate limiter
+  // (ThrottlerGuard) cuente por la IP real del cliente (X-Forwarded-For),
+  // no por la IP del reverse proxy.
+  app.set('trust proxy', 1);
 
   app.setGlobalPrefix('api');
   app.enableCors({ origin: true, credentials: true });

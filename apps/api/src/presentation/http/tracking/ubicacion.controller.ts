@@ -7,6 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { RegistrarUbicacionUseCase } from '../../../application/tracking/registrar-ubicacion.usecase';
 import { UbicacionPublica } from '../../../application/tracking/tracking.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,6 +25,7 @@ import { RegistrarUbicacionesLoteDto } from './dto/registrar-ubicaciones-lote.dt
  */
 @Controller('viajes')
 @UseGuards(JwtAuthGuard, ConductorGuard)
+@SkipThrottle()
 export class UbicacionController {
   constructor(
     private readonly registrarUbicacion: RegistrarUbicacionUseCase,
