@@ -122,15 +122,11 @@ export default function ConductoresPage() {
       <PageHeader
         title="Conductores"
         description="Gestiona los conductores de la flotilla, sus documentos e historial."
-        action={
-          <Button onClick={() => setCrearOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Nuevo conductor
-          </Button>
-        }
       />
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative w-full max-w-sm">
+      {/* Barra de acciones: filtro + agregar, alineados a la derecha */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -142,11 +138,9 @@ export default function ConductoresPage() {
             }}
           />
         </div>
-        {data && (
-          <p className="shrink-0 text-xs text-muted-foreground">
-            {data.total} {data.total === 1 ? 'conductor' : 'conductores'}
-          </p>
-        )}
+        <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Nuevo conductor
+        </Button>
       </div>
 
       <div className="rounded-md border">
@@ -292,10 +286,11 @@ export default function ConductoresPage() {
         </Table>
       </div>
 
-      {data && totalPaginas > 1 && (
+      {data && conductores.length > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Página {data.page} de {totalPaginas} · {data.total} conductores
+            {data.total} {data.total === 1 ? 'conductor' : 'conductores'} · Página{' '}
+            {data.page} de {totalPaginas}
           </p>
           <div className="flex gap-2">
             <Button
