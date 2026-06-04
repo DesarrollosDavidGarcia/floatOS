@@ -4,17 +4,40 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { FileText, FolderOpen, Pencil, Plus, Route, Trash2 } from 'lucide-react';
+import {
+  FileText,
+  FolderOpen,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Route,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import type { Paginado } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { PageHeader } from '@/components/page-header';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -23,12 +46,30 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import type { Conductor } from '@/components/conductores/types';
 import { ConductorFormDialog } from '@/components/conductores/conductor-form-dialog';
 import { DocumentosDialog } from '@/components/conductores/documentos-dialog';
 import { ViajesDialog } from '@/components/conductores/viajes-dialog';
 
 const PAGE_SIZE = 10;
+
+function nombreCompleto(c: Conductor): string {
+  return `${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}`;
+}
+
+/** Avatar circular con iniciales del conductor. */
+function Avatar({ conductor }: { conductor: Conductor }) {
+  const iniciales =
+    `${conductor.nombre?.[0] ?? ''}${conductor.apellidos?.[0] ?? ''}`
+      .toUpperCase()
+      .trim() || '?';
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+      {iniciales}
+    </div>
+  );
+}
 
 export default function ConductoresPage() {
   const queryClient = useQueryClient();
@@ -40,6 +81,7 @@ export default function ConductoresPage() {
   const [editando, setEditando] = useState<Conductor | null>(null);
   const [docsConductor, setDocsConductor] = useState<Conductor | null>(null);
   const [viajesConductor, setViajesConductor] = useState<Conductor | null>(null);
+  const [eliminarConductor, setEliminarConductor] = useState<Conductor | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['conductores', { q, page }],
@@ -58,10 +100,14 @@ export default function ConductoresPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conductores'] });
       toast.success('Conductor eliminado');
+      setEliminarConductor(null);
     },
     onError: (err) => {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
-        toast.error(apiError(err) || 'No se puede eliminar: el conductor tiene viajes asociados.');
+        toast.error(
+          apiError(err) ||
+            'No se puede eliminar: el conductor tiene viajes asociados.',
+        );
         return;
       }
       toast.error(apiError(err));
@@ -83,26 +129,45 @@ export default function ConductoresPage() {
         }
       />
 
-      <div className="max-w-sm">
-        <Input
-          placeholder="Buscar por nombre, usuario…"
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setPage(1);
-          }}
-        />
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Buscar por nombre, usuario…"
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        {data && (
+          <p className="shrink-0 text-xs text-muted-foreground">
+            {data.total} {data.total === 1 ? 'conductor' : 'conductores'}
+          </p>
+        )}
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Usuario</TableHead>
-              <TableHead>Teléfono</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Conductor
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Contacto
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Licencia
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Estado
+              </TableHead>
+              <TableHead className="w-[60px] text-right text-xs uppercase text-muted-foreground">
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -110,84 +175,115 @@ export default function ConductoresPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell colSpan={5}>
-                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-10 w-full" />
                   </TableCell>
                 </TableRow>
               ))
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-destructive">
+                <TableCell colSpan={5} className="py-10 text-center text-destructive">
                   No se pudieron cargar los conductores.
                 </TableCell>
               </TableRow>
             ) : conductores.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="py-10 text-center text-muted-foreground"
+                >
                   No hay conductores que coincidan con la búsqueda.
                 </TableCell>
               </TableRow>
             ) : (
               conductores.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">
-                    {c.nombre}
-                    {c.apellidos ? ` ${c.apellidos}` : ''}
+                  {/* Conductor */}
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar conductor={c} />
+                      <div className="flex flex-col">
+                        <Link
+                          href={`/conductores/${c.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {nombreCompleto(c)}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">
+                          {c.usuario}
+                          {c.puesto ? ' · ' : ''}
+                          {c.puesto && (
+                            <CatalogoTexto grupo="PUESTO" codigo={c.puesto} />
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell>{c.usuario}</TableCell>
-                  <TableCell>{c.telefono ?? '—'}</TableCell>
+
+                  {/* Contacto */}
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{c.telefono ?? '—'}</span>
+                      {c.email && (
+                        <span className="text-xs text-muted-foreground">
+                          {c.email}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Licencia */}
+                  <TableCell>
+                    {c.categoriaLicencia ? (
+                      <Badge variant="outline">
+                        <CatalogoTexto
+                          grupo="CATEGORIA_LICENCIA"
+                          codigo={c.categoriaLicencia}
+                        />
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Estado */}
                   <TableCell>
                     <Badge variant={c.activo ? 'success' : 'secondary'}>
                       {c.activo ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </TableCell>
+
+                  {/* Acciones */}
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Ver expediente"
-                        asChild
-                      >
-                        <Link href={`/conductores/${c.id}`}>
-                          <FolderOpen className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Documentos"
-                        onClick={() => setDocsConductor(c)}
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Historial de viajes"
-                        onClick={() => setViajesConductor(c)}
-                      >
-                        <Route className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Editar"
-                        onClick={() => setEditando(c)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <ConfirmDialog
-                        trigger={
-                          <Button variant="ghost" size="icon" title="Eliminar">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        }
-                        title="Eliminar conductor"
-                        description={`¿Eliminar a ${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}? Esta acción no se puede deshacer.`}
-                        confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(c.id)}
-                      />
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Acciones">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/conductores/${c.id}`}>
+                            <FolderOpen className="h-4 w-4" /> Ver expediente
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setDocsConductor(c)}>
+                          <FileText className="h-4 w-4" /> Documentos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setViajesConductor(c)}>
+                          <Route className="h-4 w-4" /> Historial de viajes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditando(c)}>
+                          <Pencil className="h-4 w-4" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => setEliminarConductor(c)}
+                        >
+                          <Trash2 className="h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -251,6 +347,43 @@ export default function ConductoresPage() {
           if (!o) setViajesConductor(null);
         }}
       />
+
+      {/* Confirmar eliminación */}
+      <Dialog
+        open={Boolean(eliminarConductor)}
+        onOpenChange={(o) => {
+          if (!o) setEliminarConductor(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar conductor</DialogTitle>
+            <DialogDescription>
+              {eliminarConductor
+                ? `¿Eliminar a ${nombreCompleto(eliminarConductor)}? Esta acción no se puede deshacer.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEliminarConductor(null)}
+              disabled={eliminar.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                eliminarConductor && eliminar.mutate(eliminarConductor.id)
+              }
+              disabled={eliminar.isPending}
+            >
+              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

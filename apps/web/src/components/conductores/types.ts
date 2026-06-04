@@ -10,6 +10,10 @@ export interface Conductor {
   telefono: string | null;
   fotoKey?: string | null;
   activo: boolean;
+  // Datos de RH (catálogos / texto) usados en el listado
+  puesto?: string | null;
+  categoriaLicencia?: string | null;
+  numeroEmpleado?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
