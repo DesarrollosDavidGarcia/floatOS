@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { EstadoViaje } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { generarTokenSeguro } from '../shared/token.util';
 import { CrearViajeInput, RELACIONES_RESUMEN } from './viajes.types';
 
 /**
@@ -76,6 +77,7 @@ export class CrearViajeUseCase {
         ? new Date(input.fechaProgramada)
         : undefined,
       estado: EstadoViaje.ASIGNADO,
+      trackingToken: generarTokenSeguro(),
       ...(input.unidadId
         ? { unidad: { connect: { id: input.unidadId } } }
         : {}),

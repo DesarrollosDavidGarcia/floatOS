@@ -200,7 +200,7 @@ model Viaje {
   dimensiones      String?
 
   estado        EstadoViaje @default(ASIGNADO)
-  trackingToken String      @unique @default(cuid()) // link público de seguimiento
+  trackingToken String      @unique // link público; token aleatorio seguro (ver token.util.ts)
 
   fechaProgramada DateTime?
   fechaInicio     DateTime?
