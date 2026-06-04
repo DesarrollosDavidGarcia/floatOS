@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  seleccionRequerida,
+  fechaRequerida,
+  finNoAntesDeInicio,
+} from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -61,16 +66,21 @@ function isoADate(iso?: string | null): string {
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
-const schema = z.object({
-  tipo: z.string().min(1, 'Requerido'),
-  resultado: z.string().optional(),
-  institucion: z.string().trim().optional(),
-  folio: z.string().trim().optional(),
-  fechaEvaluacion: z.string().min(1, 'La fecha de evaluación es obligatoria'),
-  fechaVencimiento: z.string().optional(),
-  observaciones: z.string().trim().optional(),
-  archivoKey: z.string().trim().optional(),
-});
+const schema = z
+  .object({
+    tipo: seleccionRequerida(),
+    resultado: z.string().optional(),
+    institucion: z.string().trim().optional(),
+    folio: z.string().trim().optional(),
+    fechaEvaluacion: fechaRequerida('La fecha de evaluación es obligatoria'),
+    fechaVencimiento: z.string().optional(),
+    observaciones: z.string().trim().optional(),
+    archivoKey: z.string().trim().optional(),
+  })
+  .refine((d) => finNoAntesDeInicio(d.fechaEvaluacion, d.fechaVencimiento), {
+    path: ['fechaVencimiento'],
+    message: 'No puede ser anterior a la fecha de evaluación',
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -92,6 +102,7 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipo: '',
       resultado: '',
@@ -225,11 +236,11 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
       >
         <CamposGrid cols={2}>
           {/* Tipo */}
-          <Campo label="Tipo" error={errors.tipo?.message}>
+          <Campo label="Tipo" required error={errors.tipo?.message}>
             <CatalogoSelect
               grupo="TIPO_CONTROL_CONFIANZA"
               value={tipo}
-              onChange={(c) => setValue('tipo', c)}
+              onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
               placeholder="Selecciona un tipo"
             />
           </Campo>
@@ -258,13 +269,18 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
           <Campo
             label="Fecha de evaluación"
             htmlFor="fechaEvaluacion"
+            required
             error={errors.fechaEvaluacion?.message}
           >
             <Input id="fechaEvaluacion" type="date" {...register('fechaEvaluacion')} />
           </Campo>
 
           {/* Fecha vencimiento */}
-          <Campo label="Fecha de vencimiento" htmlFor="fechaVencimiento">
+          <Campo
+            label="Fecha de vencimiento"
+            htmlFor="fechaVencimiento"
+            error={errors.fechaVencimiento?.message}
+          >
             <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
           </Campo>
 

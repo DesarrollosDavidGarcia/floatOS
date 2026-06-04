@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,17 +33,23 @@ export function CamposGrid({
   );
 }
 
-/** Campo compacto: etiqueta pequeña + control + error. `full` ocupa toda la fila. */
+/**
+ * Campo compacto: etiqueta pequeña + control + error. `full` ocupa toda la
+ * fila. `required` muestra un asterisco. Cuando hay `error`, resalta en rojo
+ * la etiqueta, el borde del control (input/textarea/select) y muestra el motivo.
+ */
 export function Campo({
   label,
   htmlFor,
   error,
+  required,
   full,
   children,
 }: {
   label: string;
   htmlFor?: string;
   error?: string;
+  required?: boolean;
   full?: boolean;
   children: ReactNode;
 }) {
@@ -50,12 +57,28 @@ export function Campo({
     <div className={cn('space-y-1', full && 'sm:col-span-full')}>
       <Label
         htmlFor={htmlFor}
-        className="text-xs font-medium text-muted-foreground"
+        className={cn(
+          'text-xs font-medium',
+          error ? 'text-destructive' : 'text-muted-foreground',
+        )}
       >
         {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div
+        className={cn(
+          error &&
+            '[&_input]:border-destructive [&_input]:focus-visible:ring-destructive [&_textarea]:border-destructive [&_[role=combobox]]:border-destructive',
+        )}
+      >
+        {children}
+      </div>
+      {error && (
+        <p className="flex items-start gap-1 text-xs text-destructive">
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
+      )}
     </div>
   );
 }

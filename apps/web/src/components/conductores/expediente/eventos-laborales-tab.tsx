@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  textoRequerido,
+  seleccionRequerida,
+  fechaRequerida,
+} from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -47,9 +52,9 @@ function isoADate(iso?: string | null): string {
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipo: z.string().min(1, 'Requerido'),
-  titulo: z.string().min(1, 'El título es obligatorio'),
-  fecha: z.string().min(1, 'La fecha es obligatoria'),
+  tipo: seleccionRequerida(),
+  titulo: textoRequerido('El título es obligatorio'),
+  fecha: fechaRequerida('La fecha es obligatoria'),
   descripcion: z.string().trim().optional(),
   puestoNuevo: z.string().trim().optional(),
   registradoPor: z.string().trim().optional(),
@@ -106,6 +111,7 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipo: '',
       titulo: '',
@@ -179,18 +185,18 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
         size="md"
       >
         <CamposGrid cols={2}>
-          <Campo label="Tipo" error={errors.tipo?.message}>
+          <Campo label="Tipo" required error={errors.tipo?.message}>
             <CatalogoSelect
               grupo="TIPO_EVENTO_LABORAL"
               value={tipo}
-              onChange={(c) => setValue('tipo', c)}
+              onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
               placeholder="Selecciona…"
             />
           </Campo>
-          <Campo label="Título" htmlFor="ev-titulo" error={errors.titulo?.message}>
+          <Campo label="Título" htmlFor="ev-titulo" required error={errors.titulo?.message}>
             <Input id="ev-titulo" {...register('titulo')} />
           </Campo>
-          <Campo label="Fecha" htmlFor="ev-fecha" error={errors.fecha?.message}>
+          <Campo label="Fecha" htmlFor="ev-fecha" required error={errors.fecha?.message}>
             <Input id="ev-fecha" type="date" {...register('fecha')} />
           </Campo>
           <Campo label="Puesto nuevo" htmlFor="ev-puestoNuevo">

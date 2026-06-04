@@ -4,6 +4,11 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  fechaRequerida,
+  numeroOpcional,
+  finNoAntesDeInicio,
+} from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -77,18 +82,23 @@ function puntuacionVariant(score?: number | string | null): BadgeVariant {
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
-const schema = z.object({
-  periodoInicio: z.string().min(1, 'El periodo de inicio es obligatorio'),
-  periodoFin: z.string().min(1, 'El periodo de fin es obligatorio'),
-  puntuacionGeneral: z.string().optional(),
-  puntualidad: z.string().optional(),
-  consumoCombustible: z.string().optional(),
-  cumplimientoRutas: z.string().optional(),
-  incidenciasPeriodo: z.string().optional(),
-  viajesCompletados: z.string().optional(),
-  comentarios: z.string().trim().optional(),
-  evaluadoPor: z.string().trim().optional(),
-});
+const schema = z
+  .object({
+    periodoInicio: fechaRequerida('El inicio del periodo es obligatorio'),
+    periodoFin: fechaRequerida('El fin del periodo es obligatorio'),
+    puntuacionGeneral: numeroOpcional({ min: 0, max: 100 }),
+    puntualidad: numeroOpcional({ min: 0, max: 100 }),
+    consumoCombustible: numeroOpcional({ min: 0 }),
+    cumplimientoRutas: numeroOpcional({ min: 0, max: 100 }),
+    incidenciasPeriodo: numeroOpcional({ min: 0, entero: true }),
+    viajesCompletados: numeroOpcional({ min: 0, entero: true }),
+    comentarios: z.string().trim().optional(),
+    evaluadoPor: z.string().trim().optional(),
+  })
+  .refine(
+    (d) => finNoAntesDeInicio(d.periodoInicio, d.periodoFin),
+    { path: ['periodoFin'], message: 'El fin no puede ser anterior al inicio' },
+  );
 
 type FormValues = z.infer<typeof schema>;
 
@@ -117,6 +127,7 @@ function EvaluacionForm({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       periodoInicio: isoADate(evaluacion?.periodoInicio),
       periodoFin: isoADate(evaluacion?.periodoFin),
@@ -192,10 +203,10 @@ function EvaluacionForm({
     >
       <CamposGrid cols={3}>
         {/* Periodo */}
-        <Campo label="Periodo inicio" htmlFor="periodoInicio" error={errors.periodoInicio?.message}>
+        <Campo label="Periodo inicio" htmlFor="periodoInicio" required error={errors.periodoInicio?.message}>
           <Input id="periodoInicio" type="date" {...register('periodoInicio')} />
         </Campo>
-        <Campo label="Periodo fin" htmlFor="periodoFin" error={errors.periodoFin?.message}>
+        <Campo label="Periodo fin" htmlFor="periodoFin" required error={errors.periodoFin?.message}>
           <Input id="periodoFin" type="date" {...register('periodoFin')} />
         </Campo>
 
@@ -205,7 +216,7 @@ function EvaluacionForm({
         </Campo>
 
         {/* KPIs numéricos */}
-        <Campo label="Puntuación general (0–100)" htmlFor="puntuacionGeneral">
+        <Campo label="Puntuación general (0–100)" htmlFor="puntuacionGeneral" error={errors.puntuacionGeneral?.message}>
           <Input
             id="puntuacionGeneral"
             type="number"
@@ -215,7 +226,7 @@ function EvaluacionForm({
             {...register('puntuacionGeneral')}
           />
         </Campo>
-        <Campo label="Puntualidad" htmlFor="puntualidad">
+        <Campo label="Puntualidad" htmlFor="puntualidad" error={errors.puntualidad?.message}>
           <Input
             id="puntualidad"
             type="number"
@@ -225,7 +236,7 @@ function EvaluacionForm({
             {...register('puntualidad')}
           />
         </Campo>
-        <Campo label="Consumo combustible (km/L)" htmlFor="consumoCombustible">
+        <Campo label="Consumo combustible (km/L)" htmlFor="consumoCombustible" error={errors.consumoCombustible?.message}>
           <Input
             id="consumoCombustible"
             type="number"
@@ -234,7 +245,7 @@ function EvaluacionForm({
             {...register('consumoCombustible')}
           />
         </Campo>
-        <Campo label="Cumplimiento de rutas" htmlFor="cumplimientoRutas">
+        <Campo label="Cumplimiento de rutas" htmlFor="cumplimientoRutas" error={errors.cumplimientoRutas?.message}>
           <Input
             id="cumplimientoRutas"
             type="number"
@@ -244,7 +255,7 @@ function EvaluacionForm({
             {...register('cumplimientoRutas')}
           />
         </Campo>
-        <Campo label="Incidencias en el periodo" htmlFor="incidenciasPeriodo">
+        <Campo label="Incidencias en el periodo" htmlFor="incidenciasPeriodo" error={errors.incidenciasPeriodo?.message}>
           <Input
             id="incidenciasPeriodo"
             type="number"
@@ -253,7 +264,7 @@ function EvaluacionForm({
             {...register('incidenciasPeriodo')}
           />
         </Campo>
-        <Campo label="Viajes completados" htmlFor="viajesCompletados">
+        <Campo label="Viajes completados" htmlFor="viajesCompletados" error={errors.viajesCompletados?.message}>
           <Input
             id="viajesCompletados"
             type="number"

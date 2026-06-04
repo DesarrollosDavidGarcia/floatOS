@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  seleccionRequerida,
+  fechaRequerida,
+  numeroOpcional,
+  finNoAntesDeInicio,
+} from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -60,16 +66,21 @@ function isoADate(iso?: string | null): string {
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
-const schema = z.object({
-  tipo: z.string().min(1, 'Requerido'),
-  fechaInicio: z.string().min(1, 'La fecha de inicio es obligatoria'),
-  fechaFin: z.string().optional(),
-  dias: z.string().optional(),
-  motivo: z.string().trim().optional(),
-  folioIncapacidad: z.string().trim().optional(),
-  autorizadoPor: z.string().trim().optional(),
-  documentoKey: z.string().trim().optional(),
-});
+const schema = z
+  .object({
+    tipo: seleccionRequerida(),
+    fechaInicio: fechaRequerida('La fecha de inicio es obligatoria'),
+    fechaFin: z.string().optional(),
+    dias: numeroOpcional({ min: 0, entero: true }),
+    motivo: z.string().trim().optional(),
+    folioIncapacidad: z.string().trim().optional(),
+    autorizadoPor: z.string().trim().optional(),
+    documentoKey: z.string().trim().optional(),
+  })
+  .refine(
+    (d) => finNoAntesDeInicio(d.fechaInicio, d.fechaFin),
+    { path: ['fechaFin'], message: 'No puede ser anterior a la fecha de inicio' },
+  );
 
 type FormValues = z.infer<typeof schema>;
 
@@ -122,6 +133,7 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipo: '',
       fechaInicio: '',
@@ -206,21 +218,21 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
         size="md"
       >
         <CamposGrid cols={2}>
-          <Campo label="Tipo" error={errors.tipo?.message}>
+          <Campo label="Tipo" required error={errors.tipo?.message}>
             <CatalogoSelect
               grupo="TIPO_AUSENCIA"
               value={tipo}
-              onChange={(c) => setValue('tipo', c)}
+              onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
               placeholder="Selecciona…"
             />
           </Campo>
-          <Campo label="Días" htmlFor="aus-dias">
-            <Input id="aus-dias" type="number" min={1} {...register('dias')} />
+          <Campo label="Días" htmlFor="aus-dias" error={errors.dias?.message}>
+            <Input id="aus-dias" type="number" min={0} {...register('dias')} />
           </Campo>
-          <Campo label="Fecha de inicio" htmlFor="aus-fechaInicio" error={errors.fechaInicio?.message}>
+          <Campo label="Fecha de inicio" htmlFor="aus-fechaInicio" required error={errors.fechaInicio?.message}>
             <Input id="aus-fechaInicio" type="date" {...register('fechaInicio')} />
           </Campo>
-          <Campo label="Fecha de fin" htmlFor="aus-fechaFin">
+          <Campo label="Fecha de fin" htmlFor="aus-fechaFin" error={errors.fechaFin?.message}>
             <Input id="aus-fechaFin" type="date" {...register('fechaFin')} />
           </Campo>
           <Campo label="Folio de incapacidad" htmlFor="aus-folioIncapacidad">

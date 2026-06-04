@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -35,6 +38,11 @@ import {
   Conteo,
   unirSub,
 } from '@/components/conductores/expediente/tabla-ui';
+import {
+  textoRequerido,
+  numeroOpcional,
+  finNoAntesDeInicio,
+} from '@/lib/validacion';
 
 interface CapacitacionConductor {
   id: string;
@@ -71,6 +79,30 @@ function isoADate(iso?: string | null): string {
   return iso.slice(0, 10);
 }
 
+// ── Schema ──────────────────────────────────────────────────────────────────────
+
+const schema = z
+  .object({
+    nombre: textoRequerido('El nombre del curso es obligatorio'),
+    instructor: z.string().trim().optional(),
+    institucion: z.string().trim().optional(),
+    horas: numeroOpcional({ min: 0, entero: true }),
+    calificacion: numeroOpcional({ min: 0, max: 100 }),
+    fechaInicio: z.string().optional(),
+    fechaFin: z.string().optional(),
+    aprobado: z.string().optional(),
+    constanciaKey: z.string().trim().optional(),
+    notas: z.string().trim().optional(),
+  })
+  .refine((d) => finNoAntesDeInicio(d.fechaInicio, d.fechaFin), {
+    path: ['fechaFin'],
+    message: 'No puede ser anterior a la fecha de inicio',
+  });
+
+type FormValues = z.infer<typeof schema>;
+
+// ── Formulario modal ─────────────────────────────────────────────────────────────
+
 function CapacitacionForm({
   conductorId,
   capacitacion,
@@ -87,62 +119,70 @@ function CapacitacionForm({
   const esEdicion = Boolean(capacitacion);
   const queryClient = useQueryClient();
 
-  const [nombre, setNombre] = useState(capacitacion?.nombre ?? '');
-  const [instructor, setInstructor] = useState(capacitacion?.instructor ?? '');
-  const [institucion, setInstitucion] = useState(capacitacion?.institucion ?? '');
-  const [horas, setHoras] = useState(capacitacion?.horas?.toString() ?? '');
-  const [fechaInicio, setFechaInicio] = useState(isoADate(capacitacion?.fechaInicio));
-  const [fechaFin, setFechaFin] = useState(isoADate(capacitacion?.fechaFin));
-  const [aprobado, setAprobado] = useState<string>(
-    capacitacion?.aprobado === true
-      ? 'true'
-      : capacitacion?.aprobado === false
-        ? 'false'
-        : '',
-  );
-  const [calificacion, setCalificacion] = useState(
-    capacitacion?.calificacion?.toString() ?? '',
-  );
-  const [constanciaKey, setConstanciaKey] = useState(capacitacion?.constanciaKey ?? '');
-  const [notas, setNotas] = useState(capacitacion?.notas ?? '');
-  const [error, setError] = useState('');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    mode: 'onTouched',
+    defaultValues: {
+      nombre: capacitacion?.nombre ?? '',
+      instructor: capacitacion?.instructor ?? '',
+      institucion: capacitacion?.institucion ?? '',
+      horas: capacitacion?.horas?.toString() ?? '',
+      calificacion: capacitacion?.calificacion?.toString() ?? '',
+      fechaInicio: isoADate(capacitacion?.fechaInicio),
+      fechaFin: isoADate(capacitacion?.fechaFin),
+      aprobado:
+        capacitacion?.aprobado === true
+          ? 'true'
+          : capacitacion?.aprobado === false
+            ? 'false'
+            : '',
+      constanciaKey: capacitacion?.constanciaKey ?? '',
+      notas: capacitacion?.notas ?? '',
+    },
+  });
 
   useEffect(() => {
-    setNombre(capacitacion?.nombre ?? '');
-    setInstructor(capacitacion?.instructor ?? '');
-    setInstitucion(capacitacion?.institucion ?? '');
-    setHoras(capacitacion?.horas?.toString() ?? '');
-    setFechaInicio(isoADate(capacitacion?.fechaInicio));
-    setFechaFin(isoADate(capacitacion?.fechaFin));
-    setAprobado(
-      capacitacion?.aprobado === true
-        ? 'true'
-        : capacitacion?.aprobado === false
-          ? 'false'
-          : '',
-    );
-    setCalificacion(capacitacion?.calificacion?.toString() ?? '');
-    setConstanciaKey(capacitacion?.constanciaKey ?? '');
-    setNotas(capacitacion?.notas ?? '');
-    setError('');
-  }, [capacitacion]);
+    reset({
+      nombre: capacitacion?.nombre ?? '',
+      instructor: capacitacion?.instructor ?? '',
+      institucion: capacitacion?.institucion ?? '',
+      horas: capacitacion?.horas?.toString() ?? '',
+      calificacion: capacitacion?.calificacion?.toString() ?? '',
+      fechaInicio: isoADate(capacitacion?.fechaInicio),
+      fechaFin: isoADate(capacitacion?.fechaFin),
+      aprobado:
+        capacitacion?.aprobado === true
+          ? 'true'
+          : capacitacion?.aprobado === false
+            ? 'false'
+            : '',
+      constanciaKey: capacitacion?.constanciaKey ?? '',
+      notas: capacitacion?.notas ?? '',
+    });
+  }, [capacitacion, reset]);
+
+  const aprobado = watch('aprobado');
 
   const mutation = useMutation({
-    mutationFn: async () => {
-      if (!nombre.trim()) {
-        throw new Error('El nombre es obligatorio');
-      }
-
-      const payload: CapacitacionFormPayload = { nombre: nombre.trim() };
-      if (instructor.trim()) payload.instructor = instructor.trim();
-      if (institucion.trim()) payload.institucion = institucion.trim();
-      if (horas !== '') payload.horas = Number(horas);
-      if (fechaInicio) payload.fechaInicio = new Date(fechaInicio).toISOString();
-      if (fechaFin) payload.fechaFin = new Date(fechaFin).toISOString();
-      if (aprobado !== '') payload.aprobado = aprobado === 'true';
-      if (calificacion !== '') payload.calificacion = Number(calificacion);
-      if (constanciaKey.trim()) payload.constanciaKey = constanciaKey.trim();
-      if (notas.trim()) payload.notas = notas.trim();
+    mutationFn: async (values: FormValues) => {
+      const payload: CapacitacionFormPayload = { nombre: values.nombre.trim() };
+      if (values.instructor?.trim()) payload.instructor = values.instructor.trim();
+      if (values.institucion?.trim()) payload.institucion = values.institucion.trim();
+      if (values.horas?.trim()) payload.horas = Number(values.horas);
+      if (values.fechaInicio) payload.fechaInicio = new Date(values.fechaInicio).toISOString();
+      if (values.fechaFin) payload.fechaFin = new Date(values.fechaFin).toISOString();
+      if (values.aprobado !== '' && values.aprobado != null)
+        payload.aprobado = values.aprobado === 'true';
+      if (values.calificacion?.trim()) payload.calificacion = Number(values.calificacion);
+      if (values.constanciaKey?.trim()) payload.constanciaKey = values.constanciaKey.trim();
+      if (values.notas?.trim()) payload.notas = values.notas.trim();
 
       if (esEdicion && capacitacion) {
         await api.patch(
@@ -160,11 +200,7 @@ function CapacitacionForm({
       toast.success(esEdicion ? 'Capacitación actualizada' : 'Capacitación agregada');
       onDone();
     },
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : apiError(err);
-      setError(msg);
-      toast.error(msg);
-    },
+    onError: (err) => toast.error(apiError(err)),
   });
 
   return (
@@ -172,59 +208,54 @@ function CapacitacionForm({
       open={open}
       onOpenChange={(o) => { if (!o) onDone(); onOpenChange(o); }}
       title={esEdicion ? 'Editar capacitación' : 'Nueva capacitación'}
-      onSubmit={(e) => {
-        e.preventDefault();
-        setError('');
-        mutation.mutate();
-      }}
+      onSubmit={handleSubmit((values) => mutation.mutate(values))}
       saving={mutation.isPending}
       submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
       size="md"
     >
       <CamposGrid cols={2}>
-        <Campo label="Nombre *" htmlFor="cap-nombre" full>
+        <Campo
+          label="Nombre"
+          htmlFor="cap-nombre"
+          full
+          required
+          error={errors.nombre?.message}
+        >
           <Input
             id="cap-nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
             placeholder="Nombre del curso"
+            {...register('nombre')}
           />
         </Campo>
 
         <Campo label="Instructor" htmlFor="cap-instructor">
-          <Input
-            id="cap-instructor"
-            value={instructor}
-            onChange={(e) => setInstructor(e.target.value)}
-          />
+          <Input id="cap-instructor" {...register('instructor')} />
         </Campo>
 
         <Campo label="Institución" htmlFor="cap-institucion">
-          <Input
-            id="cap-institucion"
-            value={institucion}
-            onChange={(e) => setInstitucion(e.target.value)}
-          />
+          <Input id="cap-institucion" {...register('institucion')} />
         </Campo>
 
-        <Campo label="Horas" htmlFor="cap-horas">
+        <Campo label="Horas" htmlFor="cap-horas" error={errors.horas?.message}>
           <Input
             id="cap-horas"
             type="number"
             min={0}
-            value={horas}
-            onChange={(e) => setHoras(e.target.value)}
+            {...register('horas')}
           />
         </Campo>
 
-        <Campo label="Calificación" htmlFor="cap-calificacion">
+        <Campo
+          label="Calificación"
+          htmlFor="cap-calificacion"
+          error={errors.calificacion?.message}
+        >
           <Input
             id="cap-calificacion"
             type="number"
             step="0.01"
             min={0}
-            value={calificacion}
-            onChange={(e) => setCalificacion(e.target.value)}
+            {...register('calificacion')}
           />
         </Campo>
 
@@ -232,22 +263,27 @@ function CapacitacionForm({
           <Input
             id="cap-fechaInicio"
             type="date"
-            value={fechaInicio}
-            onChange={(e) => setFechaInicio(e.target.value)}
+            {...register('fechaInicio')}
           />
         </Campo>
 
-        <Campo label="Fecha fin" htmlFor="cap-fechaFin">
+        <Campo
+          label="Fecha fin"
+          htmlFor="cap-fechaFin"
+          error={errors.fechaFin?.message}
+        >
           <Input
             id="cap-fechaFin"
             type="date"
-            value={fechaFin}
-            onChange={(e) => setFechaFin(e.target.value)}
+            {...register('fechaFin')}
           />
         </Campo>
 
         <Campo label="Aprobado">
-          <Select value={aprobado} onValueChange={setAprobado}>
+          <Select
+            value={aprobado ?? ''}
+            onValueChange={(c) => setValue('aprobado', c, { shouldValidate: true })}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Sin definir" />
             </SelectTrigger>
@@ -259,24 +295,17 @@ function CapacitacionForm({
         </Campo>
 
         <Campo label="Clave constancia" htmlFor="cap-constanciaKey">
-          <Input
-            id="cap-constanciaKey"
-            value={constanciaKey}
-            onChange={(e) => setConstanciaKey(e.target.value)}
-          />
+          <Input id="cap-constanciaKey" {...register('constanciaKey')} />
         </Campo>
 
         <Campo label="Notas" htmlFor="cap-notas" full>
           <textarea
             id="cap-notas"
             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
+            {...register('notas')}
           />
         </Campo>
       </CamposGrid>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </ExpedienteFormDialog>
   );
 }

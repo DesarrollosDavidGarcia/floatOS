@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  seleccionRequerida,
+  fechaRequerida,
+  finNoAntesDeInicio,
+} from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -62,16 +67,21 @@ function isoADate(iso?: string | null): string {
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
-const schema = z.object({
-  tipo: z.string().min(1, 'Requerido'),
-  resultado: z.string().optional(),
-  fechaExamen: z.string().min(1, 'La fecha del examen es obligatoria'),
-  fechaVencimiento: z.string().optional(),
-  institucion: z.string().trim().optional(),
-  medico: z.string().trim().optional(),
-  observaciones: z.string().trim().optional(),
-  archivoKey: z.string().trim().optional(),
-});
+const schema = z
+  .object({
+    tipo: seleccionRequerida(),
+    resultado: z.string().optional(),
+    fechaExamen: fechaRequerida('La fecha del examen es obligatoria'),
+    fechaVencimiento: z.string().optional(),
+    institucion: z.string().trim().optional(),
+    medico: z.string().trim().optional(),
+    observaciones: z.string().trim().optional(),
+    archivoKey: z.string().trim().optional(),
+  })
+  .refine((d) => finNoAntesDeInicio(d.fechaExamen, d.fechaVencimiento), {
+    path: ['fechaVencimiento'],
+    message: 'No puede ser anterior a la fecha del examen',
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -100,6 +110,7 @@ function ExamenMedicoForm({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipo: examen?.tipo ?? '',
       resultado: examen?.resultado ?? '',
@@ -170,11 +181,11 @@ function ExamenMedicoForm({
       size="md"
     >
       <CamposGrid cols={2}>
-        <Campo label="Tipo">
+        <Campo label="Tipo" required error={errors.tipo?.message}>
           <CatalogoSelect
             grupo="TIPO_EXAMEN_MEDICO"
             value={watch('tipo')}
-            onChange={(c) => setValue('tipo', c)}
+            onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
             placeholder="Selecciona un tipo"
           />
         </Campo>
@@ -191,12 +202,17 @@ function ExamenMedicoForm({
         <Campo
           label="Fecha del examen"
           htmlFor="fechaExamen"
+          required
           error={errors.fechaExamen?.message}
         >
           <Input id="fechaExamen" type="date" {...register('fechaExamen')} />
         </Campo>
 
-        <Campo label="Fecha de vencimiento" htmlFor="fechaVencimiento">
+        <Campo
+          label="Fecha de vencimiento"
+          htmlFor="fechaVencimiento"
+          error={errors.fechaVencimiento?.message}
+        >
           <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
         </Campo>
 

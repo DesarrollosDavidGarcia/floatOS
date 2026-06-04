@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, X, Check } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -18,6 +20,38 @@ import {
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { CamposGrid, Campo } from '@/components/conductores/expediente/form-ui';
+
+// ── Schema Zod ────────────────────────────────────────────────────────────────
+
+const datosSchema = z.object({
+  curp: z.string().trim().optional().refine(
+    (v) => !v || /^[A-Z0-9]{18}$/i.test(v),
+    'La CURP debe tener 18 caracteres',
+  ),
+  rfc: z.string().trim().optional().refine(
+    (v) => !v || /^[A-ZÑ&0-9]{12,13}$/i.test(v),
+    'El RFC debe tener 12 o 13 caracteres',
+  ),
+  nss: z.string().trim().optional().refine(
+    (v) => !v || /^\d{11}$/.test(v),
+    'El NSS debe tener 11 dígitos',
+  ),
+  emergenciaTelefono: z.string().optional().refine(
+    (v) => !v || /^\d{10}$/.test(v.replace(/\D/g, '')),
+    'El teléfono debe tener 10 dígitos',
+  ),
+  fechaNacimiento: z.string().optional(),
+  tipoSangre: z.string().optional(),
+  direccion: z.string().optional(),
+  numeroEmpleado: z.string().optional(),
+  puesto: z.string().optional(),
+  fechaIngreso: z.string().optional(),
+  categoriaLicencia: z.string().optional(),
+  emergenciaNombre: z.string().optional(),
+  emergenciaRelacion: z.string().optional(),
+});
+
+type DatosSchema = z.infer<typeof datosSchema>;
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -126,6 +160,8 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
     watch,
     formState: { errors },
   } = useForm<DatosFormValues>({
+    resolver: zodResolver(datosSchema) as any,
+    mode: 'onTouched',
     defaultValues: {
       curp: '',
       rfc: '',
@@ -248,7 +284,7 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
           </CardHeader>
           <CardContent className="pb-3">
             <CamposGrid cols={3}>
-              <Campo label="CURP" htmlFor="curp">
+              <Campo label="CURP" htmlFor="curp" error={errors.curp?.message}>
                 <Input id="curp" {...register('curp')} />
               </Campo>
               <Campo label="Fecha de nacimiento" htmlFor="fechaNacimiento">
@@ -278,10 +314,10 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
           </CardHeader>
           <CardContent className="pb-3">
             <CamposGrid cols={3}>
-              <Campo label="RFC" htmlFor="rfc">
+              <Campo label="RFC" htmlFor="rfc" error={errors.rfc?.message}>
                 <Input id="rfc" {...register('rfc')} />
               </Campo>
-              <Campo label="NSS (IMSS)" htmlFor="nss">
+              <Campo label="NSS (IMSS)" htmlFor="nss" error={errors.nss?.message}>
                 <Input id="nss" {...register('nss')} />
               </Campo>
             </CamposGrid>
@@ -348,7 +384,7 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
               <Campo label="Nombre" htmlFor="emergenciaNombre">
                 <Input id="emergenciaNombre" {...register('emergenciaNombre')} />
               </Campo>
-              <Campo label="Teléfono" htmlFor="emergenciaTelefono">
+              <Campo label="Teléfono" htmlFor="emergenciaTelefono" error={errors.emergenciaTelefono?.message}>
                 <Input id="emergenciaTelefono" {...register('emergenciaTelefono')} />
               </Campo>
               <Campo label="Relación" htmlFor="emergenciaRelacion">

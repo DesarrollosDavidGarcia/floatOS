@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { seleccionRequerida, numeroOpcional } from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -48,10 +49,10 @@ interface AptitudUnidadConductor {
 // ── schema ─────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  tipoUnidad: z.string().min(1, 'Requerido'),
+  tipoUnidad: seleccionRequerida(),
   nivel: z.string().optional(),
-  aniosExperiencia: z.string().optional(),
-  notas: z.string().optional(),
+  aniosExperiencia: numeroOpcional({ min: 0, max: 60, entero: true }),
+  notas: z.string().trim().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -81,6 +82,7 @@ function AptitudForm({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipoUnidad: aptitud?.tipoUnidad ?? '',
       nivel: aptitud?.nivel ?? '',
@@ -148,11 +150,11 @@ function AptitudForm({
       size="md"
     >
       <CamposGrid cols={2}>
-        <Campo label="Tipo de unidad" error={errors.tipoUnidad?.message}>
+        <Campo label="Tipo de unidad" required error={errors.tipoUnidad?.message}>
           <CatalogoSelect
             grupo="TIPO_UNIDAD_MANEJO"
             value={tipoUnidad}
-            onChange={(c) => setValue('tipoUnidad', c)}
+            onChange={(c) => setValue('tipoUnidad', c, { shouldValidate: true })}
             placeholder="Selecciona un tipo"
           />
         </Campo>
@@ -160,11 +162,15 @@ function AptitudForm({
           <CatalogoSelect
             grupo="NIVEL_APTITUD"
             value={nivel ?? ''}
-            onChange={(c) => setValue('nivel', c)}
+            onChange={(c) => setValue('nivel', c, { shouldValidate: true })}
             placeholder="Selecciona un nivel"
           />
         </Campo>
-        <Campo label="Años de experiencia" htmlFor="aniosExperiencia">
+        <Campo
+          label="Años de experiencia"
+          htmlFor="aniosExperiencia"
+          error={errors.aniosExperiencia?.message}
+        >
           <Input
             id="aniosExperiencia"
             type="number"

@@ -1,9 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import {
+  textoRequerido,
+  seleccionRequerida,
+  fechaRequerida,
+  numeroOpcional,
+} from '@/lib/validacion';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoBadge, CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import {
@@ -65,38 +74,27 @@ interface Incidencia {
   actualizadoEn: string;
 }
 
-interface FormState {
-  tipo: string;
-  gravedad: string;
-  titulo: string;
-  descripcion: string;
-  fecha: string;
-  lugar: string;
-  costoEstimado: string;
-  resuelta: string;
-  evidenciaKey: string;
-  registradoPor: string;
-  viajeId: string;
-}
-
-const FORM_EMPTY: FormState = {
-  tipo: '',
-  gravedad: '',
-  titulo: '',
-  descripcion: '',
-  fecha: '',
-  lugar: '',
-  costoEstimado: '',
-  resuelta: 'false',
-  evidenciaKey: '',
-  registradoPor: '',
-  viajeId: '',
-};
-
 function isoADate(iso?: string | null): string {
   if (!iso) return '';
   return iso.slice(0, 10);
 }
+
+// ── Schema ───────────────────────────────────────────────────────────────────
+
+const schema = z.object({
+  tipo: seleccionRequerida(),
+  titulo: textoRequerido('El título es obligatorio'),
+  fecha: fechaRequerida('La fecha es obligatoria'),
+  gravedad: z.string().optional(),
+  descripcion: z.string().trim().optional(),
+  lugar: z.string().trim().optional(),
+  costoEstimado: numeroOpcional({ min: 0 }),
+  resuelta: z.string().optional(),
+  evidenciaKey: z.string().trim().optional(),
+  registradoPor: z.string().trim().optional(),
+});
+
+type FormValues = z.infer<typeof schema>;
 
 // ── Tab principal ────────────────────────────────────────────────────────────
 
@@ -106,38 +104,57 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [eliminarTarget, setEliminarTarget] = useState<Incidencia | null>(null);
 
-  const [form, setForm] = useState<FormState>({ ...FORM_EMPTY });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-
   const esEdicion = Boolean(editando);
 
-  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setErrors((prev) => ({ ...prev, [key]: undefined }));
-  }
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    mode: 'onTouched',
+    defaultValues: {
+      tipo: '',
+      titulo: '',
+      fecha: '',
+      gravedad: '',
+      descripcion: '',
+      lugar: '',
+      costoEstimado: '',
+      resuelta: 'false',
+      evidenciaKey: '',
+      registradoPor: '',
+    },
+  });
+
+  useEffect(() => {
+    reset({
+      tipo: editando?.tipo ?? '',
+      titulo: editando?.titulo ?? '',
+      fecha: isoADate(editando?.fecha),
+      gravedad: editando?.gravedad ?? '',
+      descripcion: editando?.descripcion ?? '',
+      lugar: editando?.lugar ?? '',
+      costoEstimado: editando?.costoEstimado ?? '',
+      resuelta: editando ? String(editando.resuelta) : 'false',
+      evidenciaKey: editando?.evidenciaKey ?? '',
+      registradoPor: editando?.registradoPor ?? '',
+    });
+  }, [editando, mostrarForm, reset]);
+
+  const tipo = watch('tipo');
+  const gravedad = watch('gravedad');
+  const resuelta = watch('resuelta');
 
   function abrirNuevo() {
-    setForm({ ...FORM_EMPTY });
-    setErrors({});
     setEditando(null);
     setMostrarForm(true);
   }
 
   function abrirEdicion(inc: Incidencia) {
-    setForm({
-      tipo: inc.tipo,
-      gravedad: inc.gravedad,
-      titulo: inc.titulo,
-      descripcion: inc.descripcion ?? '',
-      fecha: isoADate(inc.fecha),
-      lugar: inc.lugar ?? '',
-      costoEstimado: inc.costoEstimado ?? '',
-      resuelta: String(inc.resuelta),
-      evidenciaKey: inc.evidenciaKey ?? '',
-      registradoPor: inc.registradoPor ?? '',
-      viajeId: inc.viajeId ?? '',
-    });
-    setErrors({});
     setEditando(inc);
     setMostrarForm(false);
   }
@@ -145,15 +162,6 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
   function cerrarForm() {
     setEditando(null);
     setMostrarForm(false);
-    setErrors({});
-  }
-
-  function validate(): boolean {
-    const e: Partial<Record<keyof FormState, string>> = {};
-    if (!form.titulo.trim()) e.titulo = 'El título es obligatorio';
-    if (!form.fecha) e.fecha = 'La fecha es obligatoria';
-    setErrors(e);
-    return Object.keys(e).length === 0;
   }
 
   const { data, isLoading, isError } = useQuery({
@@ -167,22 +175,21 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
   });
 
   const mutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (values: FormValues) => {
       const payload: Record<string, unknown> = {
-        tipo: form.tipo,
-        gravedad: form.gravedad,
-        titulo: form.titulo.trim(),
-        fecha: new Date(form.fecha).toISOString(),
-        resuelta: form.resuelta === 'true',
+        tipo: values.tipo,
+        titulo: values.titulo.trim(),
+        fecha: new Date(values.fecha).toISOString(),
+        resuelta: values.resuelta === 'true',
       };
-      if (form.descripcion.trim()) payload.descripcion = form.descripcion.trim();
-      if (form.lugar.trim()) payload.lugar = form.lugar.trim();
-      if (form.costoEstimado.trim())
-        payload.costoEstimado = Number(form.costoEstimado);
-      if (form.evidenciaKey.trim()) payload.evidenciaKey = form.evidenciaKey.trim();
-      if (form.registradoPor.trim())
-        payload.registradoPor = form.registradoPor.trim();
-      if (form.viajeId.trim()) payload.viajeId = form.viajeId.trim();
+      if (values.gravedad) payload.gravedad = values.gravedad;
+      if (values.descripcion?.trim()) payload.descripcion = values.descripcion.trim();
+      if (values.lugar?.trim()) payload.lugar = values.lugar.trim();
+      if (values.costoEstimado?.trim())
+        payload.costoEstimado = Number(values.costoEstimado);
+      if (values.evidenciaKey?.trim()) payload.evidenciaKey = values.evidenciaKey.trim();
+      if (values.registradoPor?.trim())
+        payload.registradoPor = values.registradoPor.trim();
 
       if (esEdicion && editando) {
         await api.patch(
@@ -217,12 +224,6 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
     onError: (err) => toast.error(apiError(err)),
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-    mutation.mutate();
-  }
-
   return (
     <div className="space-y-4">
       {/* Contador + Botón Agregar */}
@@ -238,18 +239,22 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
         open={mostrarForm || Boolean(editando)}
         onOpenChange={(o) => { if (!o) cerrarForm(); }}
         title={esEdicion ? 'Editar incidencia' : 'Nueva incidencia'}
-        onSubmit={handleSubmit}
+        onSubmit={handleSubmit((v) => mutation.mutate(v))}
         saving={mutation.isPending}
         submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
         size="lg"
       >
         <CamposGrid cols={2}>
           {/* Tipo */}
-          <Campo label="Tipo">
+          <Campo
+            label="Tipo"
+            required
+            error={errors.tipo?.message}
+          >
             <CatalogoSelect
               grupo="TIPO_INCIDENCIA"
-              value={form.tipo}
-              onChange={(c) => set('tipo', c)}
+              value={tipo}
+              onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
               placeholder="Selecciona…"
             />
           </Campo>
@@ -258,57 +263,54 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
           <Campo label="Gravedad">
             <CatalogoSelect
               grupo="GRAVEDAD_INCIDENCIA"
-              value={form.gravedad}
-              onChange={(c) => set('gravedad', c)}
+              value={gravedad ?? ''}
+              onChange={(c) => setValue('gravedad', c, { shouldValidate: true })}
               placeholder="Selecciona…"
             />
           </Campo>
 
           {/* Título */}
-          <Campo label="Título *" htmlFor="titulo" error={errors.titulo} full>
-            <Input
-              id="titulo"
-              value={form.titulo}
-              onChange={(e) => set('titulo', e.target.value)}
-            />
+          <Campo
+            label="Título"
+            htmlFor="titulo"
+            required
+            error={errors.titulo?.message}
+            full
+          >
+            <Input id="titulo" {...register('titulo')} />
           </Campo>
 
           {/* Fecha */}
-          <Campo label="Fecha *" htmlFor="fecha" error={errors.fecha}>
-            <Input
-              id="fecha"
-              type="date"
-              value={form.fecha}
-              onChange={(e) => set('fecha', e.target.value)}
-            />
+          <Campo
+            label="Fecha"
+            htmlFor="fecha"
+            required
+            error={errors.fecha?.message}
+          >
+            <Input id="fecha" type="date" {...register('fecha')} />
           </Campo>
 
           {/* Lugar */}
           <Campo label="Lugar" htmlFor="lugar">
-            <Input
-              id="lugar"
-              value={form.lugar}
-              onChange={(e) => set('lugar', e.target.value)}
-            />
+            <Input id="lugar" {...register('lugar')} />
           </Campo>
 
           {/* Costo estimado */}
-          <Campo label="Costo estimado" htmlFor="costoEstimado">
+          <Campo label="Costo estimado" htmlFor="costoEstimado" error={errors.costoEstimado?.message}>
             <Input
               id="costoEstimado"
               type="number"
               min="0"
               step="0.01"
-              value={form.costoEstimado}
-              onChange={(e) => set('costoEstimado', e.target.value)}
+              {...register('costoEstimado')}
             />
           </Campo>
 
           {/* Resuelta */}
           <Campo label="Resuelta">
             <Select
-              value={form.resuelta}
-              onValueChange={(v) => set('resuelta', v)}
+              value={resuelta ?? 'false'}
+              onValueChange={(v) => setValue('resuelta', v, { shouldValidate: true })}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -322,20 +324,12 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
 
           {/* Registrado por */}
           <Campo label="Registrado por" htmlFor="registradoPor">
-            <Input
-              id="registradoPor"
-              value={form.registradoPor}
-              onChange={(e) => set('registradoPor', e.target.value)}
-            />
+            <Input id="registradoPor" {...register('registradoPor')} />
           </Campo>
 
           {/* Evidencia key */}
           <Campo label="Clave de evidencia" htmlFor="evidenciaKey">
-            <Input
-              id="evidenciaKey"
-              value={form.evidenciaKey}
-              onChange={(e) => set('evidenciaKey', e.target.value)}
-            />
+            <Input id="evidenciaKey" {...register('evidenciaKey')} />
           </Campo>
 
           {/* Descripción */}
@@ -343,8 +337,7 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
             <textarea
               id="descripcion"
               className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-              value={form.descripcion}
-              onChange={(e) => set('descripcion', e.target.value)}
+              {...register('descripcion')}
             />
           </Campo>
         </CamposGrid>

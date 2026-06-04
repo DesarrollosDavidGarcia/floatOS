@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { seleccionRequerida, fechaRequerida, finNoAntesDeInicio } from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -35,12 +36,17 @@ import {
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
 
-const schema = z.object({
-  tipo: z.string().min(1, 'Requerido'),
-  numero: z.string().trim().optional(),
-  fechaEmision: z.string().optional(),
-  fechaVencimiento: z.string().min(1, 'La fecha de vencimiento es obligatoria'),
-});
+const schema = z
+  .object({
+    tipo: seleccionRequerida(),
+    numero: z.string().trim().optional(),
+    fechaEmision: z.string().optional(),
+    fechaVencimiento: fechaRequerida('La fecha de vencimiento es obligatoria'),
+  })
+  .refine((d) => finNoAntesDeInicio(d.fechaEmision, d.fechaVencimiento), {
+    path: ['fechaVencimiento'],
+    message: 'El vencimiento no puede ser anterior a la emisión',
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -72,6 +78,7 @@ function DocumentoForm({
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipo: documento?.tipo ?? '',
       numero: documento?.numero ?? '',
@@ -125,11 +132,11 @@ function DocumentoForm({
       size="md"
     >
       <CamposGrid cols={2}>
-        <Campo label="Tipo" error={errors.tipo?.message}>
+        <Campo label="Tipo" required error={errors.tipo?.message}>
           <CatalogoSelect
             grupo="TIPO_DOCUMENTO_CONDUCTOR"
             value={tipo}
-            onChange={(c) => setValue('tipo', c)}
+            onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
             placeholder="Selecciona un tipo"
           />
         </Campo>
@@ -140,8 +147,9 @@ function DocumentoForm({
           <Input id="doc-fechaEmision" type="date" {...register('fechaEmision')} />
         </Campo>
         <Campo
-          label="Fecha de vencimiento *"
+          label="Fecha de vencimiento"
           htmlFor="doc-fechaVencimiento"
+          required
           error={errors.fechaVencimiento?.message}
         >
           <Input id="doc-fechaVencimiento" type="date" {...register('fechaVencimiento')} />

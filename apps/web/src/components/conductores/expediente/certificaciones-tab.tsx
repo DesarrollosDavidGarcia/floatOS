@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { textoRequerido, seleccionRequerida, finNoAntesDeInicio } from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -58,14 +59,20 @@ function isoADate(iso?: string | null): string {
 
 // ── schema ─────────────────────────────────────────────────────────────────────
 
-const schema = z.object({
-  tipo: z.string().min(1, 'Requerido'),
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
-  emisor: z.string().trim().optional(),
-  folio: z.string().trim().optional(),
-  fechaEmision: z.string().optional(),
-  fechaVencimiento: z.string().optional(),
-});
+const schema = z
+  .object({
+    tipo: seleccionRequerida(),
+    nombre: textoRequerido('El nombre es obligatorio'),
+    emisor: z.string().trim().optional(),
+    folio: z.string().trim().optional(),
+    archivoKey: z.string().trim().optional(),
+    fechaEmision: z.string().optional(),
+    fechaVencimiento: z.string().optional(),
+  })
+  .refine((d) => finNoAntesDeInicio(d.fechaEmision, d.fechaVencimiento), {
+    path: ['fechaVencimiento'],
+    message: 'No puede ser anterior a la fecha de emisión',
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -117,11 +124,13 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onTouched',
     defaultValues: {
       tipo: '',
       nombre: '',
       emisor: '',
       folio: '',
+      archivoKey: '',
       fechaEmision: '',
       fechaVencimiento: '',
     },
@@ -133,6 +142,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
       nombre: editando?.nombre ?? '',
       emisor: editando?.emisor ?? '',
       folio: editando?.folio ?? '',
+      archivoKey: editando?.archivoKey ?? '',
       fechaEmision: isoADate(editando?.fechaEmision),
       fechaVencimiento: isoADate(editando?.fechaVencimiento),
     });
@@ -195,15 +205,15 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
         size="md"
       >
         <CamposGrid cols={2}>
-          <Campo label="Tipo" error={errors.tipo?.message}>
+          <Campo label="Tipo" required error={errors.tipo?.message}>
             <CatalogoSelect
               grupo="TIPO_CERTIFICACION"
               value={tipo}
-              onChange={(c) => setValue('tipo', c)}
+              onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
               placeholder="Selecciona…"
             />
           </Campo>
-          <Campo label="Nombre" htmlFor="cert-nombre" error={errors.nombre?.message}>
+          <Campo label="Nombre" htmlFor="cert-nombre" required error={errors.nombre?.message}>
             <Input id="cert-nombre" {...register('nombre')} />
           </Campo>
           <Campo label="Emisor" htmlFor="cert-emisor">
@@ -215,7 +225,11 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
           <Campo label="Fecha de emisión" htmlFor="cert-fechaEmision">
             <Input id="cert-fechaEmision" type="date" {...register('fechaEmision')} />
           </Campo>
-          <Campo label="Fecha de vencimiento" htmlFor="cert-fechaVencimiento">
+          <Campo
+            label="Fecha de vencimiento"
+            htmlFor="cert-fechaVencimiento"
+            error={errors.fechaVencimiento?.message}
+          >
             <Input id="cert-fechaVencimiento" type="date" {...register('fechaVencimiento')} />
           </Campo>
         </CamposGrid>
