@@ -80,6 +80,8 @@ function displayDate(iso?: string | null): string {
 }
 
 const CATEGORIAS_LICENCIA = Object.values(CategoriaLicencia);
+// Radix Select no admite value="" en un Item; usamos un centinela para "Sin categoría".
+const SIN_CATEGORIA = '__sin_categoria__';
 
 // ── Fila de detalle (modo vista) ───────────────────────────────────────────────
 
@@ -311,14 +313,16 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
               <div className="space-y-1.5">
                 <Label>Categoría de licencia</Label>
                 <Select
-                  value={categoriaLicenciaValue}
-                  onValueChange={(v) => setValue('categoriaLicencia', v)}
+                  value={categoriaLicenciaValue || SIN_CATEGORIA}
+                  onValueChange={(v) =>
+                    setValue('categoriaLicencia', v === SIN_CATEGORIA ? '' : v)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin categoría</SelectItem>
+                    <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
                     {CATEGORIAS_LICENCIA.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         Categoría {cat}
