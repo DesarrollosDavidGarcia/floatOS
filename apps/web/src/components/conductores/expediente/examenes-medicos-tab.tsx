@@ -5,12 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +28,13 @@ import {
   Campo,
   SeccionHeader,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  unirSub,
+  Fecha,
+  Vigencia,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -255,6 +259,7 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
   return (
     <div className="space-y-4">
       <SeccionHeader>
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar examen
         </Button>
@@ -286,38 +291,31 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Resultado</TableHead>
-                <TableHead>Fecha examen</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Institución</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Examen</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Resultado</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Fecha</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Vigencia</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((examen) => (
                 <TableRow key={examen.id}>
                   <TableCell>
-                    <CatalogoTexto grupo="TIPO_EXAMEN_MEDICO" codigo={examen.tipo} />
+                    <CeldaPrincipal
+                      titulo={<CatalogoTexto grupo="TIPO_EXAMEN_MEDICO" codigo={examen.tipo} />}
+                      subtitulo={unirSub(examen.institucion, examen.medico)}
+                    />
                   </TableCell>
                   <TableCell>
                     <CatalogoBadge grupo="RESULTADO_EXAMEN" codigo={examen.resultado} />
                   </TableCell>
                   <TableCell>
-                    {format(new Date(examen.fechaExamen), 'dd MMM yyyy', { locale: es })}
+                    <Fecha iso={examen.fechaExamen} />
                   </TableCell>
                   <TableCell>
-                    {examen.fechaVencimiento ? (
-                      <Badge variant="outline">
-                        {format(new Date(examen.fechaVencimiento), 'dd MMM yyyy', {
-                          locale: es,
-                        })}
-                      </Badge>
-                    ) : (
-                      '—'
-                    )}
+                    <Vigencia iso={examen.fechaVencimiento} />
                   </TableCell>
-                  <TableCell>{examen.institucion ?? '—'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button

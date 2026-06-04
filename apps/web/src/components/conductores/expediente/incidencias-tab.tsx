@@ -6,6 +6,12 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoBadge, CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import {
+  CeldaPrincipal,
+  Fecha,
+  Dinero,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,15 +96,6 @@ const FORM_EMPTY: FormState = {
 function isoADate(iso?: string | null): string {
   if (!iso) return '';
   return iso.slice(0, 10);
-}
-
-function formatFecha(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 // ── Tab principal ────────────────────────────────────────────────────────────
@@ -228,8 +225,9 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Botón Agregar siempre visible arriba a la derecha */}
-      <div className="flex justify-end">
+      {/* Contador + Botón Agregar */}
+      <div className="flex items-center justify-between">
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={abrirNuevo}>
           <Plus className="mr-1 h-4 w-4" /> Agregar incidencia
         </Button>
@@ -372,33 +370,33 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Gravedad</TableHead>
-                <TableHead>Título</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Costo est.</TableHead>
-                <TableHead>Resuelta</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Incidencia</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Gravedad</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Fecha</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Costo</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Resuelta</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((inc) => (
                 <TableRow key={inc.id}>
                   <TableCell>
-                    <CatalogoTexto grupo="TIPO_INCIDENCIA" codigo={inc.tipo} />
+                    <CeldaPrincipal
+                      titulo={inc.titulo}
+                      subtitulo={
+                        <span>
+                          <CatalogoTexto grupo="TIPO_INCIDENCIA" codigo={inc.tipo} />
+                          {inc.lugar ? ` · ${inc.lugar}` : ''}
+                        </span>
+                      }
+                    />
                   </TableCell>
                   <TableCell>
                     <CatalogoBadge grupo="GRAVEDAD_INCIDENCIA" codigo={inc.gravedad} />
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {inc.titulo}
-                  </TableCell>
-                  <TableCell>{formatFecha(inc.fecha)}</TableCell>
-                  <TableCell>
-                    {inc.costoEstimado
-                      ? `$${Number(inc.costoEstimado).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
-                      : '—'}
-                  </TableCell>
+                  <TableCell><Fecha iso={inc.fecha} /></TableCell>
+                  <TableCell><Dinero value={inc.costoEstimado} /></TableCell>
                   <TableCell>
                     <Badge variant={inc.resuelta ? 'outline' : 'secondary'}>
                       {inc.resuelta ? 'Sí' : 'No'}

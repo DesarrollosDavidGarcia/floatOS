@@ -5,12 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,6 +22,12 @@ import {
 } from '@/components/ui/table';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import {
+  CeldaPrincipal,
+  RangoFechas,
+  Conteo,
+  unirSub,
+} from '@/components/conductores/expediente/tabla-ui';
 import {
   ExpedienteFormDialog,
   CamposGrid,
@@ -184,8 +187,9 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Botón Agregar siempre visible arriba a la derecha */}
-      <div className="flex justify-end">
+      {/* Contador + Botón Agregar */}
+      <div className="flex items-center justify-between">
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar ausencia
         </Button>
@@ -255,33 +259,29 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Periodo</TableHead>
-                <TableHead>Días</TableHead>
-                <TableHead>Folio incapacidad</TableHead>
-                <TableHead>Autorizado por</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Tipo</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Periodo</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Días</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((ausencia) => (
                 <TableRow key={ausencia.id}>
                   <TableCell>
-                    <Badge variant="secondary">
-                      <CatalogoTexto grupo="TIPO_AUSENCIA" codigo={ausencia.tipo} />
-                    </Badge>
+                    <CeldaPrincipal
+                      titulo={<CatalogoTexto grupo="TIPO_AUSENCIA" codigo={ausencia.tipo} />}
+                      subtitulo={unirSub(
+                        ausencia.motivo,
+                        ausencia.folioIncapacidad ? `Folio ${ausencia.folioIncapacidad}` : '',
+                        ausencia.autorizadoPor ? `Aut: ${ausencia.autorizadoPor}` : '',
+                      )}
+                    />
                   </TableCell>
                   <TableCell>
-                    {format(new Date(ausencia.fechaInicio), 'dd MMM yyyy', { locale: es })}
-                    {ausencia.fechaFin
-                      ? ` – ${format(new Date(ausencia.fechaFin), 'dd MMM yyyy', { locale: es })}`
-                      : ''}
+                    <RangoFechas inicio={ausencia.fechaInicio} fin={ausencia.fechaFin} />
                   </TableCell>
-                  <TableCell>
-                    {ausencia.dias != null ? ausencia.dias : '—'}
-                  </TableCell>
-                  <TableCell>{ausencia.folioIncapacidad ?? '—'}</TableCell>
-                  <TableCell>{ausencia.autorizadoPor ?? '—'}</TableCell>
+                  <TableCell>{ausencia.dias ?? '—'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button

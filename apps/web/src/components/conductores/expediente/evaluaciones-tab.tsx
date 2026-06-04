@@ -5,8 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, apiError } from '@/lib/api';
@@ -29,6 +27,11 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  RangoFechas,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -311,7 +314,8 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar evaluación
         </Button>
@@ -344,15 +348,14 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Periodo</TableHead>
-                <TableHead>Puntuación</TableHead>
-                <TableHead>Puntualidad</TableHead>
-                <TableHead>Combustible (km/L)</TableHead>
-                <TableHead>Rutas</TableHead>
-                <TableHead>Incidencias</TableHead>
-                <TableHead>Viajes</TableHead>
-                <TableHead>Evaluado por</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Periodo</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Puntuación</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Puntualidad</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Combustible (km/L)</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Rutas</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Incid.</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Viajes</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -360,10 +363,11 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
                 const score = toNum(ev.puntuacionGeneral);
                 return (
                   <TableRow key={ev.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {format(new Date(ev.periodoInicio), 'dd MMM yyyy', { locale: es })}
-                      {' – '}
-                      {format(new Date(ev.periodoFin), 'dd MMM yyyy', { locale: es })}
+                    <TableCell>
+                      <CeldaPrincipal
+                        titulo={<RangoFechas inicio={ev.periodoInicio} fin={ev.periodoFin} />}
+                        subtitulo={ev.evaluadoPor ? `Evaluó: ${ev.evaluadoPor}` : ''}
+                      />
                     </TableCell>
                     <TableCell>
                       {score !== undefined ? (
@@ -391,7 +395,6 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
                     </TableCell>
                     <TableCell>{ev.incidenciasPeriodo ?? '—'}</TableCell>
                     <TableCell>{ev.viajesCompletados ?? '—'}</TableCell>
-                    <TableCell>{ev.evaluadoPor ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button

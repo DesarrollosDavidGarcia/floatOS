@@ -5,12 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +27,13 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  unirSub,
+  Fecha,
+  Vigencia,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -202,7 +206,8 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
   return (
     <div className="space-y-4">
       {/* Botón Agregar siempre visible arriba a la derecha */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={abrirNuevo}>
           <Plus className="mr-1 h-4 w-4" /> Agregar registro
         </Button>
@@ -299,40 +304,31 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Resultado</TableHead>
-                <TableHead>Fecha evaluación</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Institución</TableHead>
-                <TableHead>Folio</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Tipo</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Resultado</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Fecha</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Vigencia</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((registro) => (
                 <TableRow key={registro.id}>
                   <TableCell>
-                    <CatalogoTexto grupo="TIPO_CONTROL_CONFIANZA" codigo={registro.tipo} />
+                    <CeldaPrincipal
+                      titulo={<CatalogoTexto grupo="TIPO_CONTROL_CONFIANZA" codigo={registro.tipo} />}
+                      subtitulo={unirSub(registro.institucion, registro.folio)}
+                    />
                   </TableCell>
                   <TableCell>
                     <CatalogoBadge grupo="RESULTADO_EXAMEN" codigo={registro.resultado} />
                   </TableCell>
                   <TableCell>
-                    {format(new Date(registro.fechaEvaluacion), 'dd MMM yyyy', { locale: es })}
+                    <Fecha iso={registro.fechaEvaluacion} />
                   </TableCell>
                   <TableCell>
-                    {registro.fechaVencimiento ? (
-                      <Badge variant="outline">
-                        {format(new Date(registro.fechaVencimiento), 'dd MMM yyyy', {
-                          locale: es,
-                        })}
-                      </Badge>
-                    ) : (
-                      '—'
-                    )}
+                    <Vigencia iso={registro.fechaVencimiento} />
                   </TableCell>
-                  <TableCell>{registro.institucion ?? '—'}</TableCell>
-                  <TableCell>{registro.folio ?? '—'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button

@@ -5,12 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +27,11 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  Vigencia,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -45,37 +47,6 @@ interface CertificacionConductor {
   archivoKey: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-// ── badge de vencimiento ───────────────────────────────────────────────────────
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
-
-function vencimientoBadge(fechaVencimiento: string | null): {
-  label: string;
-  variant: BadgeVariant;
-} | null {
-  if (!fechaVencimiento) return null;
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const venc = new Date(fechaVencimiento);
-  venc.setHours(0, 0, 0, 0);
-  const dias = Math.round((venc.getTime() - hoy.getTime()) / 86_400_000);
-
-  if (dias < 0) {
-    return {
-      label: `Vencido hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'}`,
-      variant: 'destructive',
-    };
-  }
-  if (dias === 0) return { label: 'Vence hoy', variant: 'destructive' };
-  if (dias <= 30) {
-    return {
-      label: `Vence en ${dias} día${dias === 1 ? '' : 's'}`,
-      variant: 'warning',
-    };
-  }
-  return { label: 'Vigente', variant: 'success' };
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -205,8 +176,9 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Botón Agregar siempre visible arriba a la derecha */}
-      <div className="flex justify-end">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar certificación
         </Button>
@@ -269,68 +241,57 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Emisor</TableHead>
-                <TableHead>Folio</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Certificación</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Folio</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Vigencia</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((cert) => {
-                const badge = vencimientoBadge(cert.fechaVencimiento);
-                return (
-                  <TableRow key={cert.id}>
-                    <TableCell>
-                      <CatalogoTexto grupo="TIPO_CERTIFICACION" codigo={cert.tipo} />
-                    </TableCell>
-                    <TableCell>{cert.nombre}</TableCell>
-                    <TableCell>{cert.emisor ?? '—'}</TableCell>
-                    <TableCell>{cert.folio ?? '—'}</TableCell>
-                    <TableCell>
-                      {cert.fechaVencimiento
-                        ? format(new Date(cert.fechaVencimiento), 'dd MMM yyyy', {
-                            locale: es,
-                          })
-                        : '—'}
-                    </TableCell>
-                    <TableCell>
-                      {badge ? (
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditando(cert);
-                            setMostrarForm(false);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          }
-                          title="Eliminar certificación"
-                          description="Esta acción no se puede deshacer."
-                          confirmLabel="Eliminar"
-                          onConfirm={() => eliminar.mutateAsync(cert.id)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {data.map((cert) => (
+                <TableRow key={cert.id}>
+                  <TableCell>
+                    <CeldaPrincipal
+                      titulo={cert.nombre}
+                      subtitulo={
+                        <span>
+                          <CatalogoTexto grupo="TIPO_CERTIFICACION" codigo={cert.tipo} />
+                          {cert.emisor ? ` · ${cert.emisor}` : ''}
+                        </span>
+                      }
+                    />
+                  </TableCell>
+                  <TableCell>{cert.folio ?? '—'}</TableCell>
+                  <TableCell>
+                    <Vigencia iso={cert.fechaVencimiento} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditando(cert);
+                          setMostrarForm(false);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDialog
+                        trigger={
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        }
+                        title="Eliminar certificación"
+                        description="Esta acción no se puede deshacer."
+                        confirmLabel="Eliminar"
+                        onConfirm={() => eliminar.mutateAsync(cert.id)}
+                      />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}

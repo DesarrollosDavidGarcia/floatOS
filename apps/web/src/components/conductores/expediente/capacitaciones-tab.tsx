@@ -30,6 +30,11 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  Conteo,
+  unirSub,
+} from '@/components/conductores/expediente/tabla-ui';
 
 interface CapacitacionConductor {
   id: string;
@@ -311,7 +316,8 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <Conteo n={data?.length ?? 0} />
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar capacitación
         </Button>
@@ -344,26 +350,24 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Institución</TableHead>
-                <TableHead>Horas</TableHead>
-                <TableHead>Calificación</TableHead>
-                <TableHead>Aprobado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Curso</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Horas</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Calificación</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Aprobado</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((cap) => (
                 <TableRow key={cap.id}>
                   <TableCell>
-                    <div className="font-medium">{cap.nombre}</div>
-                    {cap.instructor && (
-                      <div className="text-xs text-muted-foreground">{cap.instructor}</div>
-                    )}
+                    <CeldaPrincipal
+                      titulo={cap.nombre}
+                      subtitulo={unirSub(cap.institucion, cap.instructor)}
+                    />
                   </TableCell>
-                  <TableCell>{cap.institucion ?? '—'}</TableCell>
-                  <TableCell>{cap.horas != null ? cap.horas : '—'}</TableCell>
-                  <TableCell>{cap.calificacion != null ? Number(cap.calificacion) : '—'}</TableCell>
+                  <TableCell>{cap.horas ?? '—'}</TableCell>
+                  <TableCell>{cap.calificacion ?? '—'}</TableCell>
                   <TableCell>
                     {cap.aprobado === true ? (
                       <Badge variant="default">Sí</Badge>

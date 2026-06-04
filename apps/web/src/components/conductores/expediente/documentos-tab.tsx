@@ -5,12 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +29,11 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  Vigencia,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 
 const schema = z.object({
   tipo: z.string().min(1, 'Requerido'),
@@ -182,7 +184,8 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar documento
         </Button>
@@ -214,56 +217,50 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Número</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Documento</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Vigencia</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((doc) => {
-                const venc = vencimientoInfo(doc.fechaVencimiento);
-                return (
-                  <TableRow key={doc.id}>
-                    <TableCell>
-                      <CatalogoTexto grupo="TIPO_DOCUMENTO_CONDUCTOR" codigo={doc.tipo} />
-                    </TableCell>
-                    <TableCell>{doc.numero ?? '—'}</TableCell>
-                    <TableCell>
-                      {format(new Date(doc.fechaVencimiento), 'dd MMM yyyy', { locale: es })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={venc.variant}>{venc.label}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditando(doc);
-                            setMostrarForm(false);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          }
-                          title="Eliminar documento"
-                          description="Esta acción no se puede deshacer."
-                          confirmLabel="Eliminar"
-                          onConfirm={() => eliminar.mutateAsync(doc.id)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {data.map((doc) => (
+                <TableRow key={doc.id}>
+                  <TableCell>
+                    <CeldaPrincipal
+                      titulo={<CatalogoTexto grupo="TIPO_DOCUMENTO_CONDUCTOR" codigo={doc.tipo} />}
+                      subtitulo={doc.numero ? `N.º ${doc.numero}` : ''}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Vigencia iso={doc.fechaVencimiento} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditando(doc);
+                          setMostrarForm(false);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDialog
+                        trigger={
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        }
+                        title="Eliminar documento"
+                        description="Esta acción no se puede deshacer."
+                        confirmLabel="Eliminar"
+                        onConfirm={() => eliminar.mutateAsync(doc.id)}
+                      />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}

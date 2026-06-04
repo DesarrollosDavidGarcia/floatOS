@@ -27,6 +27,10 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import {
+  CeldaPrincipal,
+  Conteo,
+} from '@/components/conductores/expediente/tabla-ui';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -217,7 +221,8 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <Conteo n={data?.length ?? 0} />
         <Button size="sm" onClick={() => setMostrarForm(true)}>
           <Plus className="mr-1 h-4 w-4" /> Agregar aptitud
         </Button>
@@ -249,29 +254,28 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo de unidad</TableHead>
-                <TableHead>Nivel</TableHead>
-                <TableHead>Experiencia</TableHead>
-                <TableHead>Notas</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Unidad</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Nivel</TableHead>
+                <TableHead className="text-xs uppercase text-muted-foreground">Experiencia</TableHead>
+                <TableHead className="text-right text-xs uppercase text-muted-foreground">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((aptitud) => (
                 <TableRow key={aptitud.id}>
                   <TableCell>
-                    <CatalogoTexto grupo="TIPO_UNIDAD_MANEJO" codigo={aptitud.tipoUnidad} />
+                    <CeldaPrincipal
+                      titulo={<CatalogoTexto grupo="TIPO_UNIDAD_MANEJO" codigo={aptitud.tipoUnidad} />}
+                      subtitulo={aptitud.notas ?? ''}
+                    />
                   </TableCell>
                   <TableCell>
                     <CatalogoBadge grupo="NIVEL_APTITUD" codigo={aptitud.nivel} />
                   </TableCell>
                   <TableCell>
                     {aptitud.aniosExperiencia != null
-                      ? `${aptitud.aniosExperiencia} año${aptitud.aniosExperiencia === 1 ? '' : 's'}`
+                      ? `${aptitud.aniosExperiencia} año(s)`
                       : '—'}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {aptitud.notas ?? '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
