@@ -10,7 +10,6 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -34,6 +33,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -97,45 +101,54 @@ function formatFecha(iso: string): string {
   });
 }
 
-// ── Formulario inline ────────────────────────────────────────────────────────
+// ── Tab principal ────────────────────────────────────────────────────────────
 
-function IncidenciaForm({
-  conductorId,
-  incidencia,
-  onDone,
-}: {
-  conductorId: string;
-  incidencia?: Incidencia;
-  onDone: () => void;
-}) {
-  const esEdicion = Boolean(incidencia);
+export function IncidenciasTab({ conductorId }: { conductorId: string }) {
   const queryClient = useQueryClient();
+  const [editando, setEditando] = useState<Incidencia | null>(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [eliminarTarget, setEliminarTarget] = useState<Incidencia | null>(null);
 
-  const [form, setForm] = useState<FormState>(() =>
-    incidencia
-      ? {
-          tipo: incidencia.tipo,
-          gravedad: incidencia.gravedad,
-          titulo: incidencia.titulo,
-          descripcion: incidencia.descripcion ?? '',
-          fecha: isoADate(incidencia.fecha),
-          lugar: incidencia.lugar ?? '',
-          costoEstimado: incidencia.costoEstimado ?? '',
-          resuelta: String(incidencia.resuelta),
-          evidenciaKey: incidencia.evidenciaKey ?? '',
-          registradoPor: incidencia.registradoPor ?? '',
-          viajeId: incidencia.viajeId ?? '',
-        }
-      : { ...FORM_EMPTY },
-  );
+  const [form, setForm] = useState<FormState>({ ...FORM_EMPTY });
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
-    {},
-  );
+  const esEdicion = Boolean(editando);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: undefined }));
+  }
+
+  function abrirNuevo() {
+    setForm({ ...FORM_EMPTY });
+    setErrors({});
+    setEditando(null);
+    setMostrarForm(true);
+  }
+
+  function abrirEdicion(inc: Incidencia) {
+    setForm({
+      tipo: inc.tipo,
+      gravedad: inc.gravedad,
+      titulo: inc.titulo,
+      descripcion: inc.descripcion ?? '',
+      fecha: isoADate(inc.fecha),
+      lugar: inc.lugar ?? '',
+      costoEstimado: inc.costoEstimado ?? '',
+      resuelta: String(inc.resuelta),
+      evidenciaKey: inc.evidenciaKey ?? '',
+      registradoPor: inc.registradoPor ?? '',
+      viajeId: inc.viajeId ?? '',
+    });
+    setErrors({});
+    setEditando(inc);
+    setMostrarForm(false);
+  }
+
+  function cerrarForm() {
+    setEditando(null);
+    setMostrarForm(false);
+    setErrors({});
   }
 
   function validate(): boolean {
@@ -145,6 +158,16 @@ function IncidenciaForm({
     setErrors(e);
     return Object.keys(e).length === 0;
   }
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['conductor-incidencias', conductorId],
+    queryFn: async () => {
+      const { data } = await api.get<Incidencia[]>(
+        `/conductores/${conductorId}/incidencias`,
+      );
+      return data;
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -164,9 +187,9 @@ function IncidenciaForm({
         payload.registradoPor = form.registradoPor.trim();
       if (form.viajeId.trim()) payload.viajeId = form.viajeId.trim();
 
-      if (esEdicion && incidencia) {
+      if (esEdicion && editando) {
         await api.patch(
-          `/conductores/${conductorId}/incidencias/${incidencia.id}`,
+          `/conductores/${conductorId}/incidencias/${editando.id}`,
           payload,
         );
       } else {
@@ -178,190 +201,9 @@ function IncidenciaForm({
         queryKey: ['conductor-incidencias', conductorId],
       });
       toast.success(esEdicion ? 'Incidencia actualizada' : 'Incidencia registrada');
-      onDone();
+      cerrarForm();
     },
     onError: (err) => toast.error(apiError(err)),
-  });
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-    mutation.mutate();
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-4 rounded-md border p-4"
-    >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar incidencia' : 'Nueva incidencia'}
-      </p>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Tipo */}
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
-          <CatalogoSelect
-            grupo="TIPO_INCIDENCIA"
-            value={form.tipo}
-            onChange={(c) => set('tipo', c)}
-            placeholder="Selecciona…"
-          />
-        </div>
-
-        {/* Gravedad */}
-        <div className="space-y-1.5">
-          <Label>Gravedad</Label>
-          <CatalogoSelect
-            grupo="GRAVEDAD_INCIDENCIA"
-            value={form.gravedad}
-            onChange={(c) => set('gravedad', c)}
-            placeholder="Selecciona…"
-          />
-        </div>
-
-        {/* Título */}
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="titulo">Título *</Label>
-          <Input
-            id="titulo"
-            value={form.titulo}
-            onChange={(e) => set('titulo', e.target.value)}
-          />
-          {errors.titulo && (
-            <p className="text-sm text-destructive">{errors.titulo}</p>
-          )}
-        </div>
-
-        {/* Fecha */}
-        <div className="space-y-1.5">
-          <Label htmlFor="fecha">Fecha *</Label>
-          <Input
-            id="fecha"
-            type="date"
-            value={form.fecha}
-            onChange={(e) => set('fecha', e.target.value)}
-          />
-          {errors.fecha && (
-            <p className="text-sm text-destructive">{errors.fecha}</p>
-          )}
-        </div>
-
-        {/* Lugar */}
-        <div className="space-y-1.5">
-          <Label htmlFor="lugar">Lugar</Label>
-          <Input
-            id="lugar"
-            value={form.lugar}
-            onChange={(e) => set('lugar', e.target.value)}
-          />
-        </div>
-
-        {/* Costo estimado */}
-        <div className="space-y-1.5">
-          <Label htmlFor="costoEstimado">Costo estimado</Label>
-          <Input
-            id="costoEstimado"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.costoEstimado}
-            onChange={(e) => set('costoEstimado', e.target.value)}
-          />
-        </div>
-
-        {/* Resuelta */}
-        <div className="space-y-1.5">
-          <Label>Resuelta</Label>
-          <Select
-            value={form.resuelta}
-            onValueChange={(v) => set('resuelta', v)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="true">Sí</SelectItem>
-              <SelectItem value="false">No</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Descripción */}
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="descripcion">Descripción</Label>
-          <textarea
-            id="descripcion"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            value={form.descripcion}
-            onChange={(e) => set('descripcion', e.target.value)}
-          />
-        </div>
-
-        {/* Registrado por */}
-        <div className="space-y-1.5">
-          <Label htmlFor="registradoPor">Registrado por</Label>
-          <Input
-            id="registradoPor"
-            value={form.registradoPor}
-            onChange={(e) => set('registradoPor', e.target.value)}
-          />
-        </div>
-
-        {/* Evidencia key */}
-        <div className="space-y-1.5">
-          <Label htmlFor="evidenciaKey">Clave de evidencia</Label>
-          <Input
-            id="evidenciaKey"
-            value={form.evidenciaKey}
-            onChange={(e) => set('evidenciaKey', e.target.value)}
-          />
-        </div>
-
-        {/* Viaje ID */}
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="viajeId">ID de viaje relacionado</Label>
-          <Input
-            id="viajeId"
-            value={form.viajeId}
-            onChange={(e) => set('viajeId', e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending
-            ? 'Guardando…'
-            : esEdicion
-              ? 'Guardar'
-              : 'Agregar'}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-// ── Tab principal ────────────────────────────────────────────────────────────
-
-export function IncidenciasTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<Incidencia | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [eliminarTarget, setEliminarTarget] = useState<Incidencia | null>(null);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-incidencias', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<Incidencia[]>(
-        `/conductores/${conductorId}/incidencias`,
-      );
-      return data;
-    },
   });
 
   const eliminar = useMutation({
@@ -378,30 +220,137 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
     onError: (err) => toast.error(apiError(err)),
   });
 
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validate()) return;
+    mutation.mutate();
   }
 
   return (
     <div className="space-y-4">
-      {/* Botón agregar */}
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar incidencia
-          </Button>
-        </div>
-      )}
+      {/* Botón Agregar siempre visible arriba a la derecha */}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={abrirNuevo}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar incidencia
+        </Button>
+      </div>
 
-      {/* Formulario inline */}
-      {(mostrarForm || editando) && (
-        <IncidenciaForm
-          conductorId={conductorId}
-          incidencia={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      {/* Modal crear / editar */}
+      <ExpedienteFormDialog
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+        title={esEdicion ? 'Editar incidencia' : 'Nueva incidencia'}
+        onSubmit={handleSubmit}
+        saving={mutation.isPending}
+        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        size="lg"
+      >
+        <CamposGrid cols={2}>
+          {/* Tipo */}
+          <Campo label="Tipo">
+            <CatalogoSelect
+              grupo="TIPO_INCIDENCIA"
+              value={form.tipo}
+              onChange={(c) => set('tipo', c)}
+              placeholder="Selecciona…"
+            />
+          </Campo>
+
+          {/* Gravedad */}
+          <Campo label="Gravedad">
+            <CatalogoSelect
+              grupo="GRAVEDAD_INCIDENCIA"
+              value={form.gravedad}
+              onChange={(c) => set('gravedad', c)}
+              placeholder="Selecciona…"
+            />
+          </Campo>
+
+          {/* Título */}
+          <Campo label="Título *" htmlFor="titulo" error={errors.titulo} full>
+            <Input
+              id="titulo"
+              value={form.titulo}
+              onChange={(e) => set('titulo', e.target.value)}
+            />
+          </Campo>
+
+          {/* Fecha */}
+          <Campo label="Fecha *" htmlFor="fecha" error={errors.fecha}>
+            <Input
+              id="fecha"
+              type="date"
+              value={form.fecha}
+              onChange={(e) => set('fecha', e.target.value)}
+            />
+          </Campo>
+
+          {/* Lugar */}
+          <Campo label="Lugar" htmlFor="lugar">
+            <Input
+              id="lugar"
+              value={form.lugar}
+              onChange={(e) => set('lugar', e.target.value)}
+            />
+          </Campo>
+
+          {/* Costo estimado */}
+          <Campo label="Costo estimado" htmlFor="costoEstimado">
+            <Input
+              id="costoEstimado"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.costoEstimado}
+              onChange={(e) => set('costoEstimado', e.target.value)}
+            />
+          </Campo>
+
+          {/* Resuelta */}
+          <Campo label="Resuelta">
+            <Select
+              value={form.resuelta}
+              onValueChange={(v) => set('resuelta', v)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Sí</SelectItem>
+                <SelectItem value="false">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </Campo>
+
+          {/* Registrado por */}
+          <Campo label="Registrado por" htmlFor="registradoPor">
+            <Input
+              id="registradoPor"
+              value={form.registradoPor}
+              onChange={(e) => set('registradoPor', e.target.value)}
+            />
+          </Campo>
+
+          {/* Evidencia key */}
+          <Campo label="Clave de evidencia" htmlFor="evidenciaKey">
+            <Input
+              id="evidenciaKey"
+              value={form.evidenciaKey}
+              onChange={(e) => set('evidenciaKey', e.target.value)}
+            />
+          </Campo>
+
+          {/* Descripción */}
+          <Campo label="Descripción" htmlFor="descripcion" full>
+            <textarea
+              id="descripcion"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              value={form.descripcion}
+              onChange={(e) => set('descripcion', e.target.value)}
+            />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
       {/* Tabla */}
       {isLoading ? (
@@ -460,10 +409,7 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(inc);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => abrirEdicion(inc)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>

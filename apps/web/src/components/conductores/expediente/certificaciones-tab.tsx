@@ -13,7 +13,6 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -23,17 +22,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -102,147 +98,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ── formulario inline ──────────────────────────────────────────────────────────
-
-function CertificacionForm({
-  conductorId,
-  certificacion,
-  onDone,
-}: {
-  conductorId: string;
-  certificacion?: CertificacionConductor;
-  onDone: () => void;
-}) {
-  const esEdicion = Boolean(certificacion);
-  const queryClient = useQueryClient();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      tipo: certificacion?.tipo ?? '',
-      nombre: certificacion?.nombre ?? '',
-      emisor: certificacion?.emisor ?? '',
-      folio: certificacion?.folio ?? '',
-      fechaEmision: isoADate(certificacion?.fechaEmision),
-      fechaVencimiento: isoADate(certificacion?.fechaVencimiento),
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: certificacion?.tipo ?? '',
-      nombre: certificacion?.nombre ?? '',
-      emisor: certificacion?.emisor ?? '',
-      folio: certificacion?.folio ?? '',
-      fechaEmision: isoADate(certificacion?.fechaEmision),
-      fechaVencimiento: isoADate(certificacion?.fechaVencimiento),
-    });
-  }, [certificacion, reset]);
-
-  const tipo = watch('tipo');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload: Record<string, unknown> = {
-        tipo: values.tipo,
-        nombre: values.nombre,
-      };
-      if (values.emisor?.trim()) payload.emisor = values.emisor.trim();
-      if (values.folio?.trim()) payload.folio = values.folio.trim();
-      if (values.fechaEmision) {
-        payload.fechaEmision = new Date(values.fechaEmision).toISOString();
-      }
-      if (values.fechaVencimiento) {
-        payload.fechaVencimiento = new Date(values.fechaVencimiento).toISOString();
-      }
-
-      if (esEdicion && certificacion) {
-        await api.patch(
-          `/conductores/${conductorId}/certificaciones/${certificacion.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/certificaciones`, payload);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-certificaciones', conductorId],
-      });
-      toast.success(esEdicion ? 'Certificación actualizada' : 'Certificación agregada');
-      onDone();
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  return (
-    <form
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
-    >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar certificación' : 'Nueva certificación'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
-          <CatalogoSelect
-            grupo="TIPO_CERTIFICACION"
-            value={tipo}
-            onChange={(c) => setValue('tipo', c)}
-            placeholder="Selecciona…"
-          />
-          {errors.tipo && (
-            <p className="text-sm text-destructive">{errors.tipo.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="nombre">Nombre</Label>
-          <Input id="nombre" {...register('nombre')} />
-          {errors.nombre && (
-            <p className="text-sm text-destructive">{errors.nombre.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="emisor">Emisor</Label>
-          <Input id="emisor" {...register('emisor')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="folio">Folio</Label>
-          <Input id="folio" {...register('folio')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaEmision">Fecha de emisión</Label>
-          <Input id="fechaEmision" type="date" {...register('fechaEmision')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaVencimiento">Fecha de vencimiento</Label>
-          <Input
-            id="fechaVencimiento"
-            type="date"
-            {...register('fechaVencimiento')}
-          />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 // ── tab principal ──────────────────────────────────────────────────────────────
 
 export function CertificacionesTab({ conductorId }: { conductorId: string }) {
@@ -278,24 +133,123 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
     setMostrarForm(false);
   }
 
+  // ── form interno (react-hook-form + mutación) ────────────────────────────────
+
+  const esEdicion = Boolean(editando);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      tipo: '',
+      nombre: '',
+      emisor: '',
+      folio: '',
+      fechaEmision: '',
+      fechaVencimiento: '',
+    },
+  });
+
+  useEffect(() => {
+    reset({
+      tipo: editando?.tipo ?? '',
+      nombre: editando?.nombre ?? '',
+      emisor: editando?.emisor ?? '',
+      folio: editando?.folio ?? '',
+      fechaEmision: isoADate(editando?.fechaEmision),
+      fechaVencimiento: isoADate(editando?.fechaVencimiento),
+    });
+  }, [editando, mostrarForm, reset]);
+
+  const tipo = watch('tipo');
+
+  const mutation = useMutation({
+    mutationFn: async (values: FormValues) => {
+      const payload: Record<string, unknown> = {
+        tipo: values.tipo,
+        nombre: values.nombre,
+      };
+      if (values.emisor?.trim()) payload.emisor = values.emisor.trim();
+      if (values.folio?.trim()) payload.folio = values.folio.trim();
+      if (values.fechaEmision) {
+        payload.fechaEmision = new Date(values.fechaEmision).toISOString();
+      }
+      if (values.fechaVencimiento) {
+        payload.fechaVencimiento = new Date(values.fechaVencimiento).toISOString();
+      }
+
+      if (esEdicion && editando) {
+        await api.patch(
+          `/conductores/${conductorId}/certificaciones/${editando.id}`,
+          payload,
+        );
+      } else {
+        await api.post(`/conductores/${conductorId}/certificaciones`, payload);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['conductor-certificaciones', conductorId],
+      });
+      toast.success(esEdicion ? 'Certificación actualizada' : 'Certificación agregada');
+      cerrarForm();
+    },
+    onError: (err) => toast.error(apiError(err)),
+  });
+
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar certificación
-          </Button>
-        </div>
-      )}
+      {/* Botón Agregar siempre visible arriba a la derecha */}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar certificación
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <CertificacionForm
-          conductorId={conductorId}
-          certificacion={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      {/* Modal compacto (crear y editar) */}
+      <ExpedienteFormDialog
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+        title={esEdicion ? 'Editar certificación' : 'Nueva certificación'}
+        onSubmit={handleSubmit((v) => mutation.mutate(v))}
+        saving={mutation.isPending}
+        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        size="md"
+      >
+        <CamposGrid cols={2}>
+          <Campo label="Tipo" error={errors.tipo?.message}>
+            <CatalogoSelect
+              grupo="TIPO_CERTIFICACION"
+              value={tipo}
+              onChange={(c) => setValue('tipo', c)}
+              placeholder="Selecciona…"
+            />
+          </Campo>
+          <Campo label="Nombre" htmlFor="cert-nombre" error={errors.nombre?.message}>
+            <Input id="cert-nombre" {...register('nombre')} />
+          </Campo>
+          <Campo label="Emisor" htmlFor="cert-emisor">
+            <Input id="cert-emisor" {...register('emisor')} />
+          </Campo>
+          <Campo label="Folio" htmlFor="cert-folio">
+            <Input id="cert-folio" {...register('folio')} />
+          </Campo>
+          <Campo label="Fecha de emisión" htmlFor="cert-fechaEmision">
+            <Input id="cert-fechaEmision" type="date" {...register('fechaEmision')} />
+          </Campo>
+          <Campo label="Fecha de vencimiento" htmlFor="cert-fechaVencimiento">
+            <Input id="cert-fechaVencimiento" type="date" {...register('fechaVencimiento')} />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
+      {/* Tabla */}
       <div className="overflow-auto">
         {isLoading ? (
           <div className="space-y-2">

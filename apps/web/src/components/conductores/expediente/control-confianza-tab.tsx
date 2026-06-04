@@ -13,7 +13,6 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -26,6 +25,11 @@ import {
 } from '@/components/ui/table';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto, CatalogoBadge } from '@/components/catalogos/catalogo-badge';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -66,19 +70,14 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Form ───────────────────────────────────────────────────────────────────────
+// ── Tab ────────────────────────────────────────────────────────────────────────
 
-function ControlConfianzaForm({
-  conductorId,
-  registro,
-  onDone,
-}: {
-  conductorId: string;
-  registro?: ControlConfianza;
-  onDone: () => void;
-}) {
-  const esEdicion = Boolean(registro);
+export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
   const queryClient = useQueryClient();
+  const [editando, setEditando] = useState<ControlConfianza | null>(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+
+  const esEdicion = Boolean(editando);
 
   const {
     register,
@@ -90,32 +89,68 @@ function ControlConfianzaForm({
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      tipo: registro?.tipo ?? '',
-      resultado: registro?.resultado ?? '',
-      institucion: registro?.institucion ?? '',
-      folio: registro?.folio ?? '',
-      fechaEvaluacion: isoADate(registro?.fechaEvaluacion),
-      fechaVencimiento: isoADate(registro?.fechaVencimiento),
-      observaciones: registro?.observaciones ?? '',
-      archivoKey: registro?.archivoKey ?? '',
+      tipo: '',
+      resultado: '',
+      institucion: '',
+      folio: '',
+      fechaEvaluacion: '',
+      fechaVencimiento: '',
+      observaciones: '',
+      archivoKey: '',
     },
   });
 
   useEffect(() => {
     reset({
-      tipo: registro?.tipo ?? '',
-      resultado: registro?.resultado ?? '',
-      institucion: registro?.institucion ?? '',
-      folio: registro?.folio ?? '',
-      fechaEvaluacion: isoADate(registro?.fechaEvaluacion),
-      fechaVencimiento: isoADate(registro?.fechaVencimiento),
-      observaciones: registro?.observaciones ?? '',
-      archivoKey: registro?.archivoKey ?? '',
+      tipo: editando?.tipo ?? '',
+      resultado: editando?.resultado ?? '',
+      institucion: editando?.institucion ?? '',
+      folio: editando?.folio ?? '',
+      fechaEvaluacion: isoADate(editando?.fechaEvaluacion),
+      fechaVencimiento: isoADate(editando?.fechaVencimiento),
+      observaciones: editando?.observaciones ?? '',
+      archivoKey: editando?.archivoKey ?? '',
     });
-  }, [registro, reset]);
+  }, [editando, reset]);
 
   const tipo = watch('tipo');
   const resultado = watch('resultado');
+
+  function abrirNuevo() {
+    setEditando(null);
+    reset({
+      tipo: '',
+      resultado: '',
+      institucion: '',
+      folio: '',
+      fechaEvaluacion: '',
+      fechaVencimiento: '',
+      observaciones: '',
+      archivoKey: '',
+    });
+    setMostrarForm(true);
+  }
+
+  function abrirEdicion(registro: ControlConfianza) {
+    setMostrarForm(false);
+    setEditando(registro);
+  }
+
+  function cerrarForm() {
+    setEditando(null);
+    setMostrarForm(false);
+  }
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['conductor-control-confianza', conductorId],
+    queryFn: async () => {
+      const { data } = await api.get<ControlConfianza[]>(
+        `/conductores/${conductorId}/control-confianza`,
+      );
+      return data;
+    },
+    enabled: Boolean(conductorId),
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -132,9 +167,9 @@ function ControlConfianzaForm({
       if (values.observaciones?.trim()) payload.observaciones = values.observaciones.trim();
       if (values.archivoKey?.trim()) payload.archivoKey = values.archivoKey.trim();
 
-      if (esEdicion && registro) {
+      if (esEdicion && editando) {
         await api.patch(
-          `/conductores/${conductorId}/control-confianza/${registro.id}`,
+          `/conductores/${conductorId}/control-confianza/${editando.id}`,
           payload,
         );
       } else {
@@ -146,94 +181,9 @@ function ControlConfianzaForm({
         queryKey: ['conductor-control-confianza', conductorId],
       });
       toast.success(esEdicion ? 'Registro actualizado' : 'Registro agregado');
-      onDone();
+      cerrarForm();
     },
     onError: (err) => toast.error(apiError(err)),
-  });
-
-  return (
-    <form
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
-    >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar registro' : 'Nuevo registro de control de confianza'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
-          <CatalogoSelect
-            grupo="TIPO_CONTROL_CONFIANZA"
-            value={tipo}
-            onChange={(c) => setValue('tipo', c)}
-            placeholder="Selecciona un tipo"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Resultado</Label>
-          <CatalogoSelect
-            grupo="RESULTADO_EXAMEN"
-            value={resultado ?? ''}
-            onChange={(c) => setValue('resultado', c)}
-            placeholder="Selecciona un resultado"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaEvaluacion">Fecha de evaluación</Label>
-          <Input id="fechaEvaluacion" type="date" {...register('fechaEvaluacion')} />
-          {errors.fechaEvaluacion && (
-            <p className="text-sm text-destructive">{errors.fechaEvaluacion.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaVencimiento">Fecha de vencimiento</Label>
-          <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="institucion">Institución</Label>
-          <Input id="institucion" {...register('institucion')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="folio">Folio</Label>
-          <Input id="folio" {...register('folio')} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="observaciones">Observaciones</Label>
-          <textarea
-            id="observaciones"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            {...register('observaciones')}
-          />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-// ── Tab ────────────────────────────────────────────────────────────────────────
-
-export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<ControlConfianza | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-control-confianza', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<ControlConfianza[]>(
-        `/conductores/${conductorId}/control-confianza`,
-      );
-      return data;
-    },
-    enabled: Boolean(conductorId),
   });
 
   const eliminar = useMutation({
@@ -249,29 +199,87 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
     onError: (err) => toast.error(apiError(err)),
   });
 
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
-
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar registro
-          </Button>
-        </div>
-      )}
+      {/* Botón Agregar siempre visible arriba a la derecha */}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={abrirNuevo}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar registro
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <ControlConfianzaForm
-          conductorId={conductorId}
-          registro={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      {/* Modal crear / editar */}
+      <ExpedienteFormDialog
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+        title={esEdicion ? 'Editar control de confianza' : 'Nuevo control de confianza'}
+        onSubmit={handleSubmit((values) => mutation.mutate(values))}
+        saving={mutation.isPending}
+        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        size="md"
+      >
+        <CamposGrid cols={2}>
+          {/* Tipo */}
+          <Campo label="Tipo" error={errors.tipo?.message}>
+            <CatalogoSelect
+              grupo="TIPO_CONTROL_CONFIANZA"
+              value={tipo}
+              onChange={(c) => setValue('tipo', c)}
+              placeholder="Selecciona un tipo"
+            />
+          </Campo>
 
+          {/* Resultado */}
+          <Campo label="Resultado">
+            <CatalogoSelect
+              grupo="RESULTADO_EXAMEN"
+              value={resultado ?? ''}
+              onChange={(c) => setValue('resultado', c)}
+              placeholder="Selecciona un resultado"
+            />
+          </Campo>
+
+          {/* Institución */}
+          <Campo label="Institución" htmlFor="institucion">
+            <Input id="institucion" {...register('institucion')} />
+          </Campo>
+
+          {/* Folio */}
+          <Campo label="Folio" htmlFor="folio">
+            <Input id="folio" {...register('folio')} />
+          </Campo>
+
+          {/* Fecha evaluación */}
+          <Campo
+            label="Fecha de evaluación"
+            htmlFor="fechaEvaluacion"
+            error={errors.fechaEvaluacion?.message}
+          >
+            <Input id="fechaEvaluacion" type="date" {...register('fechaEvaluacion')} />
+          </Campo>
+
+          {/* Fecha vencimiento */}
+          <Campo label="Fecha de vencimiento" htmlFor="fechaVencimiento">
+            <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
+          </Campo>
+
+          {/* Observaciones */}
+          <Campo label="Observaciones" htmlFor="observaciones" full>
+            <textarea
+              id="observaciones"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...register('observaciones')}
+            />
+          </Campo>
+
+          {/* Archivo key */}
+          <Campo label="Clave de archivo" htmlFor="archivoKey">
+            <Input id="archivoKey" {...register('archivoKey')} />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
+
+      {/* Tabla */}
       <div className="overflow-auto">
         {isLoading ? (
           <div className="space-y-2">
@@ -330,10 +338,7 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(registro);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => abrirEdicion(registro)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>

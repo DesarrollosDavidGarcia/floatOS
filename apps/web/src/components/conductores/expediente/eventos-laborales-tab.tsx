@@ -13,11 +13,15 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -52,146 +56,6 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
-
-// ── Form ───────────────────────────────────────────────────────────────────────
-
-function EventoLaboralForm({
-  conductorId,
-  evento,
-  onDone,
-}: {
-  conductorId: string;
-  evento?: EventoLaboral;
-  onDone: () => void;
-}) {
-  const esEdicion = Boolean(evento);
-  const queryClient = useQueryClient();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      tipo: evento?.tipo ?? '',
-      titulo: evento?.titulo ?? '',
-      fecha: isoADate(evento?.fecha),
-      descripcion: evento?.descripcion ?? '',
-      puestoNuevo: evento?.puestoNuevo ?? '',
-      registradoPor: evento?.registradoPor ?? '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: evento?.tipo ?? '',
-      titulo: evento?.titulo ?? '',
-      fecha: isoADate(evento?.fecha),
-      descripcion: evento?.descripcion ?? '',
-      puestoNuevo: evento?.puestoNuevo ?? '',
-      registradoPor: evento?.registradoPor ?? '',
-    });
-  }, [evento, reset]);
-
-  const tipo = watch('tipo');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload: Record<string, unknown> = {
-        tipo: values.tipo,
-        titulo: values.titulo,
-        fecha: new Date(values.fecha).toISOString(),
-      };
-      if (values.descripcion?.trim()) payload.descripcion = values.descripcion.trim();
-      if (values.puestoNuevo?.trim()) payload.puestoNuevo = values.puestoNuevo.trim();
-      if (values.registradoPor?.trim()) payload.registradoPor = values.registradoPor.trim();
-
-      if (esEdicion && evento) {
-        await api.patch(
-          `/conductores/${conductorId}/eventos-laborales/${evento.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/eventos-laborales`, payload);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-eventos-laborales', conductorId],
-      });
-      toast.success(esEdicion ? 'Evento actualizado' : 'Evento agregado');
-      onDone();
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  return (
-    <form
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
-    >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar evento laboral' : 'Nuevo evento laboral'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
-          <CatalogoSelect
-            grupo="TIPO_EVENTO_LABORAL"
-            value={tipo}
-            onChange={(c) => setValue('tipo', c)}
-            placeholder="Selecciona…"
-          />
-          {errors.tipo && (
-            <p className="text-sm text-destructive">{errors.tipo.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="titulo">Título</Label>
-          <Input id="titulo" {...register('titulo')} />
-          {errors.titulo && (
-            <p className="text-sm text-destructive">{errors.titulo.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fecha">Fecha</Label>
-          <Input id="fecha" type="date" {...register('fecha')} />
-          {errors.fecha && (
-            <p className="text-sm text-destructive">{errors.fecha.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="puestoNuevo">Puesto nuevo</Label>
-          <Input id="puestoNuevo" {...register('puestoNuevo')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="registradoPor">Registrado por</Label>
-          <Input id="registradoPor" {...register('registradoPor')} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="descripcion">Descripción</Label>
-          <textarea
-            id="descripcion"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            {...register('descripcion')}
-          />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
-  );
-}
 
 // ── Tab ────────────────────────────────────────────────────────────────────────
 
@@ -229,24 +93,123 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
     setMostrarForm(false);
   }
 
+  // ── form interno (react-hook-form + mutación) ────────────────────────────────
+
+  const esEdicion = Boolean(editando);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      tipo: '',
+      titulo: '',
+      fecha: '',
+      descripcion: '',
+      puestoNuevo: '',
+      registradoPor: '',
+    },
+  });
+
+  useEffect(() => {
+    reset({
+      tipo: editando?.tipo ?? '',
+      titulo: editando?.titulo ?? '',
+      fecha: isoADate(editando?.fecha),
+      descripcion: editando?.descripcion ?? '',
+      puestoNuevo: editando?.puestoNuevo ?? '',
+      registradoPor: editando?.registradoPor ?? '',
+    });
+  }, [editando, mostrarForm, reset]);
+
+  const tipo = watch('tipo');
+
+  const mutation = useMutation({
+    mutationFn: async (values: FormValues) => {
+      const payload: Record<string, unknown> = {
+        tipo: values.tipo,
+        titulo: values.titulo,
+        fecha: new Date(values.fecha).toISOString(),
+      };
+      if (values.descripcion?.trim()) payload.descripcion = values.descripcion.trim();
+      if (values.puestoNuevo?.trim()) payload.puestoNuevo = values.puestoNuevo.trim();
+      if (values.registradoPor?.trim()) payload.registradoPor = values.registradoPor.trim();
+
+      if (esEdicion && editando) {
+        await api.patch(
+          `/conductores/${conductorId}/eventos-laborales/${editando.id}`,
+          payload,
+        );
+      } else {
+        await api.post(`/conductores/${conductorId}/eventos-laborales`, payload);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['conductor-eventos-laborales', conductorId],
+      });
+      toast.success(esEdicion ? 'Evento actualizado' : 'Evento agregado');
+      cerrarForm();
+    },
+    onError: (err) => toast.error(apiError(err)),
+  });
+
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar evento
-          </Button>
-        </div>
-      )}
+      {/* Botón Agregar siempre visible arriba a la derecha */}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar evento
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <EventoLaboralForm
-          conductorId={conductorId}
-          evento={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      {/* Modal compacto (crear y editar) */}
+      <ExpedienteFormDialog
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+        title={esEdicion ? 'Editar evento laboral' : 'Nuevo evento laboral'}
+        onSubmit={handleSubmit((v) => mutation.mutate(v))}
+        saving={mutation.isPending}
+        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        size="md"
+      >
+        <CamposGrid cols={2}>
+          <Campo label="Tipo" error={errors.tipo?.message}>
+            <CatalogoSelect
+              grupo="TIPO_EVENTO_LABORAL"
+              value={tipo}
+              onChange={(c) => setValue('tipo', c)}
+              placeholder="Selecciona…"
+            />
+          </Campo>
+          <Campo label="Título" htmlFor="ev-titulo" error={errors.titulo?.message}>
+            <Input id="ev-titulo" {...register('titulo')} />
+          </Campo>
+          <Campo label="Fecha" htmlFor="ev-fecha" error={errors.fecha?.message}>
+            <Input id="ev-fecha" type="date" {...register('fecha')} />
+          </Campo>
+          <Campo label="Puesto nuevo" htmlFor="ev-puestoNuevo">
+            <Input id="ev-puestoNuevo" {...register('puestoNuevo')} />
+          </Campo>
+          <Campo label="Registrado por" htmlFor="ev-registradoPor">
+            <Input id="ev-registradoPor" {...register('registradoPor')} />
+          </Campo>
+          <Campo label="Descripción" htmlFor="ev-descripcion" full>
+            <textarea
+              id="ev-descripcion"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...register('descripcion')}
+            />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
+      {/* Línea de tiempo */}
       <div className="overflow-auto">
         {isLoading ? (
           <div className="space-y-3">

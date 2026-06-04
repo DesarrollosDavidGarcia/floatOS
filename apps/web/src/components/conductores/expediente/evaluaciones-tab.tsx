@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,12 +8,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
@@ -24,6 +24,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -89,10 +94,14 @@ type FormValues = z.infer<typeof schema>;
 function EvaluacionForm({
   conductorId,
   evaluacion,
+  open,
+  onOpenChange,
   onDone,
 }: {
   conductorId: string;
   evaluacion?: Evaluacion;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onDone: () => void;
 }) {
   const esEdicion = Boolean(evaluacion);
@@ -169,30 +178,31 @@ function EvaluacionForm({
   });
 
   return (
-    <form
+    <ExpedienteFormDialog
+      open={open}
+      onOpenChange={(o) => { if (!o) onDone(); onOpenChange(o); }}
+      title={esEdicion ? 'Editar evaluación' : 'Nueva evaluación'}
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
+      saving={mutation.isPending}
+      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+      size="lg"
     >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar evaluación' : 'Nueva evaluación'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="periodoInicio">Periodo inicio</Label>
+      <CamposGrid cols={3}>
+        {/* Periodo */}
+        <Campo label="Periodo inicio" htmlFor="periodoInicio" error={errors.periodoInicio?.message}>
           <Input id="periodoInicio" type="date" {...register('periodoInicio')} />
-          {errors.periodoInicio && (
-            <p className="text-sm text-destructive">{errors.periodoInicio.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="periodoFin">Periodo fin</Label>
+        </Campo>
+        <Campo label="Periodo fin" htmlFor="periodoFin" error={errors.periodoFin?.message}>
           <Input id="periodoFin" type="date" {...register('periodoFin')} />
-          {errors.periodoFin && (
-            <p className="text-sm text-destructive">{errors.periodoFin.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="puntuacionGeneral">Puntuación general (0–100)</Label>
+        </Campo>
+
+        {/* Evaluado por ocupa la 3ª columna de la primera fila */}
+        <Campo label="Evaluado por" htmlFor="evaluadoPor">
+          <Input id="evaluadoPor" {...register('evaluadoPor')} />
+        </Campo>
+
+        {/* KPIs numéricos */}
+        <Campo label="Puntuación general (0–100)" htmlFor="puntuacionGeneral">
           <Input
             id="puntuacionGeneral"
             type="number"
@@ -201,9 +211,8 @@ function EvaluacionForm({
             step="0.01"
             {...register('puntuacionGeneral')}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="puntualidad">Puntualidad</Label>
+        </Campo>
+        <Campo label="Puntualidad" htmlFor="puntualidad">
           <Input
             id="puntualidad"
             type="number"
@@ -212,9 +221,8 @@ function EvaluacionForm({
             step="0.01"
             {...register('puntualidad')}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="consumoCombustible">Consumo combustible (km/L)</Label>
+        </Campo>
+        <Campo label="Consumo combustible (km/L)" htmlFor="consumoCombustible">
           <Input
             id="consumoCombustible"
             type="number"
@@ -222,9 +230,8 @@ function EvaluacionForm({
             step="0.01"
             {...register('consumoCombustible')}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="cumplimientoRutas">Cumplimiento de rutas</Label>
+        </Campo>
+        <Campo label="Cumplimiento de rutas" htmlFor="cumplimientoRutas">
           <Input
             id="cumplimientoRutas"
             type="number"
@@ -233,9 +240,8 @@ function EvaluacionForm({
             step="0.01"
             {...register('cumplimientoRutas')}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="incidenciasPeriodo">Incidencias en el periodo</Label>
+        </Campo>
+        <Campo label="Incidencias en el periodo" htmlFor="incidenciasPeriodo">
           <Input
             id="incidenciasPeriodo"
             type="number"
@@ -243,9 +249,8 @@ function EvaluacionForm({
             step={1}
             {...register('incidenciasPeriodo')}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="viajesCompletados">Viajes completados</Label>
+        </Campo>
+        <Campo label="Viajes completados" htmlFor="viajesCompletados">
           <Input
             id="viajesCompletados"
             type="number"
@@ -253,29 +258,18 @@ function EvaluacionForm({
             step={1}
             {...register('viajesCompletados')}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="evaluadoPor">Evaluado por</Label>
-          <Input id="evaluadoPor" {...register('evaluadoPor')} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="comentarios">Comentarios</Label>
+        </Campo>
+
+        {/* Comentarios: fila completa */}
+        <Campo label="Comentarios" htmlFor="comentarios" full>
           <textarea
             id="comentarios"
             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             {...register('comentarios')}
           />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
+        </Campo>
+      </CamposGrid>
+    </ExpedienteFormDialog>
   );
 }
 
@@ -317,21 +311,19 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar evaluación
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar evaluación
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <EvaluacionForm
-          conductorId={conductorId}
-          evaluacion={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      <EvaluacionForm
+        conductorId={conductorId}
+        evaluacion={editando ?? undefined}
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+        onDone={cerrarForm}
+      />
 
       <div className="overflow-auto">
         {isLoading ? (

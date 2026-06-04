@@ -13,7 +13,6 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
@@ -26,6 +25,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+  SeccionHeader,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -66,16 +71,18 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Form ───────────────────────────────────────────────────────────────────────
+// ── Form Modal ─────────────────────────────────────────────────────────────────
 
 function ExamenMedicoForm({
   conductorId,
   examen,
-  onDone,
+  open,
+  onClose,
 }: {
   conductorId: string;
   examen?: ExamenMedico;
-  onDone: () => void;
+  open: boolean;
+  onClose: () => void;
 }) {
   const esEdicion = Boolean(examen);
   const queryClient = useQueryClient();
@@ -143,75 +150,69 @@ function ExamenMedicoForm({
         queryKey: ['conductor-examenes-medicos', conductorId],
       });
       toast.success(esEdicion ? 'Examen actualizado' : 'Examen agregado');
-      onDone();
+      onClose();
     },
     onError: (err) => toast.error(apiError(err)),
   });
 
   return (
-    <form
+    <ExpedienteFormDialog
+      open={open}
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      title={esEdicion ? 'Editar examen médico' : 'Nuevo examen médico'}
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
+      saving={mutation.isPending}
+      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+      size="md"
     >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar examen médico' : 'Nuevo examen médico'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
+      <CamposGrid cols={2}>
+        <Campo label="Tipo">
           <CatalogoSelect
             grupo="TIPO_EXAMEN_MEDICO"
             value={watch('tipo')}
             onChange={(c) => setValue('tipo', c)}
             placeholder="Selecciona un tipo"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Resultado</Label>
+        </Campo>
+
+        <Campo label="Resultado">
           <CatalogoSelect
             grupo="RESULTADO_EXAMEN"
             value={watch('resultado') ?? ''}
             onChange={(c) => setValue('resultado', c)}
             placeholder="Selecciona un resultado"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaExamen">Fecha del examen</Label>
+        </Campo>
+
+        <Campo
+          label="Fecha del examen"
+          htmlFor="fechaExamen"
+          error={errors.fechaExamen?.message}
+        >
           <Input id="fechaExamen" type="date" {...register('fechaExamen')} />
-          {errors.fechaExamen && (
-            <p className="text-sm text-destructive">{errors.fechaExamen.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaVencimiento">Fecha de vencimiento</Label>
+        </Campo>
+
+        <Campo label="Fecha de vencimiento" htmlFor="fechaVencimiento">
           <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="institucion">Institución</Label>
+        </Campo>
+
+        <Campo label="Institución" htmlFor="institucion">
           <Input id="institucion" {...register('institucion')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="medico">Médico</Label>
+        </Campo>
+
+        <Campo label="Médico" htmlFor="medico">
           <Input id="medico" {...register('medico')} />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="observaciones">Observaciones</Label>
+        </Campo>
+
+        <Campo label="Observaciones" htmlFor="observaciones" full>
           <textarea
             id="observaciones"
             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             {...register('observaciones')}
           />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
+        </Campo>
+      </CamposGrid>
+    </ExpedienteFormDialog>
   );
 }
 
@@ -253,21 +254,18 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar examen
-          </Button>
-        </div>
-      )}
+      <SeccionHeader>
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar examen
+        </Button>
+      </SeccionHeader>
 
-      {(mostrarForm || editando) && (
-        <ExamenMedicoForm
-          conductorId={conductorId}
-          examen={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      <ExamenMedicoForm
+        conductorId={conductorId}
+        examen={editando ?? undefined}
+        open={mostrarForm || Boolean(editando)}
+        onClose={cerrarForm}
+      />
 
       <div className="overflow-auto">
         {isLoading ? (

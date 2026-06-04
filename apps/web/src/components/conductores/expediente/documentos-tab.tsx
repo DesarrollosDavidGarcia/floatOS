@@ -13,7 +13,6 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -28,6 +27,11 @@ import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { vencimientoInfo } from '@/components/conductores/documento-utils';
 import type { DocumentoConductor, DocumentoFormPayload } from '@/components/conductores/types';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 const schema = z.object({
   tipo: z.string().min(1, 'Requerido'),
@@ -46,11 +50,13 @@ function isoADate(iso?: string | null): string {
 function DocumentoForm({
   conductorId,
   documento,
-  onDone,
+  open,
+  onOpenChange,
 }: {
   conductorId: string;
   documento?: DocumentoConductor;
-  onDone: () => void;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
 }) {
   const esEdicion = Boolean(documento);
   const queryClient = useQueryClient();
@@ -101,54 +107,45 @@ function DocumentoForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conductor-documentos', conductorId] });
       toast.success(esEdicion ? 'Documento actualizado' : 'Documento agregado');
-      onDone();
+      onOpenChange(false);
     },
     onError: (err) => toast.error(apiError(err)),
   });
 
   return (
-    <form
+    <ExpedienteFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={esEdicion ? 'Editar documento' : 'Nuevo documento'}
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
+      saving={mutation.isPending}
+      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+      size="md"
     >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar documento' : 'Nuevo documento'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Tipo</Label>
+      <CamposGrid cols={2}>
+        <Campo label="Tipo" error={errors.tipo?.message}>
           <CatalogoSelect
             grupo="TIPO_DOCUMENTO_CONDUCTOR"
             value={tipo}
             onChange={(c) => setValue('tipo', c)}
             placeholder="Selecciona un tipo"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="doc-numero">Número</Label>
+        </Campo>
+        <Campo label="Número" htmlFor="doc-numero">
           <Input id="doc-numero" {...register('numero')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="doc-fechaEmision">Fecha de emisión</Label>
+        </Campo>
+        <Campo label="Fecha de emisión" htmlFor="doc-fechaEmision">
           <Input id="doc-fechaEmision" type="date" {...register('fechaEmision')} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="doc-fechaVencimiento">Fecha de vencimiento *</Label>
+        </Campo>
+        <Campo
+          label="Fecha de vencimiento *"
+          htmlFor="doc-fechaVencimiento"
+          error={errors.fechaVencimiento?.message}
+        >
           <Input id="doc-fechaVencimiento" type="date" {...register('fechaVencimiento')} />
-          {errors.fechaVencimiento && (
-            <p className="text-sm text-destructive">{errors.fechaVencimiento.message}</p>
-          )}
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
+        </Campo>
+      </CamposGrid>
+    </ExpedienteFormDialog>
   );
 }
 
@@ -185,21 +182,18 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar documento
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar documento
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <DocumentoForm
-          conductorId={conductorId}
-          documento={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      <DocumentoForm
+        conductorId={conductorId}
+        documento={editando ?? undefined}
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+      />
 
       <div className="overflow-auto">
         {isLoading ? (

@@ -8,7 +8,6 @@ import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -26,6 +25,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 interface CapacitacionConductor {
   id: string;
@@ -65,10 +69,14 @@ function isoADate(iso?: string | null): string {
 function CapacitacionForm({
   conductorId,
   capacitacion,
+  open,
+  onOpenChange,
   onDone,
 }: {
   conductorId: string;
   capacitacion?: CapacitacionConductor;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onDone: () => void;
 }) {
   const esEdicion = Boolean(capacitacion);
@@ -155,49 +163,46 @@ function CapacitacionForm({
   });
 
   return (
-    <form
+    <ExpedienteFormDialog
+      open={open}
+      onOpenChange={(o) => { if (!o) onDone(); onOpenChange(o); }}
+      title={esEdicion ? 'Editar capacitación' : 'Nueva capacitación'}
       onSubmit={(e) => {
         e.preventDefault();
         setError('');
         mutation.mutate();
       }}
-      className="space-y-4 rounded-md border p-4"
+      saving={mutation.isPending}
+      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+      size="md"
     >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar capacitación' : 'Nueva capacitación'}
-      </p>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="cap-nombre">Nombre *</Label>
+      <CamposGrid cols={2}>
+        <Campo label="Nombre *" htmlFor="cap-nombre" full>
           <Input
             id="cap-nombre"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Nombre del curso"
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-instructor">Instructor</Label>
+        <Campo label="Instructor" htmlFor="cap-instructor">
           <Input
             id="cap-instructor"
             value={instructor}
             onChange={(e) => setInstructor(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-institucion">Institución</Label>
+        <Campo label="Institución" htmlFor="cap-institucion">
           <Input
             id="cap-institucion"
             value={institucion}
             onChange={(e) => setInstitucion(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-horas">Horas</Label>
+        <Campo label="Horas" htmlFor="cap-horas">
           <Input
             id="cap-horas"
             type="number"
@@ -205,10 +210,9 @@ function CapacitacionForm({
             value={horas}
             onChange={(e) => setHoras(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-calificacion">Calificación</Label>
+        <Campo label="Calificación" htmlFor="cap-calificacion">
           <Input
             id="cap-calificacion"
             type="number"
@@ -217,30 +221,27 @@ function CapacitacionForm({
             value={calificacion}
             onChange={(e) => setCalificacion(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-fechaInicio">Fecha inicio</Label>
+        <Campo label="Fecha inicio" htmlFor="cap-fechaInicio">
           <Input
             id="cap-fechaInicio"
             type="date"
             value={fechaInicio}
             onChange={(e) => setFechaInicio(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-fechaFin">Fecha fin</Label>
+        <Campo label="Fecha fin" htmlFor="cap-fechaFin">
           <Input
             id="cap-fechaFin"
             type="date"
             value={fechaFin}
             onChange={(e) => setFechaFin(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label>Aprobado</Label>
+        <Campo label="Aprobado">
           <Select value={aprobado} onValueChange={setAprobado}>
             <SelectTrigger>
               <SelectValue placeholder="Sin definir" />
@@ -250,39 +251,28 @@ function CapacitacionForm({
               <SelectItem value="false">No</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="cap-constanciaKey">Clave constancia</Label>
+        <Campo label="Clave constancia" htmlFor="cap-constanciaKey">
           <Input
             id="cap-constanciaKey"
             value={constanciaKey}
             onChange={(e) => setConstanciaKey(e.target.value)}
           />
-        </div>
+        </Campo>
 
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="cap-notas">Notas</Label>
+        <Campo label="Notas" htmlFor="cap-notas" full>
           <textarea
             id="cap-notas"
             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
           />
-        </div>
-      </div>
+        </Campo>
+      </CamposGrid>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
+    </ExpedienteFormDialog>
   );
 }
 
@@ -321,21 +311,19 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar capacitación
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar capacitación
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <CapacitacionForm
-          conductorId={conductorId}
-          capacitacion={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      <CapacitacionForm
+        conductorId={conductorId}
+        capacitacion={editando ?? undefined}
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+        onDone={cerrarForm}
+      />
 
       <div className="overflow-auto">
         {isLoading ? (

@@ -10,7 +10,6 @@ import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -23,6 +22,11 @@ import {
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoBadge, CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import {
+  ExpedienteFormDialog,
+  CamposGrid,
+  Campo,
+} from '@/components/conductores/expediente/form-ui';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -48,16 +52,18 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ── formulario inline ──────────────────────────────────────────────────────────
+// ── formulario modal ───────────────────────────────────────────────────────────
 
 function AptitudForm({
   conductorId,
   aptitud,
-  onDone,
+  open,
+  onOpenChange,
 }: {
   conductorId: string;
   aptitud?: AptitudUnidadConductor;
-  onDone: () => void;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
 }) {
   const esEdicion = Boolean(aptitud);
   const queryClient = useQueryClient();
@@ -122,68 +128,55 @@ function AptitudForm({
         queryKey: ['conductor-aptitudes-unidad', conductorId],
       });
       toast.success(esEdicion ? 'Aptitud actualizada' : 'Aptitud agregada');
-      onDone();
+      onOpenChange(false);
     },
     onError: (err) => toast.error(apiError(err)),
   });
 
   return (
-    <form
+    <ExpedienteFormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={esEdicion ? 'Editar aptitud' : 'Nueva aptitud'}
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      className="space-y-4 rounded-md border p-4"
+      saving={mutation.isPending}
+      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+      size="md"
     >
-      <p className="text-sm font-medium">
-        {esEdicion ? 'Editar aptitud' : 'Nueva aptitud'}
-      </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Tipo de unidad</Label>
+      <CamposGrid cols={2}>
+        <Campo label="Tipo de unidad" error={errors.tipoUnidad?.message}>
           <CatalogoSelect
             grupo="TIPO_UNIDAD_MANEJO"
             value={tipoUnidad}
             onChange={(c) => setValue('tipoUnidad', c)}
             placeholder="Selecciona un tipo"
           />
-          {errors.tipoUnidad && (
-            <p className="text-sm text-destructive">{errors.tipoUnidad.message}</p>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <Label>Nivel</Label>
+        </Campo>
+        <Campo label="Nivel">
           <CatalogoSelect
             grupo="NIVEL_APTITUD"
             value={nivel ?? ''}
             onChange={(c) => setValue('nivel', c)}
             placeholder="Selecciona un nivel"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="aniosExperiencia">Años de experiencia</Label>
+        </Campo>
+        <Campo label="Años de experiencia" htmlFor="aniosExperiencia">
           <Input
             id="aniosExperiencia"
             type="number"
             min={0}
             {...register('aniosExperiencia')}
           />
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="notas">Notas</Label>
+        </Campo>
+        <Campo label="Notas" htmlFor="notas" full>
           <textarea
             id="notas"
             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
             {...register('notas')}
           />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onDone}>
-          Cancelar
-        </Button>
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </form>
+        </Campo>
+      </CamposGrid>
+    </ExpedienteFormDialog>
   );
 }
 
@@ -224,21 +217,18 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
 
   return (
     <div className="space-y-4">
-      {!mostrarForm && !editando && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setMostrarForm(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Agregar aptitud
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setMostrarForm(true)}>
+          <Plus className="mr-1 h-4 w-4" /> Agregar aptitud
+        </Button>
+      </div>
 
-      {(mostrarForm || editando) && (
-        <AptitudForm
-          conductorId={conductorId}
-          aptitud={editando ?? undefined}
-          onDone={cerrarForm}
-        />
-      )}
+      <AptitudForm
+        conductorId={conductorId}
+        aptitud={editando ?? undefined}
+        open={mostrarForm || Boolean(editando)}
+        onOpenChange={(o) => { if (!o) cerrarForm(); }}
+      />
 
       <div className="overflow-auto">
         {isLoading ? (

@@ -8,7 +8,6 @@ import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Card,
@@ -18,6 +17,7 @@ import {
 } from '@/components/ui/card';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import { CamposGrid, Campo } from '@/components/conductores/expediente/form-ui';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -89,13 +89,13 @@ function DetalleItem({ label, value }: { label: string; value: string | null | u
 function Seccion({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
-      <CardHeader className="pb-2 pt-4">
-        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+      <CardHeader className="pb-2 pt-3">
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="pb-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <CardContent className="pb-3">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
           {children}
         </div>
       </CardContent>
@@ -241,133 +241,120 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
 
         {/* Datos personales */}
         <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Datos personales
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="curp">CURP</Label>
+          <CardContent className="pb-3">
+            <CamposGrid cols={3}>
+              <Campo label="CURP" htmlFor="curp">
                 <Input id="curp" {...register('curp')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="fechaNacimiento">Fecha de nacimiento</Label>
+              </Campo>
+              <Campo label="Fecha de nacimiento" htmlFor="fechaNacimiento">
                 <Input id="fechaNacimiento" type="date" {...register('fechaNacimiento')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo de sangre</Label>
+              </Campo>
+              <Campo label="Tipo de sangre">
                 <CatalogoSelect
                   grupo="TIPO_SANGRE"
                   value={watch('tipoSangre')}
                   onChange={(c) => setValue('tipoSangre', c)}
                   placeholder="Selecciona…"
                 />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                <Label htmlFor="direccion">Dirección</Label>
+              </Campo>
+              <Campo label="Dirección" htmlFor="direccion" full>
                 <Input id="direccion" {...register('direccion')} />
-              </div>
-            </div>
+              </Campo>
+            </CamposGrid>
           </CardContent>
         </Card>
 
         {/* Datos fiscales / IMSS */}
         <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Datos fiscales / IMSS
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="rfc">RFC</Label>
+          <CardContent className="pb-3">
+            <CamposGrid cols={3}>
+              <Campo label="RFC" htmlFor="rfc">
                 <Input id="rfc" {...register('rfc')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nss">NSS (IMSS)</Label>
+              </Campo>
+              <Campo label="NSS (IMSS)" htmlFor="nss">
                 <Input id="nss" {...register('nss')} />
-              </div>
-            </div>
+              </Campo>
+            </CamposGrid>
           </CardContent>
         </Card>
 
         {/* Licencia */}
         <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Licencia federal
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Categoría de licencia</Label>
+          <CardContent className="pb-3">
+            <CamposGrid cols={3}>
+              <Campo label="Categoría de licencia">
                 <CatalogoSelect
                   grupo="CATEGORIA_LICENCIA"
                   value={watch('categoriaLicencia')}
                   onChange={(c) => setValue('categoriaLicencia', c)}
                   placeholder="Sin categoría"
                 />
-              </div>
-            </div>
+              </Campo>
+            </CamposGrid>
           </CardContent>
         </Card>
 
         {/* Empleo */}
         <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Empleo
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="numeroEmpleado">No. de empleado</Label>
+          <CardContent className="pb-3">
+            <CamposGrid cols={3}>
+              <Campo label="No. de empleado" htmlFor="numeroEmpleado">
                 <Input id="numeroEmpleado" {...register('numeroEmpleado')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Puesto</Label>
+              </Campo>
+              <Campo label="Puesto">
                 <CatalogoSelect
                   grupo="PUESTO"
                   value={watch('puesto')}
                   onChange={(c) => setValue('puesto', c)}
                   placeholder="Selecciona…"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="fechaIngreso">Fecha de ingreso</Label>
+              </Campo>
+              <Campo label="Fecha de ingreso" htmlFor="fechaIngreso">
                 <Input id="fechaIngreso" type="date" {...register('fechaIngreso')} />
-              </div>
-            </div>
+              </Campo>
+            </CamposGrid>
           </CardContent>
         </Card>
 
         {/* Contacto de emergencia */}
         <Card>
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Contacto de emergencia
             </CardTitle>
           </CardHeader>
-          <CardContent className="pb-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="emergenciaNombre">Nombre</Label>
+          <CardContent className="pb-3">
+            <CamposGrid cols={3}>
+              <Campo label="Nombre" htmlFor="emergenciaNombre">
                 <Input id="emergenciaNombre" {...register('emergenciaNombre')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="emergenciaTelefono">Teléfono</Label>
+              </Campo>
+              <Campo label="Teléfono" htmlFor="emergenciaTelefono">
                 <Input id="emergenciaTelefono" {...register('emergenciaTelefono')} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="emergenciaRelacion">Relación</Label>
+              </Campo>
+              <Campo label="Relación" htmlFor="emergenciaRelacion">
                 <Input id="emergenciaRelacion" placeholder="Ej. Esposa, Madre…" {...register('emergenciaRelacion')} />
-              </div>
-            </div>
+              </Campo>
+            </CamposGrid>
           </CardContent>
         </Card>
       </form>
