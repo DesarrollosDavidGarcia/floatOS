@@ -1,17 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import { MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { toast } from '@/components/ui/sonner';
 import { PageHeader } from '@/components/page-header';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -21,16 +35,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ClienteFormDialog } from '@/components/clientes/cliente-form-dialog';
+import { CeldaPrincipal, unirSub } from '@/components/conductores/expediente/tabla-ui';
 import type { Cliente, Paginado } from './tipos';
 
 const PAGE_SIZE = 10;
 
 export default function ClientesPage() {
-  const [q, setQ] = useState('');
-  const [page, setPage] = useState(1);
-  const [editando, setEditando] = useState<Cliente | null>(null);
-  const debouncedQ = useDebounce(q, 350);
   const queryClient = useQueryClient();
+  const [busqueda, setBusqueda] = useState('');
+  const [page, setPage] = useState(1);
+  const debouncedQ = useDebounce(busqueda, 350);
+
+  const [crearOpen, setCrearOpen] = useState(false);
+  const [editando, setEditando] = useState<Cliente | null>(null);
+  const [eliminarCliente, setEliminarCliente] = useState<Cliente | null>(null);
 
   const query = useQuery({
     queryKey: ['clientes', { q: debouncedQ, page, pageSize: PAGE_SIZE }],
@@ -42,30 +60,34 @@ export default function ClientesPage() {
     },
   });
 
-  function onBuscar(value: string) {
-    setQ(value);
-    setPage(1);
-  }
-
-  async function eliminar(cliente: Cliente) {
-    try {
-      await api.delete(`/clientes/${cliente.id}`);
-      toast.success('Cliente eliminado');
+  const eliminar = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/clientes/${id}`);
+    },
+    onSuccess: () => {
       // Si era el último de la página, retrocede una.
       if ((query.data?.data.length ?? 0) === 1 && page > 1) {
         setPage((p) => p - 1);
       } else {
         queryClient.invalidateQueries({ queryKey: ['clientes'] });
       }
-    } catch (err) {
-      // 409 si el cliente tiene viajes asociados: muestra el mensaje del backend.
+      toast.success('Cliente eliminado');
+      setEliminarCliente(null);
+    },
+    onError: (err) => {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        toast.error(
+          apiError(err) || 'No se puede eliminar: el cliente tiene viajes asociados.',
+        );
+        return;
+      }
       toast.error(apiError(err));
-    }
-  }
+    },
+  });
 
   const data = query.data;
   const total = data?.total ?? 0;
-  const totalPaginas = data?.totalPaginas ?? 0;
+  const totalPaginas = data?.totalPaginas ?? 1;
   const filas = data?.data ?? [];
 
   return (
@@ -74,152 +96,194 @@ export default function ClientesPage() {
         title="Clientes"
         description="Administra los clientes a los que asignas viajes."
         action={
-          <ClienteFormDialog
-            trigger={
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo cliente
-              </Button>
-            }
-          />
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar por razón social, RFC…"
+                value={busqueda}
+                onChange={(e) => {
+                  setBusqueda(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
+            </Button>
+          </div>
         }
       />
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por razón social, RFC…"
-          value={q}
-          onChange={(e) => onBuscar(e.target.value)}
-          className="pl-9"
-        />
+      <div className="rounded-md border">
+        <Table className="[&_td]:py-1.5 [&_th]:h-9">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Cliente
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Teléfono
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Dirección
+              </TableHead>
+              <TableHead className="w-[60px] text-right text-xs uppercase text-muted-foreground">
+                Acciones
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {query.isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={4}>
+                    <Skeleton className="h-10 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : query.isError ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-10 text-center text-destructive">
+                  {apiError(query.error)}
+                </TableCell>
+              </TableRow>
+            ) : filas.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  className="py-10 text-center text-muted-foreground"
+                >
+                  {debouncedQ
+                    ? 'No se encontraron clientes para tu búsqueda.'
+                    : 'Aún no hay clientes registrados.'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filas.map((cliente) => (
+                <TableRow key={cliente.id}>
+                  {/* Cliente: razón social + RFC · contacto */}
+                  <TableCell>
+                    <CeldaPrincipal
+                      titulo={cliente.razonSocial}
+                      subtitulo={unirSub(cliente.rfc, cliente.contactoNombre, cliente.contactoEmail)}
+                    />
+                  </TableCell>
+
+                  {/* Teléfono */}
+                  <TableCell>{cliente.contactoTelefono || '—'}</TableCell>
+
+                  {/* Dirección */}
+                  <TableCell className="max-w-[200px] truncate">
+                    {cliente.direccion || '—'}
+                  </TableCell>
+
+                  {/* Acciones */}
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Acciones">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onSelect={() => setEditando(cliente)}>
+                          <Pencil className="h-4 w-4" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => setEliminarCliente(cliente)}
+                        >
+                          <Trash2 className="h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Razón social</TableHead>
-                <TableHead>RFC</TableHead>
-                <TableHead>Contacto</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead className="w-[100px] text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {query.isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 5 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-5 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : query.isError ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-destructive">
-                    {apiError(query.error)}
-                  </TableCell>
-                </TableRow>
-              ) : filas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    {debouncedQ
-                      ? 'No se encontraron clientes para tu búsqueda.'
-                      : 'Aún no hay clientes registrados.'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filas.map((cliente) => (
-                  <TableRow key={cliente.id}>
-                    <TableCell className="font-medium">{cliente.razonSocial}</TableCell>
-                    <TableCell>{cliente.rfc || '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{cliente.contactoNombre || '—'}</span>
-                        {cliente.contactoEmail ? (
-                          <span className="text-xs text-muted-foreground">
-                            {cliente.contactoEmail}
-                          </span>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>{cliente.contactoTelefono || '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Editar"
-                          onClick={() => setEditando(cliente)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" size="icon" title="Eliminar">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          }
-                          title="Eliminar cliente"
-                          description={`¿Seguro que deseas eliminar a "${cliente.razonSocial}"? Esta acción no se puede deshacer.`}
-                          confirmLabel="Eliminar"
-                          onConfirm={() => eliminar(cliente)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {total > 0
-            ? `${total} cliente${total === 1 ? '' : 's'} en total`
-            : 'Sin resultados'}
-        </p>
-        {totalPaginas > 1 ? (
-          <div className="flex items-center gap-2">
+      {/* Conteo + paginación — siempre visible cuando hay filas */}
+      {data && filas.length > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {total} {total === 1 ? 'cliente' : 'clientes'} · Página {data.page} de{' '}
+            {totalPaginas}
+          </p>
+          <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
+              disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || query.isFetching}
             >
-              <ChevronLeft className="mr-1 h-4 w-4" />
               Anterior
             </Button>
-            <span className="text-sm text-muted-foreground">
-              Página {page} de {totalPaginas}
-            </span>
             <Button
               variant="outline"
               size="sm"
+              disabled={page >= totalPaginas}
               onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-              disabled={page >= totalPaginas || query.isFetching}
             >
               Siguiente
-              <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
-        ) : null}
-      </div>
+        </div>
+      )}
 
-      {/* Diálogo de edición controlado, reutiliza el mismo formulario. */}
+      {/* Crear */}
+      <ClienteFormDialog open={crearOpen} onOpenChange={setCrearOpen} />
+
+      {/* Editar */}
       <ClienteFormDialog
         cliente={editando}
         open={editando !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditando(null);
+        onOpenChange={(o) => {
+          if (!o) setEditando(null);
         }}
       />
+
+      {/* Confirmar eliminación */}
+      <Dialog
+        open={Boolean(eliminarCliente)}
+        onOpenChange={(o) => {
+          if (!o) setEliminarCliente(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar cliente</DialogTitle>
+            <DialogDescription>
+              {eliminarCliente
+                ? `¿Eliminar a "${eliminarCliente.razonSocial}"? Esta acción no se puede deshacer.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEliminarCliente(null)}
+              disabled={eliminar.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                eliminarCliente && eliminar.mutate(eliminarCliente.id)
+              }
+              disabled={eliminar.isPending}
+            >
+              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

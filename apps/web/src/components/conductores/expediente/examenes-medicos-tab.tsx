@@ -288,7 +288,7 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
             Sin exámenes médicos registrados.
           </p>
         ) : (
-          <Table>
+          <Table className="[&_td]:py-1.5 [&_th]:h-9">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Examen</TableHead>

@@ -58,6 +58,7 @@ export default function AlertasPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Encabezado ─────────────────────────────────────────────────── */}
       <PageHeader
         title="Alertas"
         description="Centro de vencimientos de documentos de unidades y conductores."
@@ -83,27 +84,39 @@ export default function AlertasPage() {
         }
       />
 
+      {/* ── Tabs + contenido ───────────────────────────────────────────── */}
       <Tabs value={tab} onValueChange={(value) => setTab(value as FiltroTipo)}>
-        <TabsList>
-          <TabsTrigger value="todos">
-            Todos
-            <Badge variant="secondary" className="ml-2">
-              {items.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="unidad">
-            Unidades
-            <Badge variant="secondary" className="ml-2">
-              {unidades.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="conductor">
-            Conductores
-            <Badge variant="secondary" className="ml-2">
-              {conductores.length}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
+        {/* Barra: tabs a la izquierda, conteo a la derecha */}
+        <div className="flex items-center justify-between gap-4">
+          <TabsList>
+            <TabsTrigger value="todos">
+              Todos
+              <Badge variant="secondary" className="ml-2">
+                {items.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="unidad">
+              Unidades
+              <Badge variant="secondary" className="ml-2">
+                {unidades.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="conductor">
+              Conductores
+              <Badge variant="secondary" className="ml-2">
+                {conductores.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Conteo de registros del tab activo (solo cuando hay datos) */}
+          {!isLoading && !isError && (
+            <p className="text-sm text-muted-foreground">
+              {itemsFiltrados.length}{' '}
+              {itemsFiltrados.length === 1 ? 'por vencer' : 'por vencer'}
+            </p>
+          )}
+        </div>
 
         <TabsContent value={tab} className="mt-4">
           {isLoading ? (
@@ -111,7 +124,7 @@ export default function AlertasPage() {
           ) : isError ? (
             <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
               <AlertTriangle className="h-4 w-4 shrink-0" />
-              {isError ? apiError(error) : 'No se pudieron cargar los vencimientos.'}
+              {apiError(error) || 'No se pudieron cargar los vencimientos.'}
             </div>
           ) : (
             <TablaVencimientos items={itemsFiltrados} />

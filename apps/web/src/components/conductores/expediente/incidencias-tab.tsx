@@ -367,7 +367,7 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
         </p>
       ) : (
         <div className="overflow-auto">
-          <Table>
+          <Table className="[&_td]:py-1.5 [&_th]:h-9">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Incidencia</TableHead>

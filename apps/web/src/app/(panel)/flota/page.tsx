@@ -2,17 +2,30 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Pencil, Plus, Search, Trash2, Truck } from 'lucide-react';
+import { FileText, MoreHorizontal, Pencil, Plus, Search, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { PageHeader } from '@/components/page-header';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -21,6 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import { CeldaPrincipal } from '@/components/conductores/expediente/tabla-ui';
 import { UnidadFormDialog } from '@/components/flota/unidad-form-dialog';
 import { DocumentosDialog } from '@/components/flota/documentos-dialog';
 import type { Paginado, Unidad } from '@/components/flota/types';
@@ -29,14 +44,15 @@ const PAGE_SIZE = 10;
 
 export default function FlotaPage() {
   const queryClient = useQueryClient();
-  const [q, setQ] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
-  const qDebounced = useDebounce(q);
+  const qDebounced = useDebounce(busqueda);
 
   const [formOpen, setFormOpen] = useState(false);
   const [unidadEditar, setUnidadEditar] = useState<Unidad | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [unidadDocs, setUnidadDocs] = useState<Unidad | null>(null);
+  const [eliminarUnidad, setEliminarUnidad] = useState<Unidad | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['unidades', qDebounced, page],
@@ -55,6 +71,7 @@ export default function FlotaPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unidades'] });
       toast.success('Unidad eliminada');
+      setEliminarUnidad(null);
     },
     onError: (err) => toast.error(apiError(err)),
   });
@@ -83,144 +100,218 @@ export default function FlotaPage() {
         title="Flota"
         description="Unidades de la flotilla y sus documentos."
         action={
-          <Button onClick={abrirNueva}>
-            <Plus className="mr-1.5 h-4 w-4" /> Nueva unidad
-          </Button>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar por placas, tipo, marca…"
+                value={busqueda}
+                onChange={(e) => {
+                  setBusqueda(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <Button className="shrink-0" onClick={abrirNueva}>
+              <Plus className="mr-1 h-4 w-4" /> Nueva unidad
+            </Button>
+          </div>
         }
       />
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Buscar por placas, tipo, marca…"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
-        />
+      <div className="rounded-md border">
+        <Table className="[&_td]:py-1.5 [&_th]:h-9">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Unidad
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Año
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Capacidad (kg)
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Aseguradora
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Estado
+              </TableHead>
+              <TableHead className="w-[60px] text-right text-xs uppercase text-muted-foreground">
+                Acciones
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={6}>
+                    <Skeleton className="h-10 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-destructive">
+                  {apiError(error)}
+                </TableCell>
+              </TableRow>
+            ) : unidades.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  <Truck className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  No se encontraron unidades.
+                </TableCell>
+              </TableRow>
+            ) : (
+              unidades.map((u) => (
+                <TableRow key={u.id}>
+                  {/* Unidad: placas + tipo · marca/modelo */}
+                  <TableCell>
+                    <CeldaPrincipal
+                      titulo={u.placas}
+                      subtitulo={
+                        <>
+                          <CatalogoTexto grupo="TIPO_UNIDAD" codigo={u.tipo} />
+                          {(u.marca || u.modelo) && (
+                            <>
+                              {' · '}
+                              {[u.marca, u.modelo].filter(Boolean).join(' ')}
+                            </>
+                          )}
+                        </>
+                      }
+                    />
+                  </TableCell>
+
+                  {/* Año */}
+                  <TableCell>{u.anio ?? '—'}</TableCell>
+
+                  {/* Capacidad */}
+                  <TableCell>
+                    {u.capacidadKg != null
+                      ? u.capacidadKg.toLocaleString('es-MX')
+                      : '—'}
+                  </TableCell>
+
+                  {/* Aseguradora */}
+                  <TableCell>
+                    {u.aseguradora ? (
+                      <CatalogoTexto grupo="ASEGURADORA" codigo={u.aseguradora} />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Estado */}
+                  <TableCell>
+                    <Badge variant={u.activo ? 'success' : 'secondary'}>
+                      {u.activo ? 'Activa' : 'Inactiva'}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Acciones */}
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Acciones">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onSelect={() => abrirDocumentos(u)}>
+                          <FileText className="h-4 w-4" /> Documentos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => abrirEdicion(u)}>
+                          <Pencil className="h-4 w-4" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => setEliminarUnidad(u)}
+                        >
+                          <Trash2 className="h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Placas</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Marca / Modelo</TableHead>
-                <TableHead>Año</TableHead>
-                <TableHead>Capacidad (kg)</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={7}>
-                      <Skeleton className="h-6 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : isError ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-destructive">
-                    {apiError(error)}
-                  </TableCell>
-                </TableRow>
-              ) : unidades.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                    <Truck className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                    No se encontraron unidades.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                unidades.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.placas}</TableCell>
-                    <TableCell>{u.tipo}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {[u.marca, u.modelo].filter(Boolean).join(' ') || '—'}
-                    </TableCell>
-                    <TableCell>{u.anio ?? '—'}</TableCell>
-                    <TableCell>
-                      {u.capacidadKg != null ? u.capacidadKg.toLocaleString('es-MX') : '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={u.activo ? 'success' : 'secondary'}>
-                        {u.activo ? 'Activa' : 'Inactiva'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => abrirDocumentos(u)}
-                        >
-                          <FileText className="mr-1 h-4 w-4" /> Documentos
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => abrirEdicion(u)}
-                          aria-label="Editar unidad"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <ConfirmDialog
-                          trigger={
-                            <Button variant="ghost" size="icon" aria-label="Eliminar unidad">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          }
-                          title="Eliminar unidad"
-                          description={`¿Eliminar la unidad ${u.placas}? Si tiene viajes asociados no podrá eliminarse.`}
-                          confirmLabel="Eliminar"
-                          onConfirm={() => deleteMutation.mutateAsync(u.id)}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {data && data.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {data.total} unidad{data.total === 1 ? '' : 'es'} · página {data.page} de {totalPaginas}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPaginas}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Siguiente
-            </Button>
-          </div>
+      {/* Conteo y paginación — siempre visible cuando hay datos */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {data
+            ? `${data.total} ${data.total === 1 ? 'unidad' : 'unidades'} · Página ${data.page} de ${totalPaginas}`
+            : ' '}
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Anterior
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPaginas}
+            onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
+          >
+            Siguiente
+          </Button>
         </div>
-      )}
+      </div>
 
+      {/* Diálogos */}
       <UnidadFormDialog unidad={unidadEditar} open={formOpen} onOpenChange={setFormOpen} />
       <DocumentosDialog unidad={unidadDocs} open={docsOpen} onOpenChange={setDocsOpen} />
+
+      {/* Confirmar eliminación */}
+      <Dialog
+        open={Boolean(eliminarUnidad)}
+        onOpenChange={(o) => {
+          if (!o) setEliminarUnidad(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar unidad</DialogTitle>
+            <DialogDescription>
+              {eliminarUnidad
+                ? `¿Eliminar la unidad ${eliminarUnidad.placas}? Si tiene viajes asociados no podrá eliminarse. Esta acción no se puede deshacer.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEliminarUnidad(null)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                eliminarUnidad && deleteMutation.mutate(eliminarUnidad.id)
+              }
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

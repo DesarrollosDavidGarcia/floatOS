@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ArrowRight, Eye, MoreHorizontal, Plus, Search } from 'lucide-react';
 import { EstadoViaje } from '@flotaos/shared-types';
 import { api } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
@@ -12,9 +12,14 @@ import type { Paginado } from '@flotaos/shared-types';
 import { PageHeader } from '@/components/page-header';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -32,6 +37,11 @@ import {
 } from '@/components/ui/table';
 import { CrearViajeDialog } from '@/components/viajes/crear-viaje-dialog';
 import type { Viaje } from '@/components/viajes/types';
+import {
+  CeldaPrincipal,
+  Fecha,
+  unirSub,
+} from '@/components/conductores/expediente/tabla-ui';
 
 const PAGE_SIZE = 20;
 const TODOS = '__todos__';
@@ -62,22 +72,27 @@ export default function ViajesPage() {
       <PageHeader
         title="Viajes"
         description="Gestiona y monitorea los viajes de la flotilla."
-        action={<CrearViajeDialog />}
+        action={
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar por folio, cliente, dirección…"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <CrearViajeDialog />
+          </div>
+        }
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por folio, cliente, dirección…"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
-            className="pl-9"
-          />
-        </div>
+      {/* Fila de filtros secundarios */}
+      <div className="flex flex-wrap items-center gap-3">
         <Select
           value={estado}
           onValueChange={(v) => {
@@ -85,7 +100,7 @@ export default function ViajesPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="sm:w-56">
+          <SelectTrigger className="w-52">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
@@ -99,102 +114,172 @@ export default function ViajesPage() {
         </Select>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+      <div className="rounded-md border">
+        <Table className="[&_td]:py-1.5 [&_th]:h-9">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Folio / Cliente
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Ruta
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Conductor
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Unidad
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Fecha
+              </TableHead>
+              <TableHead className="text-xs uppercase text-muted-foreground">
+                Estado
+              </TableHead>
+              <TableHead className="w-[60px] text-right text-xs uppercase text-muted-foreground">
+                Acciones
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={7}>
+                    <Skeleton className="h-10 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : isError ? (
               <TableRow>
-                <TableHead>Folio</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Ruta</TableHead>
-                <TableHead>Conductor</TableHead>
-                <TableHead>Unidad</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableCell colSpan={7} className="py-10 text-center text-destructive">
+                  No se pudieron cargar los viajes.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : isError ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-destructive">
-                    No se pudieron cargar los viajes.
+            ) : viajes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  No hay viajes que coincidan.
+                </TableCell>
+              </TableRow>
+            ) : (
+              viajes.map((v) => (
+                <TableRow
+                  key={v.id}
+                  className={isPlaceholderData ? 'opacity-60' : undefined}
+                >
+                  {/* Folio + Cliente */}
+                  <TableCell>
+                    <CeldaPrincipal
+                      titulo={
+                        <Link href={`/viajes/${v.id}`} className="hover:underline">
+                          {v.folio}
+                        </Link>
+                      }
+                      subtitulo={v.cliente?.nombre}
+                    />
+                  </TableCell>
+
+                  {/* Ruta: origen → destino */}
+                  <TableCell className="max-w-xs">
+                    <div className="flex flex-col gap-0.5 text-sm">
+                      <span className="truncate font-medium" title={v.origenDireccion}>
+                        {v.origenDireccion}
+                      </span>
+                      <span className="flex items-center gap-1 truncate text-xs text-muted-foreground" title={v.destinoDireccion}>
+                        <ArrowRight className="h-3 w-3 shrink-0" />
+                        {v.destinoDireccion}
+                      </span>
+                    </div>
+                  </TableCell>
+
+                  {/* Conductor */}
+                  <TableCell>
+                    {v.conductor ? (
+                      <CeldaPrincipal
+                        titulo={v.conductor.nombre}
+                        subtitulo={v.conductor.telefono ?? undefined}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Unidad */}
+                  <TableCell>
+                    {v.unidad ? (
+                      <CeldaPrincipal
+                        titulo={v.unidad.placas}
+                        subtitulo={unirSub(v.unidad.marca, v.unidad.modelo)}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Fecha programada (o creación como fallback) */}
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <Fecha iso={v.fechaProgramada ?? v.createdAt} />
+                      {v.fechaProgramada && (
+                        <span className="text-xs text-muted-foreground">programada</span>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Estado */}
+                  <TableCell>
+                    <Badge variant={ESTADO_VIAJE_BADGE[v.estado]}>
+                      {ESTADO_VIAJE_LABEL[v.estado]}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Acciones */}
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" title="Acciones">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/viajes/${v.id}`}>
+                            <Eye className="h-4 w-4" /> Ver detalle
+                          </Link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ) : viajes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    No hay viajes que coincidan.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                viajes.map((v) => (
-                  <TableRow
-                    key={v.id}
-                    className={isPlaceholderData ? 'opacity-60' : undefined}
-                  >
-                    <TableCell className="font-medium">
-                      <Link href={`/viajes/${v.id}`} className="hover:underline">
-                        {v.folio}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{v.cliente?.nombre ?? '—'}</TableCell>
-                    <TableCell className="max-w-xs">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <span className="truncate" title={v.origenDireccion}>
-                          {v.origenDireccion}
-                        </span>
-                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="truncate" title={v.destinoDireccion}>
-                          {v.destinoDireccion}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{v.conductor?.nombre ?? '—'}</TableCell>
-                    <TableCell>{v.unidad?.placas ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={ESTADO_VIAJE_BADGE[v.estado]}>
-                        {ESTADO_VIAJE_LABEL[v.estado]}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {data ? `${data.total} viaje(s) · página ${data.page} de ${totalPaginas}` : ''}
+          {data
+            ? `${data.total} ${data.total === 1 ? 'viaje' : 'viajes'} · Página ${data.page} de ${totalPaginas}`
+            : ''}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            <ChevronLeft className="mr-1 h-4 w-4" />
             Anterior
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => p + 1)}
             disabled={page >= totalPaginas}
+            onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
           >
             Siguiente
-            <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
       </div>

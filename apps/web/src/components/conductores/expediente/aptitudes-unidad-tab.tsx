@@ -251,7 +251,7 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
             Sin aptitudes registradas.
           </p>
         ) : (
-          <Table>
+          <Table className="[&_td]:py-1.5 [&_th]:h-9">
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs uppercase text-muted-foreground">Unidad</TableHead>
