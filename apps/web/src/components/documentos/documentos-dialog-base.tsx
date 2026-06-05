@@ -5,8 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
@@ -34,6 +32,7 @@ import {
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { vencimientoInfo } from '@/lib/vencimiento';
+import { fechaCorta } from '@/lib/fecha';
 
 /** Forma mínima común de un documento (conductor o unidad). */
 export interface DocumentoBase {
@@ -57,8 +56,6 @@ type FormValues = z.infer<typeof schema>;
 
 const isoADate = (iso?: string | null) => (iso ? iso.slice(0, 10) : '');
 const dateAIso = (date: string) => new Date(`${date}T00:00:00`).toISOString();
-const fmt = (iso?: string | null) =>
-  iso ? format(new Date(iso), 'dd MMM yyyy', { locale: es }) : '—';
 
 export interface DocumentosDialogBaseProps<T extends DocumentoBase> {
   open: boolean;
@@ -328,8 +325,8 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
                       <TableCell className="text-muted-foreground">
                         {extra || '—'}
                       </TableCell>
-                      <TableCell>{fmt(doc.fechaEmision)}</TableCell>
-                      <TableCell>{fmt(doc.fechaVencimiento)}</TableCell>
+                      <TableCell>{fechaCorta(doc.fechaEmision)}</TableCell>
+                      <TableCell>{fechaCorta(doc.fechaVencimiento)}</TableCell>
                       <TableCell>
                         <Badge variant={venc.variant}>
                           {venc.estado === 'vigente' ? 'Vigente' : venc.label}

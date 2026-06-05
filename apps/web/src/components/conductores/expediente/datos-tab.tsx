@@ -20,6 +20,7 @@ import {
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { CamposGrid, Campo } from '@/components/conductores/expediente/form-ui';
+import { fechaCorta } from '@/lib/fecha';
 
 // ── Schema Zod ────────────────────────────────────────────────────────────────
 
@@ -102,9 +103,7 @@ function isoADate(iso?: string | null): string {
 }
 
 function displayDate(iso?: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return fechaCorta(iso);
 }
 
 // ── Fila de detalle (modo vista) ───────────────────────────────────────────────

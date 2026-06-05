@@ -3,21 +3,12 @@
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { vencimientoInfo } from '@/lib/vencimiento';
+import { fechaCorta, fechaRango } from '@/lib/fecha';
 
 /** Fecha corta en español ("15 ene 2026") o "—". */
 export function Fecha({ iso }: { iso?: string | null }) {
   if (!iso) return <span className="text-muted-foreground">—</span>;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return <span className="text-muted-foreground">—</span>;
-  return (
-    <>
-      {d.toLocaleDateString('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })}
-    </>
-  );
+  return <>{fechaCorta(iso)}</>;
 }
 
 /** Rango de fechas "15 ene – 22 ene 2026" (o solo inicio si no hay fin). */
@@ -29,13 +20,7 @@ export function RangoFechas({
   fin?: string | null;
 }) {
   if (!inicio) return <span className="text-muted-foreground">—</span>;
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString('es-MX', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  return <>{fin ? `${fmt(inicio)} – ${fmt(fin)}` : fmt(inicio)}</>;
+  return <>{fechaRango(inicio, fin)}</>;
 }
 
 /** Monto en pesos ("$1,234.00") o "—". */
@@ -65,13 +50,7 @@ export function Vigencia({ iso }: { iso?: string | null }) {
   return (
     <div className="flex flex-col items-start gap-0.5">
       <Badge variant={variant}>{estado === 'vigente' ? 'Vigente' : label}</Badge>
-      <span className="text-xs text-muted-foreground">
-        {venc.toLocaleDateString('es-MX', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })}
-      </span>
+      <span className="text-xs text-muted-foreground">{fechaCorta(iso)}</span>
     </div>
   );
 }

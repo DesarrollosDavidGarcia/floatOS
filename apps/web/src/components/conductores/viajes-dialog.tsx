@@ -1,9 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { api } from '@/lib/api';
+import { fechaCorta } from '@/lib/fecha';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,11 +25,6 @@ import {
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import type { Paginado } from '@flotaos/shared-types';
 import type { Conductor, ViajeConductor } from './types';
-
-function fecha(iso: string | null): string {
-  if (!iso) return '—';
-  return format(new Date(iso), 'dd MMM yyyy', { locale: es });
-}
 
 export function ViajesDialog({
   conductor,
@@ -101,7 +95,7 @@ export function ViajesDialog({
                       </span>
                       <span className="block text-xs text-muted-foreground">{v.tipoCarga}</span>
                     </TableCell>
-                    <TableCell>{fecha(v.fechaProgramada)}</TableCell>
+                    <TableCell>{fechaCorta(v.fechaProgramada)}</TableCell>
                     <TableCell>
                       <Badge variant={ESTADO_VIAJE_BADGE[v.estado]}>
                         {ESTADO_VIAJE_LABEL[v.estado]}

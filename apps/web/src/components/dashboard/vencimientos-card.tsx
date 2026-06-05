@@ -1,7 +1,5 @@
 'use client';
 
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Truck, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -13,6 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { etiquetaDias } from '@/lib/vencimiento';
+import { fechaCorta } from '@/lib/fecha';
 import { documentoLabel, urgenciaBadge } from './etiquetas';
 import type { AlertaVencimiento } from './tipos';
 
@@ -55,8 +54,7 @@ export function VencimientosCard({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{v.entidad}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {documentoLabel(v.tipoDocumento)} ·{' '}
-                      {format(new Date(v.fechaVencimiento), "d 'de' MMM yyyy", { locale: es })}
+                      {documentoLabel(v.tipoDocumento)} · {fechaCorta(v.fechaVencimiento)}
                     </p>
                   </div>
                   <Badge variant={urgenciaBadge(v.diasRestantes)} className="shrink-0">
