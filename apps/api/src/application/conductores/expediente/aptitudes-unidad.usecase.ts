@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { AptitudUnidadConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
 
 export interface CrearAptitudUnidadInput {
   tipoUnidad: string;
@@ -24,14 +25,8 @@ export interface ActualizarAptitudUnidadInput {
 export class AptitudesUnidadUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-      select: { id: true },
-    });
-    if (!conductor) {
-      throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(

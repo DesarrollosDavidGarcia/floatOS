@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { ControlConfianzaConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
 
 export interface CrearControlConfianzaInput {
   tipo: string;
@@ -32,14 +33,8 @@ export interface ActualizarControlConfianzaInput {
 export class ControlConfianzaUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-      select: { id: true },
-    });
-    if (!conductor) {
-      throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { IncidenciaConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
 
 export interface CrearIncidenciaInput {
   tipo: string;
@@ -34,16 +35,8 @@ export interface ActualizarIncidenciaInput {
 export class IncidenciasUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-      select: { id: true },
-    });
-    if (!conductor) {
-      throw new NotFoundException(
-        `Conductor con id ${conductorId} no encontrado`,
-      );
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(
