@@ -1,24 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Viaje } from '@prisma/client';
+import { Paginado } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { paginar } from '../shared/paginar';
+import { SELECCION_LISTADO } from '../viajes/viajes.types';
 
-/** Caso de uso: historial de viajes de un conductor. */
+/** Caso de uso: historial paginado de viajes de un conductor. */
 @Injectable()
 export class ListarViajesConductorUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  async execute(conductorId: string): Promise<Viaje[]> {
+  async execute(
+    conductorId: string,
+    page?: number,
+    pageSize?: number,
+  ): Promise<Paginado<unknown>> {
     const conductor = await this.prisma.conductor.findUnique({
       where: { id: conductorId },
+      select: { id: true },
     });
     if (!conductor) {
       throw new NotFoundException('Conductor no encontrado');
     }
 
-    return this.prisma.viaje.findMany({
+    // `select: SELECCION_LISTADO` omite el trackingToken y acota las relaciones.
+    return paginar(this.prisma.viaje, {
       where: { conductorId },
       orderBy: { createdAt: 'desc' },
-      include: { cliente: true, unidad: true },
+      select: SELECCION_LISTADO,
+      page,
+      pageSize,
     });
   }
 }

@@ -11,8 +11,9 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { DocumentoConductor, Viaje } from '@prisma/client';
+import { DocumentoConductor } from '@prisma/client';
 import { Paginado } from '@flotaos/shared-types';
+import { PaginacionDto } from '../shared/paginacion.dto';
 import { CrearConductorUseCase } from '../../../application/conductores/crear-conductor.usecase';
 import { ListarConductoresUseCase } from '../../../application/conductores/listar-conductores.usecase';
 import { ObtenerConductorUseCase } from '../../../application/conductores/obtener-conductor.usecase';
@@ -89,8 +90,15 @@ export class ConductoresController {
   }
 
   @Get(':id/viajes')
-  viajes(@Param('id') id: string): Promise<Viaje[]> {
-    return this.listarViajesConductor.execute(id);
+  viajes(
+    @Param('id') id: string,
+    @Query() paginacion: PaginacionDto,
+  ): Promise<Paginado<unknown>> {
+    return this.listarViajesConductor.execute(
+      id,
+      paginacion.page,
+      paginacion.pageSize,
+    );
   }
 
   // ─────────────────── Documentos de un conductor ────────────────────

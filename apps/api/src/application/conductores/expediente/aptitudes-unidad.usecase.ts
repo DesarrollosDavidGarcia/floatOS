@@ -44,8 +44,8 @@ export class AptitudesUnidadUseCase {
       return await this.prisma.aptitudUnidadConductor.create({
         data: {
           conductorId,
-          tipoUnidad: input.tipoUnidad as any,
-          nivel: input.nivel as any ?? undefined,
+          tipoUnidad: input.tipoUnidad,
+          nivel: input.nivel ?? undefined,
           aniosExperiencia: input.aniosExperiencia ?? null,
           notas: input.notas ?? null,
         },
@@ -93,8 +93,8 @@ export class AptitudesUnidadUseCase {
     await this.obtener(conductorId, aptitudId);
 
     const data: Prisma.AptitudUnidadConductorUpdateInput = {};
-    if (input.tipoUnidad !== undefined) data.tipoUnidad = input.tipoUnidad as any;
-    if (input.nivel !== undefined) data.nivel = input.nivel as any;
+    if (input.tipoUnidad !== undefined) data.tipoUnidad = input.tipoUnidad;
+    if (input.nivel !== undefined) data.nivel = input.nivel;
     if (input.aniosExperiencia !== undefined) data.aniosExperiencia = input.aniosExperiencia;
     if (input.notas !== undefined) data.notas = input.notas;
 

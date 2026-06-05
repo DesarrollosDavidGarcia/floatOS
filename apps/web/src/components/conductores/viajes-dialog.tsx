@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
+import type { Paginado } from '@flotaos/shared-types';
 import type { Conductor, ViajeConductor } from './types';
 
 function fecha(iso: string | null): string {
@@ -45,8 +46,10 @@ export function ViajesDialog({
   const { data, isLoading, isError } = useQuery({
     queryKey: ['conductor-viajes', conductorId],
     queryFn: async () => {
-      const { data } = await api.get<ViajeConductor[]>(`/conductores/${conductorId}/viajes`);
-      return data;
+      const { data } = await api.get<Paginado<ViajeConductor>>(
+        `/conductores/${conductorId}/viajes`,
+      );
+      return data.data;
     },
     enabled: open && Boolean(conductorId),
   });

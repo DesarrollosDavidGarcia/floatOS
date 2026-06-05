@@ -65,14 +65,14 @@ export class AuthService {
     });
   }
 
-  /** Hashea el refresh token para persistirlo. */
+  /** Hashea el refresh token para persistirlo (pre-hash SHA-256 + bcrypt). */
   hashRefreshToken(token: string): Promise<string> {
-    return this.passwordService.hash(token);
+    return this.passwordService.hashToken(token);
   }
 
   /** Compara un refresh token contra su hash almacenado. */
   compararRefreshToken(token: string, hash: string): Promise<boolean> {
-    return this.passwordService.compare(token, hash);
+    return this.passwordService.compareToken(token, hash);
   }
 
   /** Compara una contraseña en claro contra su hash bcrypt. */

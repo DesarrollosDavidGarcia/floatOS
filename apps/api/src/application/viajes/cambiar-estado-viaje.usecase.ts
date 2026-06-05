@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -83,11 +84,27 @@ export class CambiarEstadoViajeUseCase {
       data.fechaEntrega = ahora;
     }
 
-    const actualizado = await this.prisma.viaje.update({
-      where: { id },
-      data,
-      include: RELACIONES_RESUMEN,
-    });
+    // Update condicional al estado leído: si otra petición concurrente ya cambió
+    // el estado, el WHERE no matchea, Prisma lanza P2025 y lo traducimos a 409.
+    // Garantiza que solo una transición concurrente gane (sin doble historial).
+    let actualizado;
+    try {
+      actualizado = await this.prisma.viaje.update({
+        where: { id, estado: estadoAnterior },
+        data,
+        include: RELACIONES_RESUMEN,
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2025'
+      ) {
+        throw new ConflictException(
+          'El estado del viaje cambió mientras se procesaba la petición; reintente.',
+        );
+      }
+      throw e;
+    }
 
     // Reemite el cambio de estado a la sala de tiempo real del viaje.
     this.tracking.emitirCambioEstado(id, {

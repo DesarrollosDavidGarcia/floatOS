@@ -48,7 +48,7 @@ export class CertificacionesUseCase {
     return this.prisma.certificacionConductor.create({
       data: {
         conductorId,
-        tipo: input.tipo as any,
+        tipo: input.tipo,
         nombre: input.nombre,
         emisor: input.emisor ?? null,
         folio: input.folio ?? null,
@@ -91,7 +91,7 @@ export class CertificacionesUseCase {
     await this.obtener(conductorId, certId);
 
     const data: Prisma.CertificacionConductorUpdateInput = {};
-    if (input.tipo !== undefined) data.tipo = input.tipo as any;
+    if (input.tipo !== undefined) data.tipo = input.tipo;
     if (input.nombre !== undefined) data.nombre = input.nombre;
     if (input.emisor !== undefined) data.emisor = input.emisor;
     if (input.folio !== undefined) data.folio = input.folio;

@@ -597,7 +597,11 @@ model Viaje {
   @@index([clienteId])
   @@index([unidadId])
   @@index([conductorId])
-  @@index([estado])
+  // El listado filtra por estado y ordena por createdAt desc (índice compuesto);
+  // fechaProgramada se usa en el filtro de rango; createdAt en el orden por defecto.
+  @@index([estado, createdAt])
+  @@index([fechaProgramada])
+  @@index([createdAt])
   @@map("viajes")
 }
 
