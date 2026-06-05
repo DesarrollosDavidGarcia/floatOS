@@ -1,12 +1,7 @@
 'use client';
 
-import { type ReactNode, useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { type ReactNode } from 'react';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
 import { textoRequerido } from '@/lib/validacion';
+import { useEntityFormDialog } from '@/lib/use-entity-form-dialog';
 import type { Cliente } from '@/app/(panel)/clientes/tipos';
 
 const schema = z.object({
@@ -83,57 +79,34 @@ export function ClienteFormDialog({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const open = openProp ?? internalOpen;
-  const setOpen = onOpenChange ?? setInternalOpen;
-  const queryClient = useQueryClient();
-  const editando = Boolean(cliente);
-
+  const { open, setOpen, form, editando, submit, isPending } = useEntityFormDialog<
+    FormValues,
+    Cliente
+  >({
+    schema,
+    entity: cliente,
+    open: openProp,
+    onOpenChange,
+    toDefaults: (c) =>
+      c
+        ? {
+            razonSocial: c.razonSocial ?? '',
+            rfc: c.rfc ?? '',
+            contactoNombre: c.contactoNombre ?? '',
+            contactoTelefono: c.contactoTelefono ?? '',
+            contactoEmail: c.contactoEmail ?? '',
+            direccion: c.direccion ?? '',
+          }
+        : VACIO,
+    toPayload: limpiar,
+    endpoint: '/clientes',
+    invalidateKeys: [['clientes']],
+    mensajes: { creado: 'Cliente creado', actualizado: 'Cliente actualizado' },
+  });
   const {
     register,
-    handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: VACIO,
-    mode: 'onTouched',
-  });
-
-  // Rellena el formulario al abrir (crear -> vacío, editar -> datos).
-  useEffect(() => {
-    if (!open) return;
-    if (cliente) {
-      reset({
-        razonSocial: cliente.razonSocial ?? '',
-        rfc: cliente.rfc ?? '',
-        contactoNombre: cliente.contactoNombre ?? '',
-        contactoTelefono: cliente.contactoTelefono ?? '',
-        contactoEmail: cliente.contactoEmail ?? '',
-        direccion: cliente.direccion ?? '',
-      });
-    } else {
-      reset(VACIO);
-    }
-  }, [open, cliente, reset]);
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload = limpiar(values);
-      if (cliente) {
-        const { data } = await api.patch<Cliente>(`/clientes/${cliente.id}`, payload);
-        return data;
-      }
-      const { data } = await api.post<Cliente>('/clientes', payload);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clientes'] });
-      toast.success(editando ? 'Cliente actualizado' : 'Cliente creado');
-      setOpen(false);
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
+  } = form;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -148,11 +121,7 @@ export function ClienteFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          id="cliente-form"
-          onSubmit={handleSubmit((values) => mutation.mutate(values))}
-          className="space-y-3"
-        >
+        <form id="cliente-form" onSubmit={submit} className="space-y-3">
           <CamposGrid cols={2}>
             <Campo
               label="Razón social"
@@ -191,11 +160,11 @@ export function ClienteFormDialog({
         </form>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={mutation.isPending}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
             Cancelar
           </Button>
-          <Button type="submit" form="cliente-form" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear cliente'}
+          <Button type="submit" form="cliente-form" disabled={isPending}>
+            {isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear cliente'}
           </Button>
         </DialogFooter>
       </DialogContent>

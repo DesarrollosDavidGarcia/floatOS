@@ -1,12 +1,7 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { type ReactNode } from 'react';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
+import { useEntityFormDialog } from '@/lib/use-entity-form-dialog';
 import type { Conductor, ConductorFormPayload } from './types';
 
 const baseSchema = {
@@ -54,10 +50,22 @@ type FormValues = {
   password?: string;
 };
 
+function toPayload(values: FormValues): ConductorFormPayload {
+  const payload: ConductorFormPayload = {
+    nombre: values.nombre.trim(),
+    usuario: values.usuario.trim(),
+  };
+  if (values.apellidos?.trim()) payload.apellidos = values.apellidos.trim();
+  if (values.email?.trim()) payload.email = values.email.trim();
+  if (values.telefono?.trim()) payload.telefono = values.telefono.trim();
+  if (values.password) payload.password = values.password;
+  return payload;
+}
+
 export function ConductorFormDialog({
   trigger,
   conductor,
-  open,
+  open: openProp,
   onOpenChange,
 }: {
   trigger?: ReactNode;
@@ -65,131 +73,71 @@ export function ConductorFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const esEdicion = Boolean(conductor);
-  const queryClient = useQueryClient();
-
+  const { open, setOpen, form, editando, submit, isPending } = useEntityFormDialog<
+    FormValues,
+    Conductor
+  >({
+    schema: buildSchema(Boolean(conductor)),
+    entity: conductor ?? null,
+    open: openProp,
+    onOpenChange,
+    toDefaults: (c) => ({
+      nombre: c?.nombre ?? '',
+      apellidos: c?.apellidos ?? '',
+      usuario: c?.usuario ?? '',
+      email: c?.email ?? '',
+      telefono: c?.telefono ?? '',
+      password: '',
+    }),
+    toPayload,
+    endpoint: '/conductores',
+    invalidateKeys: [['conductores']],
+    mensajes: { creado: 'Conductor creado', actualizado: 'Conductor actualizado' },
+  });
   const {
     register,
-    handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(buildSchema(esEdicion)),
-    mode: 'onTouched',
-    defaultValues: {
-      nombre: '',
-      apellidos: '',
-      usuario: '',
-      email: '',
-      telefono: '',
-      password: '',
-    },
-  });
-
-  useEffect(() => {
-    if (open) {
-      reset({
-        nombre: conductor?.nombre ?? '',
-        apellidos: conductor?.apellidos ?? '',
-        usuario: conductor?.usuario ?? '',
-        email: conductor?.email ?? '',
-        telefono: conductor?.telefono ?? '',
-        password: '',
-      });
-    }
-  }, [open, conductor, reset]);
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload: ConductorFormPayload = {
-        nombre: values.nombre.trim(),
-        usuario: values.usuario.trim(),
-      };
-      if (values.apellidos?.trim()) payload.apellidos = values.apellidos.trim();
-      if (values.email?.trim()) payload.email = values.email.trim();
-      if (values.telefono?.trim()) payload.telefono = values.telefono.trim();
-      if (values.password) payload.password = values.password;
-
-      if (esEdicion && conductor) {
-        const { data } = await api.patch<Conductor>(`/conductores/${conductor.id}`, payload);
-        return data;
-      }
-      const { data } = await api.post<Conductor>('/conductores', payload);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conductores'] });
-      toast.success(esEdicion ? 'Conductor actualizado' : 'Conductor creado');
-      onOpenChange(false);
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
+  } = form;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={setOpen}>
       {trigger}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{esEdicion ? 'Editar conductor' : 'Nuevo conductor'}</DialogTitle>
+          <DialogTitle>{editando ? 'Editar conductor' : 'Nuevo conductor'}</DialogTitle>
           <DialogDescription>
-            {esEdicion
+            {editando
               ? 'Modifica los datos del conductor. Deja la contraseña vacía para no cambiarla.'
               : 'Registra un nuevo conductor en la flotilla.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form
-          onSubmit={handleSubmit((values) => mutation.mutate(values))}
-          className="space-y-4"
-        >
+        <form onSubmit={submit} className="space-y-4">
           <CamposGrid cols={2}>
-            <Campo
-              label="Nombre"
-              htmlFor="nombre"
-              required
-              error={errors.nombre?.message}
-            >
+            <Campo label="Nombre" htmlFor="nombre" required error={errors.nombre?.message}>
               <Input id="nombre" {...register('nombre')} />
             </Campo>
 
-            <Campo
-              label="Apellidos"
-              htmlFor="apellidos"
-              error={errors.apellidos?.message}
-            >
+            <Campo label="Apellidos" htmlFor="apellidos" error={errors.apellidos?.message}>
               <Input id="apellidos" {...register('apellidos')} />
             </Campo>
 
-            <Campo
-              label="Usuario"
-              htmlFor="usuario"
-              required
-              error={errors.usuario?.message}
-            >
+            <Campo label="Usuario" htmlFor="usuario" required error={errors.usuario?.message}>
               <Input id="usuario" autoComplete="off" {...register('usuario')} />
             </Campo>
 
-            <Campo
-              label="Teléfono"
-              htmlFor="telefono"
-              error={errors.telefono?.message}
-            >
+            <Campo label="Teléfono" htmlFor="telefono" error={errors.telefono?.message}>
               <Input id="telefono" {...register('telefono')} />
             </Campo>
 
-            <Campo
-              label="Email"
-              htmlFor="email"
-              full
-              error={errors.email?.message}
-            >
+            <Campo label="Email" htmlFor="email" full error={errors.email?.message}>
               <Input id="email" type="email" {...register('email')} />
             </Campo>
 
             <Campo
               label="Contraseña"
               htmlFor="password"
-              required={!esEdicion}
+              required={!editando}
               full
               error={errors.password?.message}
             >
@@ -202,23 +150,21 @@ export function ConductorFormDialog({
             </Campo>
           </CamposGrid>
 
-          {esEdicion && (
-            <p className="text-xs text-muted-foreground">
-              Dejar vacío para no cambiar.
-            </p>
+          {editando && (
+            <p className="text-xs text-muted-foreground">Dejar vacío para no cambiar.</p>
           )}
 
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={mutation.isPending}
+              onClick={() => setOpen(false)}
+              disabled={isPending}
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Crear'}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear'}
             </Button>
           </DialogFooter>
         </form>

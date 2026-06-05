@@ -1,13 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
 import { textoRequerido, numeroOpcional } from '@/lib/validacion';
+import { useEntityFormDialog } from '@/lib/use-entity-form-dialog';
 import type { Viaje } from './types';
 
 const schema = z.object({
@@ -44,58 +39,42 @@ function aLocalInput(iso?: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
-  const [open, setOpen] = useState(false);
-  const qc = useQueryClient();
+function toPayload(values: FormValues) {
+  return {
+    origenDireccion: values.origenDireccion.trim(),
+    destinoDireccion: values.destinoDireccion.trim(),
+    tipoCarga: values.tipoCarga.trim(),
+    descripcionCarga: values.descripcionCarga?.trim() || null,
+    dimensiones: values.dimensiones?.trim() || null,
+    pesoKg: values.pesoKg?.trim() ? Number(values.pesoKg) : null,
+    fechaProgramada: values.fechaProgramada
+      ? new Date(values.fechaProgramada).toISOString()
+      : null,
+  };
+}
 
+export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
+  const { open, setOpen, form, submit, isPending } = useEntityFormDialog<FormValues, Viaje>({
+    schema,
+    entity: viaje,
+    toDefaults: (v) => ({
+      origenDireccion: v?.origenDireccion ?? '',
+      destinoDireccion: v?.destinoDireccion ?? '',
+      tipoCarga: v?.tipoCarga ?? '',
+      descripcionCarga: v?.descripcionCarga ?? '',
+      pesoKg: v?.pesoKg != null ? String(v.pesoKg) : '',
+      dimensiones: v?.dimensiones ?? '',
+      fechaProgramada: aLocalInput(v?.fechaProgramada),
+    }),
+    toPayload,
+    endpoint: '/viajes',
+    invalidateKeys: [['viaje', viaje.id], ['viajes']],
+    mensajes: { creado: 'Viaje actualizado', actualizado: 'Viaje actualizado' },
+  });
   const {
     register,
-    handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-  });
-
-  useEffect(() => {
-    if (open) {
-      reset({
-        origenDireccion: viaje.origenDireccion,
-        destinoDireccion: viaje.destinoDireccion,
-        tipoCarga: viaje.tipoCarga,
-        descripcionCarga: viaje.descripcionCarga ?? '',
-        pesoKg: viaje.pesoKg != null ? String(viaje.pesoKg) : '',
-        dimensiones: viaje.dimensiones ?? '',
-        fechaProgramada: aLocalInput(viaje.fechaProgramada),
-      });
-    }
-  }, [open, viaje, reset]);
-
-  const mutar = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const body: Record<string, unknown> = {
-        origenDireccion: values.origenDireccion.trim(),
-        destinoDireccion: values.destinoDireccion.trim(),
-        tipoCarga: values.tipoCarga.trim(),
-        descripcionCarga: values.descripcionCarga?.trim() || null,
-        dimensiones: values.dimensiones?.trim() || null,
-        pesoKg: values.pesoKg?.trim() ? Number(values.pesoKg) : null,
-        fechaProgramada: values.fechaProgramada
-          ? new Date(values.fechaProgramada).toISOString()
-          : null,
-      };
-      const { data } = await api.patch(`/viajes/${viaje.id}`, body);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success('Viaje actualizado');
-      qc.invalidateQueries({ queryKey: ['viaje', viaje.id] });
-      qc.invalidateQueries({ queryKey: ['viajes'] });
-      setOpen(false);
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
+  } = form;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -111,7 +90,7 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
           <DialogDescription>Actualiza los datos generales del viaje.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit((v) => mutar.mutate(v))} className="space-y-4">
+        <form onSubmit={submit} className="space-y-4">
           {/* Origen / Destino */}
           <CamposGrid cols={2}>
             <Campo
@@ -144,22 +123,14 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
             >
               <Input id="edit-tipoCarga" {...register('tipoCarga')} />
             </Campo>
-            <Campo
-              label="Peso (kg)"
-              htmlFor="edit-pesoKg"
-              error={errors.pesoKg?.message}
-            >
+            <Campo label="Peso (kg)" htmlFor="edit-pesoKg" error={errors.pesoKg?.message}>
               <Input id="edit-pesoKg" type="number" step="any" min="0" {...register('pesoKg')} />
             </Campo>
           </CamposGrid>
 
           {/* Descripción */}
           <CamposGrid cols={2}>
-            <Campo
-              label="Descripción de la carga"
-              htmlFor="edit-descripcion"
-              full
-            >
+            <Campo label="Descripción de la carga" htmlFor="edit-descripcion" full>
               <Input id="edit-descripcion" {...register('descripcionCarga')} />
             </Campo>
           </CamposGrid>
@@ -175,11 +146,16 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
           </CamposGrid>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={mutar.isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={isPending}
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutar.isPending}>
-              {mutar.isPending ? 'Guardando…' : 'Guardar cambios'}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Guardando…' : 'Guardar cambios'}
             </Button>
           </DialogFooter>
         </form>
