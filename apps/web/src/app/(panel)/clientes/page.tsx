@@ -3,14 +3,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { toast } from '@/components/ui/sonner';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SearchInput } from '@/components/search-input';
+import { PaginacionFooter } from '@/components/paginacion-footer';
+import { EstadoTabla } from '@/components/estado-tabla';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,18 +91,14 @@ export default function ClientesPage() {
         description="Administra los clientes a los que asignas viajes."
         action={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por razón social, RFC…"
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPage(1);
+              }}
+              placeholder="Buscar por razón social, RFC…"
+            />
             <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
               <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
             </Button>
@@ -128,33 +125,18 @@ export default function ClientesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {query.isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={4}>
-                    <Skeleton className="h-10 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : query.isError ? (
-              <TableRow>
-                <TableCell colSpan={4} className="py-10 text-center text-destructive">
-                  {apiError(query.error)}
-                </TableCell>
-              </TableRow>
-            ) : filas.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="py-10 text-center text-muted-foreground"
-                >
-                  {debouncedQ
-                    ? 'No se encontraron clientes para tu búsqueda.'
-                    : 'Aún no hay clientes registrados.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filas.map((cliente) => (
+            <EstadoTabla
+              colSpan={4}
+              loading={query.isLoading}
+              error={query.isError ? apiError(query.error) || 'No se pudieron cargar los clientes.' : null}
+              vacio={filas.length === 0}
+              vacioMensaje={
+                debouncedQ
+                  ? 'No se encontraron clientes para tu búsqueda.'
+                  : 'Aún no hay clientes registrados.'
+              }
+            >
+              {filas.map((cliente) => (
                 <TableRow key={cliente.id}>
                   {/* Cliente: razón social + RFC · contacto */}
                   <TableCell>
@@ -195,39 +177,20 @@ export default function ClientesPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
+            </EstadoTabla>
           </TableBody>
         </Table>
       </div>
 
-      {/* Conteo + paginación — siempre visible cuando hay filas */}
-      {data && filas.length > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {total} {total === 1 ? 'cliente' : 'clientes'} · Página {data.page} de{' '}
-            {totalPaginas}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPaginas}
-              onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-            >
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      )}
+      <PaginacionFooter
+        page={page}
+        totalPaginas={totalPaginas}
+        total={total}
+        singular="cliente"
+        plural="clientes"
+        onPage={setPage}
+      />
 
       {/* Crear */}
       <ClienteFormDialog open={crearOpen} onOpenChange={setCrearOpen} />

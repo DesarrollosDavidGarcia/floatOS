@@ -3,17 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { ArrowRight, Eye, MoreHorizontal, Plus, Search } from 'lucide-react';
+import { ArrowRight, Eye, MoreHorizontal, Plus } from 'lucide-react';
 import { EstadoViaje } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import type { Paginado } from '@flotaos/shared-types';
 import { PageHeader } from '@/components/page-header';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SearchInput } from '@/components/search-input';
+import { PaginacionFooter } from '@/components/paginacion-footer';
+import { EstadoTabla } from '@/components/estado-tabla';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,18 +75,14 @@ export default function ViajesPage() {
         description="Gestiona y monitorea los viajes de la flotilla."
         action={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por folio, cliente, dirección…"
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+            <SearchInput
+              value={q}
+              onChange={(v) => {
+                setQ(v);
+                setPage(1);
+              }}
+              placeholder="Buscar por folio, cliente, dirección…"
+            />
             <CrearViajeDialog />
           </div>
         }
@@ -100,7 +97,7 @@ export default function ViajesPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-52">
+          <SelectTrigger className="w-full sm:w-52">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
@@ -142,30 +139,18 @@ export default function ViajesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={7}>
-                    <Skeleton className="h-10 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-destructive">
-                  {apiError(error) || 'No se pudieron cargar los viajes.'}
-                </TableCell>
-              </TableRow>
-            ) : viajes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  {qDebounced || estado !== TODOS
-                    ? 'No hay viajes que coincidan con los filtros.'
-                    : 'Aún no hay viajes registrados.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              viajes.map((v) => (
+            <EstadoTabla
+              colSpan={7}
+              loading={isLoading}
+              error={isError ? apiError(error) || 'No se pudieron cargar los viajes.' : null}
+              vacio={viajes.length === 0}
+              vacioMensaje={
+                qDebounced || estado !== TODOS
+                  ? 'No hay viajes que coincidan con los filtros.'
+                  : 'Aún no hay viajes registrados.'
+              }
+            >
+              {viajes.map((v) => (
                 <TableRow
                   key={v.id}
                   className={isPlaceholderData ? 'opacity-60' : undefined}
@@ -254,37 +239,20 @@ export default function ViajesPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
+            </EstadoTabla>
           </TableBody>
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {data
-            ? `${data.total} ${data.total === 1 ? 'viaje' : 'viajes'} · Página ${data.page} de ${totalPaginas}`
-            : ''}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Anterior
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPaginas}
-            onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-          >
-            Siguiente
-          </Button>
-        </div>
-      </div>
+      <PaginacionFooter
+        page={page}
+        totalPaginas={totalPaginas}
+        total={data?.total ?? 0}
+        singular="viaje"
+        plural="viajes"
+        onPage={setPage}
+      />
     </div>
   );
 }

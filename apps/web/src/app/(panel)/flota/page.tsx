@@ -2,15 +2,16 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, MoreHorizontal, Pencil, Plus, Search, Trash2, Truck } from 'lucide-react';
+import { FileText, MoreHorizontal, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SearchInput } from '@/components/search-input';
+import { PaginacionFooter } from '@/components/paginacion-footer';
+import { EstadoTabla } from '@/components/estado-tabla';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,18 +95,14 @@ export default function FlotaPage() {
         description="Unidades de la flotilla y sus documentos."
         action={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por placas, tipo, marca…"
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPage(1);
+              }}
+              placeholder="Buscar por placas, tipo, marca…"
+            />
             <Button className="shrink-0" onClick={abrirNueva}>
               <Plus className="mr-1 h-4 w-4" /> Nueva unidad
             </Button>
@@ -138,31 +135,21 @@ export default function FlotaPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={6}>
-                    <Skeleton className="h-10 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-destructive">
-                  {apiError(error)}
-                </TableCell>
-              </TableRow>
-            ) : unidades.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+            <EstadoTabla
+              colSpan={6}
+              loading={isLoading}
+              error={isError ? apiError(error) || 'No se pudieron cargar las unidades.' : null}
+              vacio={unidades.length === 0}
+              vacioMensaje={
+                <>
                   <Truck className="mx-auto mb-2 h-8 w-8 opacity-50" />
                   {qDebounced
                     ? 'No se encontraron unidades para tu búsqueda.'
                     : 'Aún no hay unidades registradas.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              unidades.map((u) => (
+                </>
+              }
+            >
+              {unidades.map((u) => (
                 <TableRow key={u.id}>
                   {/* Unidad: placas + tipo · marca/modelo */}
                   <TableCell>
@@ -234,38 +221,20 @@ export default function FlotaPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
+            </EstadoTabla>
           </TableBody>
         </Table>
       </div>
 
-      {/* Conteo y paginación — siempre visible cuando hay datos */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {data
-            ? `${data.total} ${data.total === 1 ? 'unidad' : 'unidades'} · Página ${data.page} de ${totalPaginas}`
-            : ' '}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Anterior
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPaginas}
-            onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-          >
-            Siguiente
-          </Button>
-        </div>
-      </div>
+      <PaginacionFooter
+        page={page}
+        totalPaginas={totalPaginas}
+        total={data?.total ?? 0}
+        singular="unidad"
+        plural="unidades"
+        onPage={setPage}
+      />
 
       {/* Diálogos */}
       <UnidadFormDialog unidad={unidadEditar} open={formOpen} onOpenChange={setFormOpen} />
