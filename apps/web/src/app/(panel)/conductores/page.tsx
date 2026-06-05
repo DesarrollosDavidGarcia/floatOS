@@ -24,20 +24,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -344,41 +337,22 @@ export default function ConductoresPage() {
       />
 
       {/* Confirmar eliminación */}
-      <Dialog
+      <ConfirmDialog
         open={Boolean(eliminarConductor)}
         onOpenChange={(o) => {
           if (!o) setEliminarConductor(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar conductor</DialogTitle>
-            <DialogDescription>
-              {eliminarConductor
-                ? `¿Eliminar a ${nombreCompleto(eliminarConductor)}? Esta acción no se puede deshacer.`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEliminarConductor(null)}
-              disabled={eliminar.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                eliminarConductor && eliminar.mutate(eliminarConductor.id)
-              }
-              disabled={eliminar.isPending}
-            >
-              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Eliminar conductor"
+        description={
+          eliminarConductor
+            ? `¿Eliminar a ${nombreCompleto(eliminarConductor)}? Esta acción no se puede deshacer.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        onConfirm={async () => {
+          if (eliminarConductor) await eliminar.mutateAsync(eliminarConductor.id);
+        }}
+      />
     </div>
   );
 }

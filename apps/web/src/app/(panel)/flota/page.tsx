@@ -12,20 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -277,41 +270,22 @@ export default function FlotaPage() {
       <DocumentosDialog unidad={unidadDocs} open={docsOpen} onOpenChange={setDocsOpen} />
 
       {/* Confirmar eliminación */}
-      <Dialog
+      <ConfirmDialog
         open={Boolean(eliminarUnidad)}
         onOpenChange={(o) => {
           if (!o) setEliminarUnidad(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar unidad</DialogTitle>
-            <DialogDescription>
-              {eliminarUnidad
-                ? `¿Eliminar la unidad ${eliminarUnidad.placas}? Si tiene viajes asociados no podrá eliminarse. Esta acción no se puede deshacer.`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEliminarUnidad(null)}
-              disabled={deleteMutation.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                eliminarUnidad && deleteMutation.mutate(eliminarUnidad.id)
-              }
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Eliminar unidad"
+        description={
+          eliminarUnidad
+            ? `¿Eliminar la unidad ${eliminarUnidad.placas}? Si tiene viajes asociados no podrá eliminarse. Esta acción no se puede deshacer.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        onConfirm={async () => {
+          if (eliminarUnidad) await deleteMutation.mutateAsync(eliminarUnidad.id);
+        }}
+      />
     </div>
   );
 }

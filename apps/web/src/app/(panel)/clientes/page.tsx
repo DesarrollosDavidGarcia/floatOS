@@ -12,14 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -35,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ClienteFormDialog } from '@/components/clientes/cliente-form-dialog';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CeldaPrincipal, unirSub } from '@/components/conductores/expediente/tabla-ui';
 import type { Cliente, Paginado } from './tipos';
 
@@ -249,41 +242,22 @@ export default function ClientesPage() {
       />
 
       {/* Confirmar eliminación */}
-      <Dialog
+      <ConfirmDialog
         open={Boolean(eliminarCliente)}
         onOpenChange={(o) => {
           if (!o) setEliminarCliente(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar cliente</DialogTitle>
-            <DialogDescription>
-              {eliminarCliente
-                ? `¿Eliminar a "${eliminarCliente.razonSocial}"? Esta acción no se puede deshacer.`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEliminarCliente(null)}
-              disabled={eliminar.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                eliminarCliente && eliminar.mutate(eliminarCliente.id)
-              }
-              disabled={eliminar.isPending}
-            >
-              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Eliminar cliente"
+        description={
+          eliminarCliente
+            ? `¿Eliminar a "${eliminarCliente.razonSocial}"? Esta acción no se puede deshacer.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        onConfirm={async () => {
+          if (eliminarCliente) await eliminar.mutateAsync(eliminarCliente.id);
+        }}
+      />
     </div>
   );
 }
