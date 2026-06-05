@@ -12,6 +12,22 @@
 
 ---
 
+## Estado de implementación (actualizado 2026-06-05)
+
+Tras la auditoría se aplicó **casi todo** en la rama `auditoria/fixes-seguros` (verificado con `tsc --noEmit` en API y Web tras cada fase, + una **auditoría del propio diff** con un agente revisor que confirmó que no se introdujeron regresiones).
+
+**APLICADO:** C-1 (bcrypt pre-hash), C-2 (IDOR historial), C-3 (auth dual cookies httpOnly web + bearer móvil), A-2 (paginación viajes-conductor), A-3 (race de estado), A-4 (ConfirmDialog), A-5 (socket token), M-1 (vencimiento escalonado unificado), M-2 (BadgeVariant centralizado), M-3 (select flota), M-4 (índices Viaje + migración), M-5 (Paginado dedup), M-7 (invalidación dashboard/tracking), M-8 (quitar `as any` de enums), M-9 (CORS), M-10 (DocumentosDialogBase), M-11 (useEntityFormDialog), M-12 (Fragment leaflet), B-1, B-3, B-7, B-9, B-15, y la parte segura de A-1 (helper `asegurarConductorExiste`).
+
+**DECISIÓN corregida:** M-8/B-2 → los campos `tipo`/`nivel`/`resultado`/`gravedad` son `String` de catálogo con `@default`, **no** enums de Prisma; el fix correcto fue *quitar* los `as any` innecesarios y diferir al `@default` (no añadir `@IsEnum` ni `?? null`, que habría roto inserts).
+
+**DIFERIDO (con razón):**
+- **A-1 (resto):** el *controller-factory* dinámico de NestJS + base-class para los 9 sub-recursos (~900 líneas) y la dedup de las 11 tabs de UI. Riesgo: un controller-factory mal hecho puede **desactivar silenciosamente la validación de DTOs**; toca 20+ archivos y no es verificable sin runtime/tests. Recomendado como pase dedicado con la app corriendo.
+- **C-3 endurecimiento extra (CSRF token):** SameSite=Strict ya mitiga CSRF (web y API same-site tras Nginx); un token CSRF explícito queda opcional.
+- **A-6 (ESLint), B-13 (flags tsconfig):** requieren `npm install` / pueden aflorar errores preexistentes; hacerlos en un paso aparte.
+- **B-6 (lib/fechas), B-8 (`as any` en un zodResolver), B-11 (página pública /seguimiento — es feature, no cleanup), B-12 (WS_EVENTS 'suscribir'), B-16 (trigger accesible):** menores; pendientes.
+
+---
+
 ## Veredicto general
 
 La base está **bien arquitecturada**: Clean Architecture real en el API (un use case por archivo, tipos públicos que ocultan campos sensibles, helpers compartidos `paginar`/`fecha.util`/`token.util` bien reutilizados), y un frontend ordenado (interceptor de refresh centralizado, defaults sensatos de TanStack Query, cleanup correcto de sockets/listeners). No hay N+1 clásicos ni `console.log` olvidados.
