@@ -1,7 +1,11 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class RefreshDto {
+  /**
+   * Token de refresh para clientes bearer (app móvil). El panel web lo omite:
+   * el token viaja en la cookie httpOnly `flotaos_refresh`.
+   */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'El refreshToken es obligatorio' })
-  refreshToken!: string;
+  refreshToken?: string;
 }

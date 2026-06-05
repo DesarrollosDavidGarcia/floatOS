@@ -1,5 +1,4 @@
 import { io, type Socket } from 'socket.io-client';
-import { tokenStore } from './token-store';
 
 /**
  * URL base del servidor de WebSockets. El namespace '/tracking' se concatena
@@ -10,12 +9,10 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3000';
 let socket: Socket | null = null;
 
 /**
- * Devuelve un socket conectado al namespace '/tracking', autenticado con el
- * access token guardado en localStorage. Reutiliza la misma instancia mientras
- * el socket siga vivo; si fue desconectado, crea uno nuevo con el token actual.
- *
- * El gateway de la API verifica `auth.token` en el handshake (ver
- * TrackingGateway.extraerToken) y desconecta si es inválido.
+ * Devuelve un socket conectado al namespace '/tracking'. La autenticación va por
+ * la cookie httpOnly de acceso, que el navegador envía en el handshake gracias a
+ * `withCredentials` (el gateway la lee en TrackingGateway.extraerToken). Reutiliza
+ * la instancia mientras siga viva; si fue desconectada, crea una nueva.
  */
 export function getSocket(): Socket {
   if (socket && socket.connected) return socket;
@@ -29,10 +26,7 @@ export function getSocket(): Socket {
 
   socket = io(`${WS_URL}/tracking`, {
     transports: ['websocket'],
-    // Forma callback: cada (re)conexión toma el token fresco de localStorage.
-    // Si se usara `auth: { token }` estático, tras expirar el access token la
-    // reconexión reenviaría el token viejo y el gateway la rechazaría.
-    auth: (cb) => cb({ token: tokenStore.getAccess() ?? '' }),
+    withCredentials: true,
     autoConnect: true,
   });
 
