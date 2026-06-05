@@ -277,7 +277,7 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
       <SeccionHeader>
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar examen
+          <Plus /> Agregar examen
         </Button>
       </SeccionHeader>
 

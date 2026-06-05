@@ -105,7 +105,7 @@ export function UnidadFormDialog({
               required
               error={errors.placas?.message}
             >
-              <Input id="placas" {...register('placas')} />
+              <Input id="placas" autoFocus {...register('placas')} />
             </Campo>
 
             <Campo

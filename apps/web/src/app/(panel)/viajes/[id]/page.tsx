@@ -71,7 +71,7 @@ export default function ViajeDetallePage() {
       <div className="space-y-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/viajes">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft />
             Volver a viajes
           </Link>
         </Button>
@@ -89,14 +89,14 @@ export default function ViajeDetallePage() {
       <div className="flex flex-col gap-4">
         <Button variant="ghost" size="sm" className="w-fit" asChild>
           <Link href="/viajes">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft />
             Volver a viajes
           </Link>
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">Viaje #{viaje.folio}</h1>
+              <h1 className="text-xl font-bold sm:text-2xl">Viaje #{viaje.folio}</h1>
               <Badge variant={ESTADO_VIAJE_BADGE[viaje.estado]}>
                 {ESTADO_VIAJE_LABEL[viaje.estado]}
               </Badge>

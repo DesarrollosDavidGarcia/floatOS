@@ -104,7 +104,7 @@ export default function FlotaPage() {
               placeholder="Buscar por placas, tipo, marca…"
             />
             <Button className="shrink-0" onClick={abrirNueva}>
-              <Plus className="mr-1 h-4 w-4" /> Nueva unidad
+              <Plus /> Nueva unidad
             </Button>
           </div>
         }

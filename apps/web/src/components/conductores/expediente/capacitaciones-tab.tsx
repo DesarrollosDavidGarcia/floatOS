@@ -348,7 +348,7 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
       <div className="flex items-center justify-between">
         <Conteo n={data?.length ?? 0} />
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar capacitación
+          <Plus /> Agregar capacitación
         </Button>
       </div>
 

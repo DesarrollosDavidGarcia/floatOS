@@ -94,7 +94,7 @@ Altura fija `h-[calc(100vh-7rem)]` con grid apilado deja la lista en una franja 
 1. **Aplicado (ronda 1):** U-1, U-3(parcial), U-4(parcial), U-5, U-6(título), U-9(texto), U-10, U-13, U-19.
 2. **Aplicado (ronda 2):** U-2 (validación accesible en `Campo`: aria-invalid/describedby/role=alert), U-16 (aria-required), U-17 (DialogDescription), U-7 (`lib/fecha.ts` unifica las 4 variantes de fecha; migrados tabla-ui, documentos, viajes-dialog, vencimientos-card, datos-tab, eventos-laborales).
 3. **Aplicado (ronda 3):** U-8 (`SearchInput`/`PaginacionFooter`/`EstadoTabla` extraídos y migrados en las 4 listas; criterio único de footer y estados; filtro de estado responsive), U-20 (folio con `#`).
-4. **Pendiente menor:** U-25 (autoFocus 1er campo), U-21 (márgenes de icono redundantes en botones — 24 sitios), U-24 (`PageHeader` en páginas de detalle).
+4. **Aplicado (ronda 4 — menores):** U-21 (quitados los `mr-1/mr-2 h-4 w-4` redundantes en 23 íconos dentro de botones; `Button` ya aplica `gap-2`+`size-4`), U-24 (h1 responsive `text-xl sm:text-2xl` en detalle de viaje y expediente), U-25 (autoFocus en el 1er campo de alta de conductor y unidad).
 5. **Opinables (validar visualmente):** U-6 sidebar desktop, U-11/U-12 tablas móvil, U-14 mapa, U-15 drawer Radix, U-22 reintentar, U-23 skeletons, U-18 login (credencial precargada).
 
 *Generado con auditoría asistida por Claude Code.*

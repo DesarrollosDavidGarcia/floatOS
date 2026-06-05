@@ -115,7 +115,7 @@ export function ConductorFormDialog({
         <form onSubmit={submit} className="space-y-4">
           <CamposGrid cols={2}>
             <Campo label="Nombre" htmlFor="nombre" required error={errors.nombre?.message}>
-              <Input id="nombre" {...register('nombre')} />
+              <Input id="nombre" autoFocus {...register('nombre')} />
             </Campo>
 
             <Campo label="Apellidos" htmlFor="apellidos" error={errors.apellidos?.message}>

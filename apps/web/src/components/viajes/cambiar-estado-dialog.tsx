@@ -71,7 +71,7 @@ export function CambiarEstadoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button disabled={opciones.length === 0}>
-          <ArrowRightLeft className="mr-2 h-4 w-4" />
+          <ArrowRightLeft />
           Cambiar estado
         </Button>
       </DialogTrigger>

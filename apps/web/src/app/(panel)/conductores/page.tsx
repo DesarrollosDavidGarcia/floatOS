@@ -126,7 +126,7 @@ export default function ConductoresPage() {
               placeholder="Buscar por nombre, usuario…"
             />
             <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" /> Nuevo conductor
+              <Plus /> Nuevo conductor
             </Button>
           </div>
         }

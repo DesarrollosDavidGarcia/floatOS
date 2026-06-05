@@ -190,7 +190,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar certificación
+          <Plus /> Agregar certificación
         </Button>
       </div>
 

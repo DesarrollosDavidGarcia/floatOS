@@ -185,7 +185,7 @@ export default function CatalogosPage() {
             <h2 className="text-lg font-semibold">{grupoMeta?.nombre ?? '—'}</h2>
             {!mostrarForm && (
               <Button size="sm" onClick={abrirNuevo} disabled={!grupo}>
-                <Plus className="mr-1 h-4 w-4" /> Agregar opción
+                <Plus /> Agregar opción
               </Button>
             )}
           </div>

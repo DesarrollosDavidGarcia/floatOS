@@ -230,7 +230,7 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={abrirNuevo}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar incidencia
+          <Plus /> Agregar incidencia
         </Button>
       </div>
 

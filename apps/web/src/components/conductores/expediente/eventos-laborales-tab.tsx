@@ -169,7 +169,7 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
       {/* Botón Agregar siempre visible arriba a la derecha */}
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar evento
+          <Plus /> Agregar evento
         </Button>
       </div>
 

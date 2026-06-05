@@ -133,7 +133,7 @@ export function CrearViajeDialog() {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus />
           Nuevo viaje
         </Button>
       </DialogTrigger>

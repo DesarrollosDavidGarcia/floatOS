@@ -81,7 +81,7 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
-          <Pencil className="mr-2 h-4 w-4" />
+          <Pencil />
           Editar
         </Button>
       </DialogTrigger>

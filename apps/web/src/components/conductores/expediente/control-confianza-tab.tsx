@@ -220,7 +220,7 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
       <div className="flex items-center justify-end gap-3">
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={abrirNuevo}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar registro
+          <Plus /> Agregar registro
         </Button>
       </div>
 

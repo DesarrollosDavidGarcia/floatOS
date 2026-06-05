@@ -100,7 +100,7 @@ export default function ClientesPage() {
               placeholder="Buscar por razón social, RFC…"
             />
             <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
+              <Plus /> Nuevo cliente
             </Button>
           </div>
         }

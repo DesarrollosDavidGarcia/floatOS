@@ -264,11 +264,11 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
               onClick={() => setEditando(false)}
               disabled={mutation.isPending}
             >
-              <X className="mr-1 h-4 w-4" />
+              <X />
               Cancelar
             </Button>
             <Button type="submit" size="sm" disabled={mutation.isPending}>
-              <Check className="mr-1 h-4 w-4" />
+              <Check />
               {mutation.isPending ? 'Guardando…' : 'Guardar'}
             </Button>
           </div>
@@ -402,7 +402,7 @@ export function DatosTab({ conductorId }: { conductorId: string }) {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button size="sm" variant="outline" onClick={() => iniciarEdicion(data)}>
-          <Pencil className="mr-1 h-4 w-4" />
+          <Pencil />
           Editar datos
         </Button>
       </div>

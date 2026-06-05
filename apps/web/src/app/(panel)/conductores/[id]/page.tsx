@@ -65,7 +65,7 @@ export default function ExpedienteConductorPage() {
           {isLoading ? (
             <Skeleton className="h-7 w-48" />
           ) : (
-            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
               Expediente — {nombre}
               {conductor && (
                 <Badge variant={conductor.activo ? 'success' : 'secondary'}>

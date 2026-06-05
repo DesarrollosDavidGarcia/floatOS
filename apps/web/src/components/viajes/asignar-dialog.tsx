@@ -75,7 +75,7 @@ export function AsignarDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
-          <UserCog className="mr-2 h-4 w-4" />
+          <UserCog />
           {tieneAsignacion ? 'Reasignar' : 'Asignar'}
         </Button>
       </DialogTrigger>
