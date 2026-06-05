@@ -13,7 +13,14 @@ async function bootstrap() {
   app.set('trust proxy', 1);
 
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: true, credentials: true });
+  // CORS: en producción se restringe vía CORS_ORIGIN (lista coma-separada),
+  // coherente con el gateway WS. Sin la variable (dev) se refleja el origen.
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0)
+    : true;
+  app.enableCors({ origin: corsOrigin, credentials: true });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

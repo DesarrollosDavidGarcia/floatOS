@@ -30,13 +30,16 @@ export class ObtenerViajeUseCase {
     return viaje;
   }
 
-  /** Devuelve solo el historial de estados de un viaje (ordenado desc). */
-  async historial(id: string) {
+  /**
+   * Devuelve solo el historial de estados de un viaje (ordenado desc). Si se
+   * pasa `conductorId`, el viaje debe pertenecerle (mismo criterio que `execute`).
+   */
+  async historial(id: string, conductorId?: string) {
     const viaje = await this.prisma.viaje.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, conductorId: true },
     });
-    if (!viaje) {
+    if (!viaje || (conductorId && viaje.conductorId !== conductorId)) {
       throw new NotFoundException(`Viaje con id ${id} no encontrado`);
     }
 

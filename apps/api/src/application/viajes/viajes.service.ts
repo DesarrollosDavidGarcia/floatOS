@@ -45,8 +45,8 @@ export class ViajesService {
     return this.obtenerViaje.execute(id, conductorId);
   }
 
-  historial(id: string) {
-    return this.obtenerViaje.historial(id);
+  historial(id: string, conductorId?: string) {
+    return this.obtenerViaje.historial(id, conductorId);
   }
 
   editar(id: string, input: EditarViajeInput) {

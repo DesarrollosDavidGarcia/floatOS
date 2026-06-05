@@ -53,8 +53,10 @@ export class ViajesController {
   }
 
   @Get(':id/historial')
-  historial(@Param('id') id: string) {
-    return this.viajes.historial(id);
+  historial(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    // El conductor solo puede ver el historial de SUS viajes.
+    const conductorId = user.type === 'conductor' ? user.sub : undefined;
+    return this.viajes.historial(id, conductorId);
   }
 
   @Patch(':id')
