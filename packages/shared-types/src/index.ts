@@ -215,6 +215,8 @@ export const CATALOGO_GRUPOS: CatalogoGrupoMeta[] = [
   { grupo: 'TIPO_AUSENCIA', nombre: 'Tipos de ausencia' },
   { grupo: 'TIPO_GASTO', nombre: 'Tipos de gasto' },
   { grupo: 'TIPO_UNIDAD', nombre: 'Tipos de unidad (flota)' },
+  { grupo: 'MARCA_UNIDAD', nombre: 'Marcas (flota)' },
+  { grupo: 'MODELO_UNIDAD', nombre: 'Modelos (flota)' },
   { grupo: 'ASEGURADORA', nombre: 'Aseguradoras' },
   { grupo: 'PUESTO', nombre: 'Puestos' },
   { grupo: 'TIPO_SANGRE', nombre: 'Tipos de sangre' },

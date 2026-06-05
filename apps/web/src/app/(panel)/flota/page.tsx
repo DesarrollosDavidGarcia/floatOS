@@ -169,7 +169,13 @@ export default function FlotaPage() {
                           {(u.marca || u.modelo) && (
                             <>
                               {' · '}
-                              {[u.marca, u.modelo].filter(Boolean).join(' ')}
+                              {u.marca ? (
+                                <CatalogoTexto grupo="MARCA_UNIDAD" codigo={u.marca} />
+                              ) : null}
+                              {u.marca && u.modelo ? ' ' : null}
+                              {u.modelo ? (
+                                <CatalogoTexto grupo="MODELO_UNIDAD" codigo={u.modelo} />
+                              ) : null}
                             </>
                           )}
                         </>

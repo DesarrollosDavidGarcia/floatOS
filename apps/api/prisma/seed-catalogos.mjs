@@ -162,6 +162,35 @@ const CATALOGOS = {
     ['AB_POS', 'AB+'],
     ['AB_NEG', 'AB−'],
   ],
+  // Marca de la unidad (editable por el admin; lista inicial de referencia).
+  MARCA_UNIDAD: [
+    ['KENWORTH', 'Kenworth'],
+    ['FREIGHTLINER', 'Freightliner'],
+    ['INTERNATIONAL', 'International'],
+    ['VOLVO', 'Volvo'],
+    ['SCANIA', 'Scania'],
+    ['MERCEDES_BENZ', 'Mercedes-Benz'],
+    ['HINO', 'Hino'],
+    ['ISUZU', 'Isuzu'],
+    ['MACK', 'Mack'],
+    ['DINA', 'DINA'],
+    ['FORD', 'Ford'],
+    ['CHEVROLET', 'Chevrolet'],
+    ['NISSAN', 'Nissan'],
+    ['OTRO', 'Otra'],
+  ],
+  // Modelo de la unidad (lista inicial mínima; el admin agrega los suyos).
+  MODELO_UNIDAD: [
+    ['T680', 'T680'],
+    ['T880', 'T880'],
+    ['CASCADIA', 'Cascadia'],
+    ['PROSTAR', 'ProStar'],
+    ['LT', 'LT'],
+    ['FH', 'FH'],
+    ['R_SERIES', 'R Series'],
+    ['ACTROS', 'Actros'],
+    ['OTRO', 'Otro'],
+  ],
 };
 
 async function main() {

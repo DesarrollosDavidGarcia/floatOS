@@ -122,20 +122,24 @@ export function UnidadFormDialog({
               />
             </Campo>
 
-            <Campo
-              label="Marca"
-              htmlFor="marca"
-              error={errors.marca?.message}
-            >
-              <Input id="marca" {...register('marca')} />
+            <Campo label="Marca" error={errors.marca?.message}>
+              <CatalogoSelect
+                grupo="MARCA_UNIDAD"
+                value={watch('marca') ?? ''}
+                onChange={(c) => setValue('marca', c, { shouldValidate: true })}
+                placeholder="Selecciona…"
+                ariaLabel="Marca"
+              />
             </Campo>
 
-            <Campo
-              label="Modelo"
-              htmlFor="modelo"
-              error={errors.modelo?.message}
-            >
-              <Input id="modelo" {...register('modelo')} />
+            <Campo label="Modelo" error={errors.modelo?.message}>
+              <CatalogoSelect
+                grupo="MODELO_UNIDAD"
+                value={watch('modelo') ?? ''}
+                onChange={(c) => setValue('modelo', c, { shouldValidate: true })}
+                placeholder="Selecciona…"
+                ariaLabel="Modelo"
+              />
             </Campo>
 
             <Campo
