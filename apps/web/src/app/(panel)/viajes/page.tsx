@@ -160,7 +160,7 @@ export default function ViajesPage() {
                     <CeldaPrincipal
                       titulo={
                         <Link href={`/viajes/${v.id}`} className="hover:underline">
-                          {v.folio}
+                          #{v.folio}
                         </Link>
                       }
                       subtitulo={v.cliente?.nombre}

@@ -93,7 +93,8 @@ Altura fija `h-[calc(100vh-7rem)]` con grid apilado deja la lista en una franja 
 ## Plan sugerido
 1. **Aplicado (ronda 1):** U-1, U-3(parcial), U-4(parcial), U-5, U-6(título), U-9(texto), U-10, U-13, U-19.
 2. **Aplicado (ronda 2):** U-2 (validación accesible en `Campo`: aria-invalid/describedby/role=alert), U-16 (aria-required), U-17 (DialogDescription), U-7 (`lib/fecha.ts` unifica las 4 variantes de fecha; migrados tabla-ui, documentos, viajes-dialog, vencimientos-card, datos-tab, eventos-laborales).
-3. **Siguiente lote seguro (pendiente):** U-8 (extraer `SearchInput`/`PaginacionFooter`/`EstadoTabla` y migrar las 4 listas — dedup puro, ~12 reemplazos), U-25 (autoFocus 1er campo), U-20/U-21/U-24 (folio `#`, márgenes de icono redundantes, `PageHeader` en detalle).
-4. **Opinables (validar visualmente):** U-6 sidebar desktop, U-11/U-12 tablas móvil, U-14 mapa, U-15 drawer Radix, U-22 reintentar, U-23 skeletons, U-18 login (credencial precargada).
+3. **Aplicado (ronda 3):** U-8 (`SearchInput`/`PaginacionFooter`/`EstadoTabla` extraídos y migrados en las 4 listas; criterio único de footer y estados; filtro de estado responsive), U-20 (folio con `#`).
+4. **Pendiente menor:** U-25 (autoFocus 1er campo), U-21 (márgenes de icono redundantes en botones — 24 sitios), U-24 (`PageHeader` en páginas de detalle).
+5. **Opinables (validar visualmente):** U-6 sidebar desktop, U-11/U-12 tablas móvil, U-14 mapa, U-15 drawer Radix, U-22 reintentar, U-23 skeletons, U-18 login (credencial precargada).
 
 *Generado con auditoría asistida por Claude Code.*

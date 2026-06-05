@@ -96,7 +96,7 @@ export default function ViajeDetallePage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{viaje.folio}</h1>
+              <h1 className="text-2xl font-bold">Viaje #{viaje.folio}</h1>
               <Badge variant={ESTADO_VIAJE_BADGE[viaje.estado]}>
                 {ESTADO_VIAJE_LABEL[viaje.estado]}
               </Badge>
