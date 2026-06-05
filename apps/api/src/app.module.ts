@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SharedModule } from './infrastructure/shared/shared.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
 import { HealthController } from './presentation/http/health.controller';
 
 // Módulos de funcionalidad (Fase 1)
@@ -26,6 +27,7 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
     PrismaModule,
     SharedModule,
+    StorageModule,
     AuthModule,
     ClientesModule,
     FlotaModule,

@@ -25,6 +25,20 @@ export interface DocumentoUnidad {
   archivoKey?: string | null;
 }
 
+/** Categoría de un archivo adjunto a la unidad. */
+export type CategoriaArchivoUnidad = 'POLIZA_SEGURO' | 'GENERAL';
+
+/** Archivo adjunto a una unidad (vista pública; sin la object key interna). */
+export interface ArchivoUnidad {
+  id: string;
+  unidadId: string;
+  categoria: CategoriaArchivoUnidad;
+  nombre: string;
+  contentType: string;
+  tamanoBytes: number;
+  createdAt: string;
+}
+
 export const TIPO_DOCUMENTO_UNIDAD_LABEL: Record<TipoDocumentoUnidad, string> = {
   [TipoDocumentoUnidad.VERIFICACION]: 'Verificación',
   [TipoDocumentoUnidad.SEGURO]: 'Seguro',

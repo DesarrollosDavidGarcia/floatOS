@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,12 +10,20 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { DocumentoUnidad, Unidad } from '@prisma/client';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { CategoriaArchivoUnidad, DocumentoUnidad, Unidad } from '@prisma/client';
 import { Paginado } from '@flotaos/shared-types';
 import { UnidadesUseCase } from '../../../application/flota/unidades.usecase';
 import { DocumentosUnidadUseCase } from '../../../application/flota/documentos-unidad.usecase';
+import {
+  ArchivosUnidadUseCase,
+  ArchivoSubido,
+  TAMANO_MAX_BYTES,
+} from '../../../application/flota/archivos-unidad.usecase';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { DiasVencimientoDto } from '../shared/dias-vencimiento.dto';
@@ -24,6 +33,15 @@ import { ListarUnidadesDto } from './dto/listar-unidades.dto';
 import { CrearDocumentoUnidadDto } from './dto/crear-documento-unidad.dto';
 import { ActualizarDocumentoUnidadDto } from './dto/actualizar-documento-unidad.dto';
 
+/** Valida y normaliza el parámetro `categoria` contra el enum de Prisma. */
+function parseCategoria(valor?: string): CategoriaArchivoUnidad {
+  if (!valor) return CategoriaArchivoUnidad.GENERAL;
+  if ((Object.values(CategoriaArchivoUnidad) as string[]).includes(valor)) {
+    return valor as CategoriaArchivoUnidad;
+  }
+  throw new BadRequestException(`Categoría inválida: ${valor}`);
+}
+
 /** Gestión administrativa de la flota: unidades y sus documentos. */
 @Controller('unidades')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -31,6 +49,7 @@ export class FlotaController {
   constructor(
     private readonly unidades: UnidadesUseCase,
     private readonly documentos: DocumentosUnidadUseCase,
+    private readonly archivos: ArchivosUnidadUseCase,
   ) {}
 
   // ── Documentos por vencer (ruta estática antes de :id) ──
@@ -108,5 +127,49 @@ export class FlotaController {
     @Param('docId') docId: string,
   ): Promise<void> {
     await this.documentos.eliminar(unidadId, docId);
+  }
+
+  // ── Archivos por unidad (póliza de seguro y archivos generales) ──
+
+  /** Sube uno o varios archivos a una categoría (?categoria=POLIZA_SEGURO|GENERAL). */
+  @Post(':unidadId/archivos')
+  @UseInterceptors(
+    FilesInterceptor('archivos', 10, { limits: { fileSize: TAMANO_MAX_BYTES } }),
+  )
+  subirArchivos(
+    @Param('unidadId') unidadId: string,
+    @Query('categoria') categoria: string | undefined,
+    @UploadedFiles() archivos: ArchivoSubido[],
+  ) {
+    return this.archivos.subir(unidadId, parseCategoria(categoria), archivos ?? []);
+  }
+
+  @Get(':unidadId/archivos')
+  listarArchivos(
+    @Param('unidadId') unidadId: string,
+    @Query('categoria') categoria?: string,
+  ) {
+    return this.archivos.listar(
+      unidadId,
+      categoria ? parseCategoria(categoria) : undefined,
+    );
+  }
+
+  /** URL temporal de descarga del archivo. */
+  @Get(':unidadId/archivos/:archivoId/url')
+  urlArchivo(
+    @Param('unidadId') unidadId: string,
+    @Param('archivoId') archivoId: string,
+  ): Promise<{ url: string }> {
+    return this.archivos.urlDescarga(unidadId, archivoId);
+  }
+
+  @Delete(':unidadId/archivos/:archivoId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async eliminarArchivo(
+    @Param('unidadId') unidadId: string,
+    @Param('archivoId') archivoId: string,
+  ): Promise<void> {
+    await this.archivos.eliminar(unidadId, archivoId);
   }
 }

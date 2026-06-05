@@ -289,9 +289,35 @@ model Unidad {
   updatedAt     DateTime @updatedAt
 
   documentos DocumentoUnidad[]
+  archivos   ArchivoUnidad[]
   viajes     Viaje[]
 
   @@map("unidades")
+}
+
+/// Categoría de un archivo adjunto a una unidad.
+enum CategoriaArchivoUnidad {
+  POLIZA_SEGURO
+  GENERAL
+}
+
+/// Archivo adjunto a una unidad (póliza de seguro o documentos propios del
+/// vehículo). Varios por unidad; el binario vive en MinIO bajo `key`.
+model ArchivoUnidad {
+  id          String                 @id @default(cuid())
+  unidadId    String
+  categoria   CategoriaArchivoUnidad @default(GENERAL)
+  nombre      String // nombre original del archivo
+  key         String // object key en MinIO
+  contentType String
+  tamanoBytes Int
+  createdAt   DateTime               @default(now())
+
+  unidad Unidad @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+
+  @@index([unidadId])
+  @@index([unidadId, categoria])
+  @@map("archivos_unidad")
 }
 
 model DocumentoUnidad {

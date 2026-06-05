@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, MoreHorizontal, Pencil, Plus, Trash2, Truck } from 'lucide-react';
+import { FileText, MoreHorizontal, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
@@ -32,6 +32,7 @@ import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { CeldaPrincipal } from '@/components/conductores/expediente/tabla-ui';
 import { UnidadFormDialog } from '@/components/flota/unidad-form-dialog';
 import { DocumentosDialog } from '@/components/flota/documentos-dialog';
+import { ArchivosDialog } from '@/components/flota/archivos-dialog';
 import type { Paginado, Unidad } from '@/components/flota/types';
 
 const PAGE_SIZE = 10;
@@ -46,6 +47,8 @@ export default function FlotaPage() {
   const [unidadEditar, setUnidadEditar] = useState<Unidad | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [unidadDocs, setUnidadDocs] = useState<Unidad | null>(null);
+  const [archivosOpen, setArchivosOpen] = useState(false);
+  const [unidadArchivos, setUnidadArchivos] = useState<Unidad | null>(null);
   const [eliminarUnidad, setEliminarUnidad] = useState<Unidad | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -83,6 +86,11 @@ export default function FlotaPage() {
   function abrirDocumentos(unidad: Unidad) {
     setUnidadDocs(unidad);
     setDocsOpen(true);
+  }
+
+  function abrirArchivos(unidad: Unidad) {
+    setUnidadArchivos(unidad);
+    setArchivosOpen(true);
   }
 
   const unidades = data?.data ?? [];
@@ -207,6 +215,9 @@ export default function FlotaPage() {
                         <DropdownMenuItem onSelect={() => abrirDocumentos(u)}>
                           <FileText className="h-4 w-4" /> Documentos
                         </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => abrirArchivos(u)}>
+                          <Paperclip className="h-4 w-4" /> Archivos
+                        </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => abrirEdicion(u)}>
                           <Pencil className="h-4 w-4" /> Editar
                         </DropdownMenuItem>
@@ -239,6 +250,11 @@ export default function FlotaPage() {
       {/* Diálogos */}
       <UnidadFormDialog unidad={unidadEditar} open={formOpen} onOpenChange={setFormOpen} />
       <DocumentosDialog unidad={unidadDocs} open={docsOpen} onOpenChange={setDocsOpen} />
+      <ArchivosDialog
+        unidad={unidadArchivos}
+        open={archivosOpen}
+        onOpenChange={setArchivosOpen}
+      />
 
       {/* Confirmar eliminación */}
       <ConfirmDialog
