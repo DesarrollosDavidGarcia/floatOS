@@ -27,11 +27,12 @@ export function getSocket(): Socket {
     socket = null;
   }
 
-  const token = tokenStore.getAccess() ?? '';
-
   socket = io(`${WS_URL}/tracking`, {
     transports: ['websocket'],
-    auth: { token },
+    // Forma callback: cada (re)conexión toma el token fresco de localStorage.
+    // Si se usara `auth: { token }` estático, tras expirar el access token la
+    // reconexión reenviaría el token viejo y el gateway la rechazaría.
+    auth: (cb) => cb({ token: tokenStore.getAccess() ?? '' }),
     autoConnect: true,
   });
 

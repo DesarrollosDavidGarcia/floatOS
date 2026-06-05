@@ -9,10 +9,5 @@ export interface Cliente {
   createdAt: string;
 }
 
-export interface Paginado<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPaginas: number;
-}
+// Contrato único de paginación: reexportado desde shared-types para no divergir.
+export type { Paginado } from '@flotaos/shared-types';

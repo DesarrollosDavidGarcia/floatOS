@@ -8,14 +8,8 @@ export type BadgeVariant =
   | 'success'
   | 'warning';
 
-/** Resultado paginado genérico de la API. */
-export interface Paginado<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPaginas: number;
-}
+/** Resultado paginado genérico de la API (contrato único en shared-types). */
+export type { Paginado } from '@flotaos/shared-types';
 
 export interface Unidad {
   id: string;
