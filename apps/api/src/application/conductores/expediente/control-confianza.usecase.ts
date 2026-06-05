@@ -35,6 +35,7 @@ export class ControlConfianzaUseCase {
   private async asegurarConductor(conductorId: string): Promise<void> {
     const conductor = await this.prisma.conductor.findUnique({
       where: { id: conductorId },
+      select: { id: true },
     });
     if (!conductor) {
       throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
