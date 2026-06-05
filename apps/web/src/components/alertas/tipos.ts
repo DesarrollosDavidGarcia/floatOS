@@ -35,21 +35,5 @@ export function etiquetaDocumento(tipoDocumento: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
-/** Variante de Badge según la urgencia de los días restantes. */
-export function variantePorDias(
-  diasRestantes: number,
-): 'destructive' | 'warning' | 'secondary' {
-  if (diasRestantes <= 3) return 'destructive';
-  if (diasRestantes <= 7) return 'warning';
-  return 'secondary';
-}
-
-/** Texto legible para los días restantes (contempla vencidos). */
-export function textoDiasRestantes(diasRestantes: number): string {
-  if (diasRestantes < 0) {
-    const dias = Math.abs(diasRestantes);
-    return dias === 1 ? 'Vencido hace 1 día' : `Vencido hace ${dias} días`;
-  }
-  if (diasRestantes === 0) return 'Vence hoy';
-  return diasRestantes === 1 ? '1 día' : `${diasRestantes} días`;
-}
+// Urgencia y texto de días restantes: regla escalonada única (lib/vencimiento).
+export { variantePorDias, etiquetaDias as textoDiasRestantes } from '@/lib/vencimiento';

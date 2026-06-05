@@ -12,14 +12,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { etiquetaDias } from '@/lib/vencimiento';
 import { documentoLabel, urgenciaBadge } from './etiquetas';
 import type { AlertaVencimiento } from './tipos';
-
-function diasLabel(dias: number): string {
-  if (dias <= 0) return 'Vence hoy';
-  if (dias === 1) return 'En 1 día';
-  return `En ${dias} días`;
-}
 
 export function VencimientosCard({
   vencimientos,
@@ -65,7 +60,7 @@ export function VencimientosCard({
                     </p>
                   </div>
                   <Badge variant={urgenciaBadge(v.diasRestantes)} className="shrink-0">
-                    {diasLabel(v.diasRestantes)}
+                    {etiquetaDias(v.diasRestantes)}
                   </Badge>
                 </li>
               );

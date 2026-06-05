@@ -1,15 +1,16 @@
 import { TipoDocumentoUnidad } from '@flotaos/shared-types';
-
-export type BadgeVariant =
-  | 'default'
-  | 'secondary'
-  | 'destructive'
-  | 'outline'
-  | 'success'
-  | 'warning';
+import {
+  diasHasta,
+  estadoPorDias,
+  ESTADO_VENCIMIENTO_VARIANT,
+} from '@/lib/vencimiento';
 
 /** Resultado paginado genérico de la API (contrato único en shared-types). */
 export type { Paginado } from '@flotaos/shared-types';
+
+/** Estado y etiquetas de vencimiento: regla escalonada única (lib/vencimiento). */
+export type { EstadoVencimiento } from '@/lib/vencimiento';
+export { ESTADO_VENCIMIENTO_LABEL } from '@/lib/vencimiento';
 
 export interface Unidad {
   id: string;
@@ -40,28 +41,10 @@ export const TIPO_DOCUMENTO_UNIDAD_LABEL: Record<TipoDocumentoUnidad, string> = 
   [TipoDocumentoUnidad.OTRO]: 'Otro',
 };
 
-export type EstadoVencimiento = 'vencido' | 'por-vencer' | 'vigente';
+/** Mapa estado → variante de Badge (alias del canónico para los consumidores de flota). */
+export const ESTADO_VENCIMIENTO_BADGE = ESTADO_VENCIMIENTO_VARIANT;
 
-/** Calcula el estado de un documento según su fecha de vencimiento. */
-export function estadoVencimiento(fechaVencimiento: string, diasUmbral = 30): EstadoVencimiento {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const vence = new Date(fechaVencimiento);
-  vence.setHours(0, 0, 0, 0);
-  const diffDias = Math.floor((vence.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDias < 0) return 'vencido';
-  if (diffDias <= diasUmbral) return 'por-vencer';
-  return 'vigente';
+/** Estado de vencimiento de un documento de unidad (regla escalonada única). */
+export function estadoVencimiento(fechaVencimiento: string) {
+  return estadoPorDias(diasHasta(fechaVencimiento));
 }
-
-export const ESTADO_VENCIMIENTO_LABEL: Record<EstadoVencimiento, string> = {
-  vencido: 'Vencido',
-  'por-vencer': 'Por vencer',
-  vigente: 'Vigente',
-};
-
-export const ESTADO_VENCIMIENTO_BADGE: Record<EstadoVencimiento, BadgeVariant> = {
-  vencido: 'destructive',
-  'por-vencer': 'warning',
-  vigente: 'success',
-};

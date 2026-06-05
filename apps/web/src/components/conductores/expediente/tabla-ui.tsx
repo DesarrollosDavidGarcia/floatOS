@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { vencimientoInfo } from '@/lib/vencimiento';
 
 /** Fecha corta en español ("15 ene 2026") o "—". */
 export function Fecha({ iso }: { iso?: string | null }) {
@@ -55,27 +56,15 @@ export function Dinero({ value }: { value?: number | string | null }) {
  */
 export function Vigencia({ iso }: { iso?: string | null }) {
   if (!iso) return <span className="text-muted-foreground">—</span>;
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
   const venc = new Date(iso);
   if (Number.isNaN(venc.getTime()))
     return <span className="text-muted-foreground">—</span>;
-  venc.setHours(0, 0, 0, 0);
-  const dias = Math.round((venc.getTime() - hoy.getTime()) / 86_400_000);
 
-  let variant: 'success' | 'warning' | 'destructive' = 'success';
-  let etiqueta = 'Vigente';
-  if (dias < 0) {
-    variant = 'destructive';
-    etiqueta = `Vencido (${Math.abs(dias)} d)`;
-  } else if (dias <= 30) {
-    variant = 'warning';
-    etiqueta = `Por vencer (${dias} d)`;
-  }
+  const { estado, variant, label } = vencimientoInfo(iso);
 
   return (
     <div className="flex flex-col items-start gap-0.5">
-      <Badge variant={variant}>{etiqueta}</Badge>
+      <Badge variant={variant}>{estado === 'vigente' ? 'Vigente' : label}</Badge>
       <span className="text-xs text-muted-foreground">
         {venc.toLocaleDateString('es-MX', {
           day: '2-digit',
