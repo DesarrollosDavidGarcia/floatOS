@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { ArrowRight, Eye, MoreHorizontal, Plus, Search } from 'lucide-react';
 import { EstadoViaje } from '@flotaos/shared-types';
-import { api } from '@/lib/api';
+import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import type { Paginado } from '@flotaos/shared-types';
@@ -52,7 +52,7 @@ export default function ViajesPage() {
   const [page, setPage] = useState(1);
   const qDebounced = useDebounce(q);
 
-  const { data, isLoading, isError, isPlaceholderData } = useQuery<Paginado<Viaje>>({
+  const { data, isLoading, isError, error, isPlaceholderData } = useQuery<Paginado<Viaje>>({
     queryKey: ['viajes', { q: qDebounced, estado, page }],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, pageSize: PAGE_SIZE };
@@ -153,13 +153,15 @@ export default function ViajesPage() {
             ) : isError ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-destructive">
-                  No se pudieron cargar los viajes.
+                  {apiError(error) || 'No se pudieron cargar los viajes.'}
                 </TableCell>
               </TableRow>
             ) : viajes.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  No hay viajes que coincidan.
+                  {qDebounced || estado !== TODOS
+                    ? 'No hay viajes que coincidan con los filtros.'
+                    : 'Aún no hay viajes registrados.'}
                 </TableCell>
               </TableRow>
             ) : (
@@ -238,7 +240,7 @@ export default function ViajesPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Acciones">
+                        <Button variant="ghost" size="icon" aria-label="Acciones">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

@@ -76,7 +76,7 @@ export default function ConductoresPage() {
   const [viajesConductor, setViajesConductor] = useState<Conductor | null>(null);
   const [eliminarConductor, setEliminarConductor] = useState<Conductor | null>(null);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['conductores', { q, page }],
     queryFn: async () => {
       const { data } = await api.get<Paginado<Conductor>>('/conductores', {
@@ -169,7 +169,7 @@ export default function ConductoresPage() {
             ) : isError ? (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-destructive">
-                  No se pudieron cargar los conductores.
+                  {apiError(error) || 'No se pudieron cargar los conductores.'}
                 </TableCell>
               </TableRow>
             ) : conductores.length === 0 ? (
@@ -178,7 +178,9 @@ export default function ConductoresPage() {
                   colSpan={5}
                   className="py-10 text-center text-muted-foreground"
                 >
-                  No hay conductores que coincidan con la búsqueda.
+                  {q
+                    ? 'No se encontraron conductores para tu búsqueda.'
+                    : 'Aún no hay conductores registrados.'}
                 </TableCell>
               </TableRow>
             ) : (
@@ -243,7 +245,7 @@ export default function ConductoresPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Acciones">
+                        <Button variant="ghost" size="icon" aria-label="Acciones">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

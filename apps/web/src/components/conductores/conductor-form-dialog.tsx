@@ -164,7 +164,7 @@ export function ConductorFormDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear'}
+              {isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear conductor'}
             </Button>
           </DialogFooter>
         </form>

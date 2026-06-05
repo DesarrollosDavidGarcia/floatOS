@@ -118,6 +118,7 @@ export function UnidadFormDialog({
                 value={watch('tipo')}
                 onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
                 placeholder="Selecciona el tipo"
+                ariaLabel="Tipo de unidad"
               />
             </Campo>
 
@@ -162,6 +163,7 @@ export function UnidadFormDialog({
                 value={watch('aseguradora') ?? ''}
                 onChange={(c) => setValue('aseguradora', c, { shouldValidate: true })}
                 placeholder="Selecciona…"
+                ariaLabel="Aseguradora"
               />
             </Campo>
 

@@ -20,12 +20,18 @@ export function CatalogoSelect({
   onChange,
   placeholder = 'Selecciona…',
   disabled,
+  id,
+  ariaLabel,
 }: {
   grupo: string;
   value?: string | null;
   onChange: (codigo: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** id para asociar un <Label htmlFor>. */
+  id?: string;
+  /** Nombre accesible cuando no hay <Label> visible asociado. */
+  ariaLabel?: string;
 }) {
   const { data: items } = useCatalogo(grupo);
   const todos = items ?? [];
@@ -41,7 +47,7 @@ export function CatalogoSelect({
       onValueChange={onChange}
       disabled={disabled}
     >
-      <SelectTrigger>
+      <SelectTrigger id={id} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -240,6 +240,7 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
                   value={tipo ?? ''}
                   onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
                   placeholder="Selecciona el tipo"
+                  ariaLabel="Tipo de documento"
                 />
                 {errors.tipo && (
                   <p className="text-sm text-destructive">{errors.tipo.message}</p>

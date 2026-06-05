@@ -156,7 +156,9 @@ export default function FlotaPage() {
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   <Truck className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  No se encontraron unidades.
+                  {qDebounced
+                    ? 'No se encontraron unidades para tu búsqueda.'
+                    : 'Aún no hay unidades registradas.'}
                 </TableCell>
               </TableRow>
             ) : (
@@ -210,7 +212,7 @@ export default function FlotaPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Acciones">
+                        <Button variant="ghost" size="icon" aria-label="Acciones">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

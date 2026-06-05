@@ -176,7 +176,7 @@ export default function ClientesPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Acciones">
+                        <Button variant="ghost" size="icon" aria-label="Acciones">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
