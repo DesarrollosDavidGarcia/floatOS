@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { invalidarViajes } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,7 +112,7 @@ export function CrearViajeDialog() {
     },
     onSuccess: (viaje) => {
       toast.success(`Viaje ${viaje.folio ?? ''} creado`);
-      qc.invalidateQueries({ queryKey: ['viajes'] });
+      invalidarViajes(qc);
       setOpen(false);
       reset();
       router.push(`/viajes/${viaje.id}`);

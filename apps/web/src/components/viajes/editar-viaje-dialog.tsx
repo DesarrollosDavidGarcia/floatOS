@@ -68,7 +68,8 @@ export function EditarViajeDialog({ viaje }: { viaje: Viaje }) {
     }),
     toPayload,
     endpoint: '/viajes',
-    invalidateKeys: [['viaje', viaje.id], ['viajes']],
+    // Refresca listado + detalle + dashboard + tracking (conteos/posiciones).
+    invalidateKeys: [['viaje', viaje.id], ['viajes'], ['dashboard'], ['tracking']],
     mensajes: { creado: 'Viaje actualizado', actualizado: 'Viaje actualizado' },
   });
   const {

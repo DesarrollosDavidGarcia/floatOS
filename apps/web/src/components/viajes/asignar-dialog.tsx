@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserCog } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { invalidarViajes } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -62,8 +63,7 @@ export function AsignarDialog({
     },
     onSuccess: () => {
       toast.success('Asignación actualizada');
-      qc.invalidateQueries({ queryKey: ['viaje', viajeId] });
-      qc.invalidateQueries({ queryKey: ['viajes'] });
+      invalidarViajes(qc, viajeId);
       setOpen(false);
     },
     onError: (err) => toast.error(apiError(err)),
