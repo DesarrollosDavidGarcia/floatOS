@@ -600,6 +600,47 @@ Pasada integral de experiencia sobre el panel Next.js, con fan-out multiagente y
 
 **Layout / navegación:** **topbar** con campana de **notificaciones** (conectada a `/alertas/vencimientos`: badge con conteo y urgencia, dropdown con próximos) y **menú de perfil** (avatar, nombre/email, cerrar sesión); **sidebar agrupado** por secciones (Operación / Gestión / Sistema); **menú hamburguesa siempre** (sidebar como drawer en todos los tamaños); panel **responsive** (header que apila en móvil, tablas con scroll y columnas adaptativas).
 
+### 2026-06-05 — Auditoría de código + correcciones (seguridad / correctitud / mantenibilidad) ✅
+
+Auditoría completa multiagente (API + web) → informe **`FlotaOS_Auditoria.md`**. Fixes aplicados en la rama **`auditoria/fixes-seguros`** (aún sin merge a `main`), verificados con `tsc` por fase + revisión adversarial del propio diff (sin regresiones).
+
+**🔴 Seguridad / correctitud:**
+- **IDOR** cerrado en `GET /viajes/:id/historial` (un conductor podía leer el historial de viajes ajenos).
+- **Race TOCTOU** en el cambio de estado del viaje: `update` condicional `where:{ id, estado }` + `P2025 → 409` (evita doble transición/historial).
+- **bcrypt del refresh token** (real, verificado): pre-hash **SHA-256** antes de bcrypt — bcrypt truncaba a 72 bytes y la rotación/revocación no funcionaba.
+- `listar-viajes-conductor` paginado y sin exponer `trackingToken`; chequeos de existencia con `select:{ id }` (ya no traían `passwordHash`); **CORS** por `CORS_ORIGIN` (coherente con el WS); cabeceras de seguridad (`nosniff`, `X-Frame-Options`); **índices** en `Viaje` (`estado+createdAt`, `fechaProgramada`, `createdAt`).
+
+**🧹 Reducción de duplicación / mantenibilidad:** helper único `asegurarConductorExiste` (9 use cases del expediente); `DocumentosDialogBase` (diálogos de documentos conductor/unidad ~650→~270 líneas); hook `useEntityFormDialog` (4 form-dialogs); `ConfirmDialog` reutilizado en las 3 listas; **`lib/vencimiento.ts`** con regla escalonada única (vencido / crítico ≤7 / por vencer ≤30 / vigente); `Paginado` y `BadgeVariant` centralizados. Corrección de criterio: `tipo/nivel/resultado/gravedad` son `String` de catálogo con `@default` (no enums) → se quitaron `as any` innecesarios (no se añadió `@IsEnum`).
+
+**Diferido (documentado en el informe):** controller-factory genérico del expediente y migración del panel a cookies (esto último ya hecho, ver siguiente entrada).
+
+### 2026-06-05 — Auth dual: cookies httpOnly (panel) + bearer (móvil) ✅
+
+El **panel web** deja de guardar tokens en `localStorage` (riesgo XSS) y pasa a **cookies `httpOnly` + `Secure` + `SameSite=Strict`** emitidas por la API en login/refresh; la API **sigue devolviendo los tokens en el body** para la futura **app móvil** (bearer). La JWT strategy y el gateway WS leen el token de **cookie o header**; logout limpia las cookies; CORS con `credentials`. El web rehidrata la sesión con `GET /auth/me` (sin tocar tokens en JS). **Verificado en vivo**: login emite cookie + tokens, `/auth/me` solo con cookie (200), refresh por cookie (200), logout (204).
+
+### 2026-06-05 — Auditoría UX/UI del panel + correcciones ✅
+
+Auditoría UX/UI multiagente (accesibilidad, consistencia, responsive, estados/microcopy) → informe **`FlotaOS_Auditoria_UX.md`**; fixes objetivos aplicados.
+- **Accesibilidad:** el componente `Campo` inyecta `aria-invalid`/`aria-describedby`/`aria-required` y marca el error con `role="alert"` (la validación se anuncia en lectores de pantalla); `aria-label` en botones-icono y menús de acción; `<th scope="col">`; `CatalogoSelect` acepta `id`/`aria-label`; título de sección dinámico en el topbar.
+- **Consistencia:** **`lib/fecha.ts`** unifica los 4 formatos de fecha dispersos; piezas compartidas **`SearchInput`/`PaginacionFooter`/`EstadoTabla`** (criterio único de footer, skeleton y estados error/vacío) en las 4 listas; folio con `#`; `BadgeVariant` desde `ui/badge`.
+- **Responsive:** `DialogContent` con `max-h-[90vh]` + scroll (el botón Guardar deja de quedar fuera de pantalla en móvil); área táctil ≥40px en menús; títulos de detalle `text-xl sm:text-2xl`.
+- **Estados / microcopy:** errores reales (`apiError`) y vacíos que distinguen "sin búsqueda" vs "sin datos"; catálogos "Opción/Activa" + colores en español.
+- **Dev:** `next dev --turbo` (Turbopack) — compila ~2–3× más rápido (la pantalla de tracking de ~1.5 s a ~0.5 s); sólo afecta a desarrollo. Verificado: `tsc` web en verde y rutas 200.
+
+### 2026-06-05 — Archivos de unidad en MinIO (póliza de seguro + generales) ✅
+
+Nueva capacidad de **adjuntar varios archivos por unidad**. No existía pipeline de archivos (`archivoKey` estaba definido pero sin usar); se construyó de punta a punta.
+- **Backend:** modelo **`ArchivoUnidad`** (categoría `POLIZA_SEGURO|GENERAL`, varios por unidad) + migración; **`StorageService` (MinIO)** — subir, **URL temporal firmada** para descarga, eliminar; crea el bucket bajo demanda; `ArchivosUnidadUseCase` valida **PDF/imagen ≤10 MB** y **no expone la object key**; endpoints en `FlotaController` (`POST` multi-archivo vía `FilesInterceptor`, `GET` listar por categoría, `GET .../url`, `DELETE`); `StorageModule` global.
+- **Web:** `ArchivosDialog` con dos secciones (**Póliza de seguro** / **Archivos del vehículo**), subida múltiple con validación en cliente, descarga y borrado; opción **"Archivos"** en el menú de cada unidad.
+- **Verificado en vivo** end-to-end contra MinIO: subir → bucket `flotaos` creado → listar → URL firmada → borrar (204).
+- Esta pieza (subida a MinIO) es la **base para POD y registro de gastos con foto** (Fase 2).
+
+### 2026-06-05 — Marca y Modelo de unidad como catálogos ✅
+
+**Marca** y **Modelo** del alta de unidad pasan de texto libre a **dropdowns de catálogo** (`MARCA_UNIDAD`, `MODELO_UNIDAD`), administrables desde la pantalla de **Catálogos**. Se añadieron los grupos a `CATALOGO_GRUPOS` (en `shared-types`, donde la lista de grupos es fija) y al seed (lista inicial editable). La tabla de flota resuelve los códigos con `CatalogoTexto`; **los valores ya escritos se conservan**. (Los demás dropdowns de flota —tipo de unidad, aseguradora, tipo de documento— ya eran catálogos editables.) **Verificado:** 20 grupos en `/catalogos/grupos`, `tsc` web en verde, `/flota` y `/catalogos` 200.
+
+> **Pendiente de cierre de Fase 1:** la **página pública de seguimiento** sin login (`/seguimiento/<token>` — el API ya existe), la **app Flutter** del conductor y el **script de alta de instancia**. Todo lo anterior vive en la rama `auditoria/fixes-seguros` (pendiente de merge a `main`).
+
 ---
 
 ## Riesgos técnicos
