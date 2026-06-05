@@ -330,7 +330,9 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
                       <TableCell>{fmt(doc.fechaEmision)}</TableCell>
                       <TableCell>{fmt(doc.fechaVencimiento)}</TableCell>
                       <TableCell>
-                        <Badge variant={venc.variant}>{venc.label}</Badge>
+                        <Badge variant={venc.variant}>
+                          {venc.estado === 'vigente' ? 'Vigente' : venc.label}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
