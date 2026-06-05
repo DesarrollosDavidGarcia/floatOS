@@ -34,7 +34,7 @@ export interface HistorialViaje {
 /** Viaje tal como lo devuelve la API (listado y detalle). */
 export interface Viaje {
   id: string;
-  folio: string;
+  folio: number;
   estado: EstadoViaje;
   cliente: ClienteResumen | null;
   clienteId: string;
