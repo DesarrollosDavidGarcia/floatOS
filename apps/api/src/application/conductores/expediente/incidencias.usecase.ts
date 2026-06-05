@@ -56,7 +56,8 @@ export class IncidenciasUseCase {
       data: {
         conductorId,
         tipo: input.tipo,
-        gravedad: input.gravedad ?? 'MEDIA',
+        // Sin valor explícito se aplica el @default("MEDIA") del schema (única fuente).
+        gravedad: input.gravedad ?? undefined,
         titulo: input.titulo,
         descripcion: input.descripcion ?? null,
         fecha: new Date(input.fecha),

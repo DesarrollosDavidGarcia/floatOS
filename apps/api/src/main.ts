@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -11,6 +12,17 @@ async function bootstrap() {
   // (ThrottlerGuard) cuente por la IP real del cliente (X-Forwarded-For),
   // no por la IP del reverse proxy.
   app.set('trust proxy', 1);
+
+  // Cabeceras de seguridad básicas (defensa en profundidad; Nginx puede añadir
+  // más). Evita una dependencia externa para lo esencial.
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
+    next();
+  });
 
   app.setGlobalPrefix('api');
   // CORS: en producción se restringe vía CORS_ORIGIN (lista coma-separada),

@@ -48,33 +48,10 @@ export class EscaneoVencimientosService {
       }),
     ]);
 
-    const alertas: AlertaVencimiento[] = [];
-
-    for (const doc of docsUnidad) {
-      alertas.push({
-        tipo: 'unidad',
-        entidad: doc.unidad.placas,
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
-
-    for (const doc of docsConductor) {
-      alertas.push({
-        tipo: 'conductor',
-        entidad: this.nombreConductor(doc.conductor),
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
-
-    alertas.sort(
-      (a, b) => a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime(),
-    );
-
-    return alertas;
+    return this.ordenarPorVencimiento([
+      ...docsUnidad.map((doc) => this.aAlertaUnidad(doc, ahora)),
+      ...docsConductor.map((doc) => this.aAlertaConductor(doc, ahora)),
+    ]);
   }
 
   /**
@@ -112,33 +89,51 @@ export class EscaneoVencimientosService {
       }),
     ]);
 
-    const resultados: AlertaVencimiento[] = [];
+    return this.ordenarPorVencimiento([
+      ...docsUnidad.map((doc) => this.aAlertaUnidad(doc, ahora)),
+      ...docsConductor.map((doc) => this.aAlertaConductor(doc, ahora)),
+    ]);
+  }
 
-    for (const doc of docsUnidad) {
-      resultados.push({
-        tipo: 'unidad',
-        entidad: doc.unidad.placas,
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
+  /** Mapea un documento de unidad a una alerta de vencimiento. */
+  private aAlertaUnidad(
+    doc: { tipo: string; fechaVencimiento: Date; unidad: { placas: string } },
+    ahora: Date,
+  ): AlertaVencimiento {
+    return {
+      tipo: 'unidad',
+      entidad: doc.unidad.placas,
+      tipoDocumento: doc.tipo,
+      fechaVencimiento: doc.fechaVencimiento,
+      diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
+    };
+  }
 
-    for (const doc of docsConductor) {
-      resultados.push({
-        tipo: 'conductor',
-        entidad: this.nombreConductor(doc.conductor),
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
+  /** Mapea un documento de conductor a una alerta de vencimiento. */
+  private aAlertaConductor(
+    doc: {
+      tipo: string;
+      fechaVencimiento: Date;
+      conductor: { nombre: string | null; apellidos: string | null };
+    },
+    ahora: Date,
+  ): AlertaVencimiento {
+    return {
+      tipo: 'conductor',
+      entidad: this.nombreConductor(doc.conductor),
+      tipoDocumento: doc.tipo,
+      fechaVencimiento: doc.fechaVencimiento,
+      diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
+    };
+  }
 
-    resultados.sort(
+  /** Ordena las alertas por fecha de vencimiento ascendente (in place). */
+  private ordenarPorVencimiento(
+    alertas: AlertaVencimiento[],
+  ): AlertaVencimiento[] {
+    return alertas.sort(
       (a, b) => a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime(),
     );
-
-    return resultados;
   }
 
   /** Construye el nombre legible del conductor (nombre + apellidos). */

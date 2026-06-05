@@ -36,6 +36,11 @@ import {
   setAuthCookies,
 } from './cookies';
 
+/** Anti fuerza bruta en login: 10 intentos/min por IP. */
+const THROTTLE_LOGIN = { default: { limit: 10, ttl: 60_000 } };
+/** Refresh legítimo (web/app renuevan a menudo): 30/min por IP. */
+const THROTTLE_REFRESH = { default: { limit: 30, ttl: 60_000 } };
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -49,7 +54,7 @@ export class AuthController {
   // Anti fuerza bruta: 10 intentos por minuto por IP.
   // Los handlers de login/refresh setean cookies httpOnly para el panel web y
   // además devuelven los tokens en el body para la app móvil (bearer).
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle(THROTTLE_LOGIN)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async loginAdminHandler(
@@ -61,7 +66,7 @@ export class AuthController {
     return result;
   }
 
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle(THROTTLE_LOGIN)
   @Post('conductor/login')
   @HttpCode(HttpStatus.OK)
   async loginConductorHandler(
@@ -75,7 +80,7 @@ export class AuthController {
 
   // Algo más holgado: la app/web renueva tokens de forma legítima.
   // El token se toma del body (móvil) o de la cookie de refresh (web).
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle(THROTTLE_REFRESH)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refreshHandler(
