@@ -5,11 +5,13 @@ import { ObtenerViajeUseCase } from './obtener-viaje.usecase';
 import { EditarViajeUseCase } from './editar-viaje.usecase';
 import { AsignarViajeUseCase } from './asignar-viaje.usecase';
 import { CambiarEstadoViajeUseCase } from './cambiar-estado-viaje.usecase';
+import { MotorViajeService } from './motor-viaje.service';
 import {
   AsignarViajeInput,
   CambiarEstadoInput,
   CrearViajeInput,
   EditarViajeInput,
+  EvaluarViajeInput,
   ListarViajesInput,
 } from './viajes.types';
 
@@ -26,10 +28,16 @@ export class ViajesService {
     private readonly editarViaje: EditarViajeUseCase,
     private readonly asignarViaje: AsignarViajeUseCase,
     private readonly cambiarEstadoViaje: CambiarEstadoViajeUseCase,
+    private readonly motor: MotorViajeService,
   ) {}
 
   crear(input: CrearViajeInput, registradoPor: string) {
     return this.crearViaje.execute(input, registradoPor);
+  }
+
+  /** Motor de cálculo: evalúa un itinerario contra la flota. */
+  evaluar(input: EvaluarViajeInput) {
+    return this.motor.evaluar(input);
   }
 
   listar(filtros: ListarViajesInput) {

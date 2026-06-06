@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ViajesService } from '../../../application/viajes/viajes.service';
 import { CrearViajeDto } from './dto/crear-viaje.dto';
+import { EvaluarViajeDto } from './dto/evaluar-viaje.dto';
 import { ListarViajesDto } from './dto/listar-viajes.dto';
 import { EditarViajeDto } from './dto/editar-viaje.dto';
 import { AsignarViajeDto } from './dto/asignar-viaje.dto';
@@ -30,6 +31,13 @@ export class ViajesController {
   @UseGuards(AdminGuard)
   crear(@Body() dto: CrearViajeDto, @CurrentUser() user: AuthPrincipal) {
     return this.viajes.crear(dto, user.sub);
+  }
+
+  /** Motor de cálculo: evalúa un itinerario contra la flota (no persiste). */
+  @Post('evaluar')
+  @UseGuards(AdminGuard)
+  evaluar(@Body() dto: EvaluarViajeDto) {
+    return this.viajes.evaluar(dto);
   }
 
   @Get()

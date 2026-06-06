@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, ArrowRight, Building2, Truck, User } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Pencil, Truck, User } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { CambiarEstadoDialog } from '@/components/viajes/cambiar-estado-dialog';
 import { AsignarDialog } from '@/components/viajes/asignar-dialog';
-import { EditarViajeDialog } from '@/components/viajes/editar-viaje-dialog';
 import { HistorialTimeline } from '@/components/viajes/historial-timeline';
 import { TrackingLink } from '@/components/viajes/tracking-link';
 import type { Viaje } from '@/components/viajes/types';
@@ -112,7 +111,12 @@ export default function ViajeDetallePage() {
               unidadIdActual={viaje.unidad?.id ?? viaje.unidadId}
               conductorIdActual={viaje.conductor?.id ?? viaje.conductorId}
             />
-            <EditarViajeDialog viaje={viaje} />
+            <Button asChild variant="outline">
+              <Link href={`/viajes/${viaje.id}/editar`}>
+                <Pencil />
+                Editar
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -121,26 +125,53 @@ export default function ViajeDetallePage() {
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Ruta y carga</CardTitle>
+              <CardTitle className="text-lg">Itinerario</CardTitle>
+              <CardDescription>
+                {(viaje.escalas?.length ?? 0)} escala(s) · Fecha programada:{' '}
+                {fechaLarga(viaje.fechaProgramada)}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                <span>{viaje.origenDireccion}</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span>{viaje.destinoDireccion}</span>
+              {/* Snapshot del motor de cálculo */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <Dato label="Distancia" value={viaje.distanciaEstimadaKm != null ? `${viaje.distanciaEstimadaKm} km` : null} />
+                <Dato label="Peso máx." value={viaje.pesoMaxKg != null ? `${viaje.pesoMaxKg} kg` : null} />
+                <Dato label="Volumen máx." value={viaje.volumenMaxM3 != null ? `${viaje.volumenMaxM3} m³` : null} />
               </div>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <Dato label="Tipo de carga" value={viaje.tipoCarga} />
-                <Dato
-                  label="Peso"
-                  value={viaje.pesoKg != null ? `${viaje.pesoKg} kg` : null}
-                />
-                <Dato label="Dimensiones" value={viaje.dimensiones} />
-                <Dato label="Fecha programada" value={fechaLarga(viaje.fechaProgramada)} />
-                <div className="sm:col-span-2">
-                  <Dato label="Descripción" value={viaje.descripcionCarga} />
-                </div>
-              </dl>
+
+              {/* Lista de escalas */}
+              <ol className="space-y-3">
+                {(viaje.escalas ?? []).map((e, i) => (
+                  <li key={e.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      {i < (viaje.escalas?.length ?? 0) - 1 && (
+                        <span className="my-1 w-px flex-1 bg-border" />
+                      )}
+                    </div>
+                    <div className="flex-1 pb-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{e.accion}</Badge>
+                        <span className="text-sm font-medium">{e.direccion}</span>
+                      </div>
+                      {e.cargas.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                          {e.cargas.map((c) => (
+                            <li key={c.id}>
+                              {c.sentido === 'DESCARGA' ? '↓ Entrega' : '↑ Recoge'}{' '}
+                              {Number(c.pesoKg)} kg · {c.tipoCarga}
+                              {c.descripcion ? ` · ${c.descripcion}` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {e.notas ? (
+                        <p className="mt-0.5 text-xs italic text-muted-foreground">{e.notas}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </CardContent>
           </Card>
 

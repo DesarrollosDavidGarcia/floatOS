@@ -6,19 +6,35 @@ import {
 import { Prisma } from '@prisma/client';
 import { EstadoViaje } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { simularCarga } from '../../domain/viaje/motor-calculo';
 import { generarTokenSeguro } from '../shared/token.util';
-import { CrearViajeInput, RELACIONES_RESUMEN } from './viajes.types';
+import { MotorViajeService } from './motor-viaje.service';
+import {
+  derivarResumen,
+  itemsDeEscalas,
+  nestedEscalasCreate,
+} from './viaje-escalas.helper';
+import { CrearViajeInput, RELACIONES_DETALLE } from './viajes.types';
 
 /**
- * Caso de uso: crear un viaje. Valida que el cliente (y la unidad/conductor
- * si se proporcionan) existan. Estado inicial ASIGNADO + historial inicial.
+ * Caso de uso: crear un viaje con su itinerario de escalas. Valida cliente
+ * (y unidad/conductor si vienen), deriva el resumen y el snapshot del motor,
+ * y crea las escalas + cargas anidadas. Estado inicial ASIGNADO.
  */
 @Injectable()
 export class CrearViajeUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly motor: MotorViajeService,
+  ) {}
 
   async execute(input: CrearViajeInput, registradoPor: string) {
-    // Validaciones de existencia independientes en paralelo.
+    if (!input.escalas || input.escalas.length < 2) {
+      throw new BadRequestException(
+        'El itinerario requiere al menos origen y destino',
+      );
+    }
+
     const [cliente, unidad, conductor] = await Promise.all([
       this.prisma.cliente.findUnique({ where: { id: input.clienteId } }),
       input.unidadId
@@ -34,7 +50,6 @@ export class CrearViajeUseCase {
         `Cliente con id ${input.clienteId} no encontrado`,
       );
     }
-
     if (input.unidadId) {
       if (!unidad) {
         throw new NotFoundException(
@@ -47,7 +62,6 @@ export class CrearViajeUseCase {
         );
       }
     }
-
     if (input.conductorId) {
       if (!conductor) {
         throw new NotFoundException(
@@ -61,23 +75,20 @@ export class CrearViajeUseCase {
       }
     }
 
+    const sim = simularCarga(itemsDeEscalas(input.escalas));
+    const { km } = await this.motor.distanciaKm(input.escalas);
+    const resumen = derivarResumen(input.escalas, sim);
+
     const data: Prisma.ViajeCreateInput = {
       cliente: { connect: { id: input.clienteId } },
-      origenDireccion: input.origenDireccion,
-      origenLat: input.origenLat,
-      origenLng: input.origenLng,
-      destinoDireccion: input.destinoDireccion,
-      destinoLat: input.destinoLat,
-      destinoLng: input.destinoLng,
-      tipoCarga: input.tipoCarga,
-      descripcionCarga: input.descripcionCarga,
-      pesoKg: input.pesoKg,
-      dimensiones: input.dimensiones,
+      ...resumen,
+      distanciaEstimadaKm: km,
       fechaProgramada: input.fechaProgramada
         ? new Date(input.fechaProgramada)
         : undefined,
       estado: EstadoViaje.ASIGNADO,
       trackingToken: generarTokenSeguro(),
+      escalas: { create: nestedEscalasCreate(input.escalas) },
       ...(input.unidadId
         ? { unidad: { connect: { id: input.unidadId } } }
         : {}),
@@ -96,7 +107,7 @@ export class CrearViajeUseCase {
 
     return this.prisma.viaje.create({
       data,
-      include: RELACIONES_RESUMEN,
+      include: RELACIONES_DETALLE,
     });
   }
 }

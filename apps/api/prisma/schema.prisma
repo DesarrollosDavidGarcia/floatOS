@@ -1,7 +1,9 @@
 // FlotaOS — Modelo de datos (Prisma)
 // Despliegue instancia-por-cliente: SIN tenantId, la BD ya está aislada por diseño.
-// PostGIS está habilitado en la BD (ver postgres/init.sql); para el MVP las
-// coordenadas se guardan como Float y las geocercas se calculan en aplicación.
+// PostGIS está habilitado en la BD (ver postgres/init.sql). Las coordenadas se
+// guardan como Float (gestionadas por Prisma) y, donde se necesitan consultas
+// geográficas (distancia/geocercas), una columna `geography` GENERADA por SQL
+// (declarada como Unsupported(...) @ignore) alimenta índices GIST y ST_Distance/ST_DWithin.
 
 generator client {
   provider = "prisma-client-js"
@@ -277,11 +279,15 @@ model Conductor {
 model Unidad {
   id            String   @id @default(cuid())
   placas        String   @unique
-  tipo          String   // tractocamión, camión, camioneta, etc.
+  tipo          String   // tractocamión, camión, camioneta, etc. (catálogo TIPO_UNIDAD)
   marca         String?
   modelo        String?
   anio          Int?
   capacidadKg   Decimal? @db.Decimal(10, 2)
+  // Entradas del motor de cálculo (uso adecuado de la unidad):
+  capacidadM3      Decimal? @db.Decimal(10, 3) // capacidad volumétrica
+  rendimientoKmL   Decimal? @db.Decimal(6, 2)  // km por litro
+  capacidadTanqueL Decimal? @db.Decimal(8, 2)  // litros de tanque (autonomía = rendimiento * tanque)
   aseguradora   String?
   numeroPoliza  String?
   activo        Boolean  @default(true)
@@ -582,7 +588,8 @@ model Viaje {
   unidadId      String?
   conductorId   String?
 
-  // Origen / destino
+  // Origen / destino — DERIVADOS de las escalas (primera = origen, última = destino).
+  // Se mantienen denormalizados para el tracking público, la búsqueda del listado y el mapa.
   origenDireccion  String
   origenLat        Float?
   origenLng        Float?
@@ -590,11 +597,16 @@ model Viaje {
   destinoLat       Float?
   destinoLng       Float?
 
-  // Carga
+  // Carga — DERIVADA de las cargas de las escalas (resumen para listado/fiscal).
   tipoCarga        String
   descripcionCarga String?
   pesoKg           Decimal? @db.Decimal(10, 2)
   dimensiones      String?
+
+  // Snapshot del motor de cálculo (se recalcula al crear/editar).
+  distanciaEstimadaKm Decimal? @db.Decimal(10, 2)
+  pesoMaxKg           Decimal? @db.Decimal(10, 2)
+  volumenMaxM3        Decimal? @db.Decimal(10, 3)
 
   estado        EstadoViaje @default(ASIGNADO)
   trackingToken String      @unique // link público; token aleatorio seguro (ver token.util.ts)
@@ -612,6 +624,7 @@ model Viaje {
   unidad    Unidad?    @relation(fields: [unidadId], references: [id])
   conductor Conductor? @relation(fields: [conductorId], references: [id])
 
+  escalas     EscalaViaje[]
   historial   HistorialEstadoViaje[]
   ubicaciones UbicacionConductor[]
   gastos      GastoViaje[]
@@ -697,6 +710,68 @@ model EvidenciaViaje {
 
   @@index([viajeId])
   @@map("evidencias_viaje")
+}
+
+/// Escala (parada) del itinerario de un viaje. Origen = orden 0, destino = última.
+model EscalaViaje {
+  id           String    @id @default(cuid())
+  viajeId      String
+  orden        Int // posición 0-based en el itinerario
+  accion       String // catálogo ACCION_ESCALA: RECOGER / ENTREGAR / RECOGER_ENTREGAR / PASO
+  direccion    String
+  lat          Float?
+  lng          Float?
+  // Columna geography GENERADA por SQL (ST_MakePoint) para consultas PostGIS;
+  // la app escribe lat/lng, no esta columna. Se declara para que Prisma la conozca
+  // (no genere drift/DROP); el ADD COLUMN se reemplaza por GENERATED en la migración.
+  ubicacion    Unsupported("geography(Point, 4326)")?
+  notas        String?
+  ventanaDesde DateTime?
+  ventanaHasta DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  viaje  Viaje         @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  cargas CargaEscala[]
+
+  @@unique([viajeId, orden])
+  @@index([viajeId])
+  @@map("escalas_viaje")
+}
+
+/// Carga que se recoge o entrega en una escala. "Reemplazar" = DESCARGA + CARGA en
+/// la misma escala; loteRef empareja una DESCARGA con la CARGA previa del mismo lote.
+model CargaEscala {
+  id          String   @id @default(cuid())
+  escalaId    String
+  sentido     String // catálogo SENTIDO_CARGA: CARGA / DESCARGA
+  tipoCarga   String // catálogo TIPO_CARGA
+  descripcion String?
+  pesoKg      Decimal  @db.Decimal(10, 2)
+  volumenM3   Decimal? @db.Decimal(10, 3)
+  largoM      Decimal? @db.Decimal(8, 3)
+  anchoM      Decimal? @db.Decimal(8, 3)
+  altoM       Decimal? @db.Decimal(8, 3)
+  cantidad    Int      @default(1)
+  loteRef     String?
+  createdAt   DateTime @default(now())
+
+  escala EscalaViaje @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+
+  @@index([escalaId])
+  @@map("cargas_escala")
+}
+
+/// Regla de compatibilidad tipo de carga ↔ tipo de unidad (la consume el motor).
+model CompatibilidadCargaUnidad {
+  id         String  @id @default(cuid())
+  tipoCarga  String // catálogo TIPO_CARGA
+  tipoUnidad String // catálogo TIPO_UNIDAD
+  permitido  Boolean @default(true)
+  nota       String?
+
+  @@unique([tipoCarga, tipoUnidad])
+  @@map("compatibilidad_carga_unidad")
 }
 
 // ──────────────────── Fiscal: Carta Porte / Factura (Fase 2) ───────

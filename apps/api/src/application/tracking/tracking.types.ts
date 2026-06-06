@@ -22,7 +22,13 @@ export interface UbicacionPublica {
 }
 
 /** Tipos de alerta de geocerca emitidos al monitorista. */
-export type TipoAlertaGeocerca = 'llegada_origen' | 'llegada_destino';
+export type TipoAlertaGeocerca = 'llegada_escala';
+
+/** Fila de la consulta PostGIS de escalas dentro del radio de geocerca. */
+export interface EscalaCercana {
+  orden: number;
+  accion: string;
+}
 
 /** Vista pública del viaje para el link de seguimiento del cliente final. */
 export interface SeguimientoPublico {

@@ -22,6 +22,33 @@ export interface ConductorResumen {
   telefono?: string | null;
 }
 
+/** Movimiento de carga (recoger/entregar) dentro de una escala. */
+export interface CargaEscala {
+  id: string;
+  sentido: string; // CARGA | DESCARGA
+  tipoCarga: string;
+  descripcion?: string | null;
+  pesoKg: number | string;
+  volumenM3?: number | string | null;
+  largoM?: number | string | null;
+  anchoM?: number | string | null;
+  altoM?: number | string | null;
+  cantidad: number;
+  loteRef?: string | null;
+}
+
+/** Escala (parada) del itinerario de un viaje. */
+export interface EscalaViaje {
+  id: string;
+  orden: number;
+  accion: string; // catálogo ACCION_ESCALA
+  direccion: string;
+  lat?: number | null;
+  lng?: number | null;
+  notas?: string | null;
+  cargas: CargaEscala[];
+}
+
 /** Entrada del historial de cambios de estado de un viaje. */
 export interface HistorialViaje {
   id: string;
@@ -52,6 +79,10 @@ export interface Viaje {
   descripcionCarga?: string | null;
   pesoKg?: number | null;
   dimensiones?: string | null;
+  distanciaEstimadaKm?: number | string | null;
+  pesoMaxKg?: number | string | null;
+  volumenMaxM3?: number | string | null;
+  escalas?: EscalaViaje[];
   fechaProgramada?: string | null;
   trackingToken?: string | null;
   historial?: HistorialViaje[];
@@ -59,19 +90,34 @@ export interface Viaje {
   updatedAt?: string;
 }
 
-/** Payload para crear un viaje. */
+/** Una carga dentro de una escala en el payload de creación/edición. */
+export interface CargaEscalaPayload {
+  sentido: string;
+  tipoCarga: string;
+  descripcion?: string;
+  pesoKg: number;
+  volumenM3?: number;
+  largoM?: number;
+  anchoM?: number;
+  altoM?: number;
+  cantidad?: number;
+  loteRef?: string;
+}
+
+/** Una escala en el payload de creación/edición. */
+export interface EscalaViajePayload {
+  accion: string;
+  direccion: string;
+  lat?: number;
+  lng?: number;
+  notas?: string;
+  cargas?: CargaEscalaPayload[];
+}
+
+/** Payload para crear un viaje (itinerario de escalas). */
 export interface CrearViajePayload {
   clienteId: string;
-  origenDireccion: string;
-  origenLat?: number;
-  origenLng?: number;
-  destinoDireccion: string;
-  destinoLat?: number;
-  destinoLng?: number;
-  tipoCarga: string;
-  descripcionCarga?: string;
-  pesoKg?: number;
-  dimensiones?: string;
+  escalas: EscalaViajePayload[];
   fechaProgramada?: string;
   unidadId?: string;
   conductorId?: string;

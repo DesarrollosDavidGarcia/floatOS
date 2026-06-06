@@ -36,7 +36,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CrearViajeDialog } from '@/components/viajes/crear-viaje-dialog';
 import type { Viaje } from '@/components/viajes/types';
 import {
   CeldaPrincipal,
@@ -83,7 +82,12 @@ export default function ViajesPage() {
               }}
               placeholder="Buscar por folio, cliente, dirección…"
             />
-            <CrearViajeDialog />
+            <Button asChild>
+              <Link href="/viajes/crear">
+                <Plus />
+                Nuevo viaje
+              </Link>
+            </Button>
           </div>
         }
       />

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { RELACIONES_RESUMEN } from './viajes.types';
+import { RELACIONES_DETALLE } from './viajes.types';
 
 /** Caso de uso: obtener el detalle de un viaje con su historial de estados. */
 @Injectable()
@@ -16,7 +16,7 @@ export class ObtenerViajeUseCase {
     const viaje = await this.prisma.viaje.findUnique({
       where: { id },
       include: {
-        ...RELACIONES_RESUMEN,
+        ...RELACIONES_DETALLE,
         historial: {
           orderBy: { createdAt: 'desc' },
         },

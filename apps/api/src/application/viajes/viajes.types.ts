@@ -14,10 +14,19 @@ export const RELACIONES_RESUMEN = {
   },
 } satisfies Prisma.ViajeInclude;
 
+/** Include para el DETALLE: relaciones resumidas + itinerario (escalas + cargas). */
+export const RELACIONES_DETALLE = {
+  ...RELACIONES_RESUMEN,
+  escalas: {
+    orderBy: { orden: 'asc' },
+    include: { cargas: true },
+  },
+} satisfies Prisma.ViajeInclude;
+
 /**
  * Selección para el LISTADO de viajes: incluye todos los campos escalares
  * EXCEPTO `trackingToken` (link público que no debe exponerse en listados),
- * más las relaciones resumidas.
+ * más las relaciones resumidas. No incluye escalas (el listado usa el resumen).
  */
 export const SELECCION_LISTADO = {
   id: true,
@@ -35,6 +44,9 @@ export const SELECCION_LISTADO = {
   descripcionCarga: true,
   pesoKg: true,
   dimensiones: true,
+  distanciaEstimadaKm: true,
+  pesoMaxKg: true,
+  volumenMaxM3: true,
   estado: true,
   fechaProgramada: true,
   fechaInicio: true,
@@ -50,37 +62,51 @@ export const SELECCION_LISTADO = {
 // Los DTOs de presentation satisfacen estructuralmente estas interfaces; la
 // capa application NO depende de presentation.
 
+/** Un movimiento de carga (recoger/entregar) dentro de una escala. */
+export interface CargaInput {
+  sentido: string; // CARGA | DESCARGA
+  tipoCarga: string;
+  descripcion?: string;
+  pesoKg: number;
+  volumenM3?: number;
+  largoM?: number;
+  anchoM?: number;
+  altoM?: number;
+  cantidad?: number;
+  loteRef?: string;
+}
+
+/** Una escala del itinerario. */
+export interface EscalaInput {
+  accion: string;
+  direccion: string;
+  lat?: number;
+  lng?: number;
+  notas?: string;
+  ventanaDesde?: string;
+  ventanaHasta?: string;
+  cargas?: CargaInput[];
+}
+
 /** Datos para crear un viaje. */
 export interface CrearViajeInput {
   clienteId: string;
-  origenDireccion: string;
-  origenLat?: number;
-  origenLng?: number;
-  destinoDireccion: string;
-  destinoLat?: number;
-  destinoLng?: number;
-  tipoCarga: string;
-  descripcionCarga?: string;
-  pesoKg?: number;
-  dimensiones?: string;
+  escalas: EscalaInput[];
   fechaProgramada?: string;
   unidadId?: string;
   conductorId?: string;
 }
 
-/** Datos para editar campos generales de un viaje. */
+/** Datos para editar un viaje. Si `escalas` viene, reemplaza el itinerario. */
 export interface EditarViajeInput {
-  origenDireccion?: string;
-  origenLat?: number;
-  origenLng?: number;
-  destinoDireccion?: string;
-  destinoLat?: number;
-  destinoLng?: number;
-  tipoCarga?: string;
-  descripcionCarga?: string;
-  pesoKg?: number;
-  dimensiones?: string;
+  escalas?: EscalaInput[];
   fechaProgramada?: string;
+}
+
+/** Datos para evaluar un itinerario contra la flota (motor de cálculo). */
+export interface EvaluarViajeInput {
+  escalas: EscalaInput[];
+  unidadIds?: string[];
 }
 
 /** Datos para asignar/reasignar unidad y/o conductor. */

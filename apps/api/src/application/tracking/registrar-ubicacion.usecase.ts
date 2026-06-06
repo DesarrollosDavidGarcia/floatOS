@@ -1,21 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { WS_EVENTS } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import {
-  RADIO_GEOCERCA_METROS,
-  dentroDeGeocerca,
-} from '../../infrastructure/realtime/geo.util';
+import { RADIO_GEOCERCA_METROS } from '../../infrastructure/realtime/geo.util';
 import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 import {
+  EscalaCercana,
   PuntoUbicacion,
-  TipoAlertaGeocerca,
   UbicacionPublica,
 } from './tracking.types';
 
 /**
  * Caso de uso: ingesta de ubicaciones del conductor.
- * Guarda los puntos en UbicacionConductor, los reemite a la sala del viaje
- * y evalúa geocercas de llegada (origen/destino) para emitir alertas.
+ * Guarda los puntos en UbicacionConductor, los reemite a la sala del viaje y
+ * evalúa geocercas de llegada a cualquier ESCALA del itinerario usando PostGIS
+ * (ST_DWithin sobre la columna geography indexada con GIST).
  */
 @Injectable()
 export class RegistrarUbicacionUseCase {
@@ -36,9 +34,8 @@ export class RegistrarUbicacionUseCase {
 
   /**
    * Registra un lote de puntos (sincronización offline) en una sola operación
-   * atómica (createManyAndReturn). Las geocercas se evalúan en memoria sobre los
-   * puntos creados; el WS sólo reemite el más reciente por capturadoEn para no
-   * saturar al monitorista.
+   * atómica (createManyAndReturn). El WS sólo reemite el más reciente por
+   * capturadoEn; las geocercas se evalúan sobre ese punto (PostGIS).
    */
   async executeBatch(
     viajeId: string,
@@ -48,20 +45,10 @@ export class RegistrarUbicacionUseCase {
     // Validamos que el viaje exista y que pertenezca al conductor autenticado.
     const viaje = await this.prisma.viaje.findUnique({
       where: { id: viajeId },
-      select: {
-        id: true,
-        conductorId: true,
-        origenLat: true,
-        origenLng: true,
-        destinoLat: true,
-        destinoLng: true,
-      },
+      select: { id: true, conductorId: true },
     });
 
-    if (!viaje) {
-      throw new NotFoundException('Viaje no encontrado');
-    }
-    if (viaje.conductorId !== conductorId) {
+    if (!viaje || viaje.conductorId !== conductorId) {
       throw new NotFoundException('Viaje no encontrado');
     }
 
@@ -91,69 +78,51 @@ export class RegistrarUbicacionUseCase {
       createdAt: registro.createdAt,
     }));
 
-    // Geocercas: evaluación en memoria sobre cada punto. Sólo notifica.
-    for (const publica of guardadas) {
-      this.evaluarGeocercas(viaje, publica);
-    }
-
     // Reemite por WS la ubicación más reciente (mayor capturadoEn).
     const masReciente = guardadas.reduce((acc, u) =>
       u.capturadoEn.getTime() > acc.capturadoEn.getTime() ? u : acc,
     );
     this.gateway.emitirUbicacion(viajeId, masReciente);
 
+    // Geocercas por escala (PostGIS) sobre el punto más reciente.
+    await this.evaluarGeocercas(viajeId, masReciente);
+
     return guardadas;
   }
 
-  private evaluarGeocercas(
-    viaje: {
-      id: string;
-      origenLat: number | null;
-      origenLng: number | null;
-      destinoLat: number | null;
-      destinoLng: number | null;
-    },
-    ubicacion: UbicacionPublica,
-  ): void {
-    if (
-      viaje.origenLat !== null &&
-      viaje.origenLng !== null &&
-      dentroDeGeocerca(
-        ubicacion.lat,
-        ubicacion.lng,
-        viaje.origenLat,
-        viaje.origenLng,
-      )
-    ) {
-      this.emitirAlerta(viaje.id, 'llegada_origen', ubicacion);
-    }
-
-    if (
-      viaje.destinoLat !== null &&
-      viaje.destinoLng !== null &&
-      dentroDeGeocerca(
-        ubicacion.lat,
-        ubicacion.lng,
-        viaje.destinoLat,
-        viaje.destinoLng,
-      )
-    ) {
-      this.emitirAlerta(viaje.id, 'llegada_destino', ubicacion);
-    }
-  }
-
-  private emitirAlerta(
+  /**
+   * Busca, vía PostGIS, las escalas del viaje dentro del radio de geocerca del
+   * punto y emite una alerta `llegada_escala` por cada una. Aprovecha el índice
+   * GIST sobre `escalas_viaje.ubicacion`.
+   */
+  private async evaluarGeocercas(
     viajeId: string,
-    tipo: TipoAlertaGeocerca,
     ubicacion: UbicacionPublica,
-  ): void {
-    this.gateway.emitirAlerta(viajeId, {
-      tipo,
-      evento: WS_EVENTS.ALERTA,
-      radioMetros: RADIO_GEOCERCA_METROS,
-      viajeId,
-      ubicacion,
-      detectadoEn: new Date(),
-    });
+  ): Promise<void> {
+    const cercanas = await this.prisma.$queryRaw<EscalaCercana[]>`
+      SELECT "orden", "accion"
+      FROM "escalas_viaje"
+      WHERE "viajeId" = ${viajeId}
+        AND "ubicacion" IS NOT NULL
+        AND ST_DWithin(
+          "ubicacion",
+          ST_SetSRID(ST_MakePoint(${ubicacion.lng}, ${ubicacion.lat}), 4326)::geography,
+          ${RADIO_GEOCERCA_METROS}
+        )
+      ORDER BY "orden"
+    `;
+
+    for (const escala of cercanas) {
+      this.gateway.emitirAlerta(viajeId, {
+        tipo: 'llegada_escala',
+        evento: WS_EVENTS.ALERTA,
+        radioMetros: RADIO_GEOCERCA_METROS,
+        viajeId,
+        escalaOrden: escala.orden,
+        escalaAccion: escala.accion,
+        ubicacion,
+        detectadoEn: new Date(),
+      });
+    }
   }
 }

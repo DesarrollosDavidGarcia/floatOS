@@ -191,6 +191,30 @@ const CATALOGOS = {
     ['ACTROS', 'Actros'],
     ['OTRO', 'Otro'],
   ],
+  // Tipo de carga (lo usa el motor de cálculo para compatibilidad carga↔unidad).
+  TIPO_CARGA: [
+    ['GENERAL', 'General'],
+    ['PALETIZADA', 'Paletizada'],
+    ['REFRIGERADA', 'Refrigerada'],
+    ['CONGELADA', 'Congelada'],
+    ['GRANEL', 'Granel'],
+    ['LIQUIDA', 'Líquida'],
+    ['PELIGROSA', 'Peligrosa'],
+    ['SOBREDIMENSIONADA', 'Sobredimensionada'],
+    ['OTRO', 'Otro'],
+  ],
+  // Acción de una escala del itinerario.
+  ACCION_ESCALA: [
+    ['RECOGER', 'Recoger'],
+    ['ENTREGAR', 'Entregar'],
+    ['RECOGER_ENTREGAR', 'Recoger y entregar'],
+    ['PASO', 'Paso / escala'],
+  ],
+  // Sentido de un movimiento de carga en una escala.
+  SENTIDO_CARGA: [
+    ['CARGA', 'Carga'],
+    ['DESCARGA', 'Descarga'],
+  ],
 };
 
 async function main() {
