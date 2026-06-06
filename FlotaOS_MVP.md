@@ -642,7 +642,7 @@ Auditoría UX/UI multiagente (accesibilidad, consistencia, responsive, estados/m
 - **Consistencia:** **`lib/fecha.ts`** unifica los 4 formatos de fecha dispersos; piezas compartidas **`SearchInput`/`PaginacionFooter`/`EstadoTabla`** (criterio único de footer, skeleton y estados error/vacío) en las 4 listas; folio con `#`; `BadgeVariant` desde `ui/badge`.
 - **Responsive:** `DialogContent` con `max-h-[90vh]` + scroll (el botón Guardar deja de quedar fuera de pantalla en móvil); área táctil ≥40px en menús; títulos de detalle `text-xl sm:text-2xl`.
 - **Estados / microcopy:** errores reales (`apiError`) y vacíos que distinguen "sin búsqueda" vs "sin datos"; catálogos "Opción/Activa" + colores en español.
-- **Dev:** `next dev --turbo` (Turbopack) — compila ~2–3× más rápido (la pantalla de tracking de ~1.5 s a ~0.5 s); sólo afecta a desarrollo. Verificado: `tsc` web en verde y rutas 200.
+- **Dev:** `next dev --turbo` (Turbopack) — compila ~2–3× más rápido; sólo afecta a desarrollo. Verificado: `tsc` web en verde y rutas 200. *(⚠ Revertido el 2026-06-06: Turbopack es incompatible con react-leaflet en SSR — ver entrada de Viajes; el dev del web usa webpack.)*
 
 ### 2026-06-05 — Archivos de unidad en MinIO (póliza de seguro + generales) ✅
 
@@ -685,6 +685,16 @@ Se cerró la administración de actualizaciones del modelo **instancia-por-clien
 - **A7:** el `ADMIN_PASSWORD` se borra del `.env` del cliente tras crear el admin (ya hasheado en BD).
 - **A8:** el seed de catálogos en el `CMD` es tolerante (un fallo no tumba el API; las migraciones siguen siendo estrictas).
 
+### 2026-06-06 — Producción: Traefik (HTTPS automático) + backups offsite ✅
+
+Capa de "operar en internet" para el modelo instancia-por-cliente (en `infra/traefik/` y `scripts/`).
+
+- **Traefik** como proxy de borde único por VPS: termina TLS con **Let's Encrypt** (desafío HTTP-01) y enruta cada **subdominio** a su instancia por labels de Docker (red externa `flotaos-edge`); 80 redirige a 443; certs y renovación automáticos.
+- **Overlay de instancia** `docker-compose.traefik.yml`: en modo Traefik el nginx por instancia queda apagado (perfil `sin-traefik`), evitando choque de puertos; Traefik enruta `Host()`→web y `/api`+`/socket.io`→api (un solo salto, sin impacto de rendimiento). Vars `CLIENT_DOMAIN`/`CLIENT_NAME`.
+- **Backups** (`scripts/backup-cliente.sh`, `backup-todos.sh`): `pg_dump` gz (online, no bloquea) + tar del volumen de MinIO, con retención local y **offsite opcional** vía rclone; ejemplo de cron 3am.
+- `.gitignore`: `infra/traefik/acme.json` (claves de certs), `.env.docker`, `.env.smoke`.
+- **Verificado:** `docker compose config` válido en el stack de Traefik y base+overlay; `bash -n` en verde. (Let's Encrypt no se prueba en local: requiere VPS con dominio y 80/443 públicos.)
+
 ### 2026-06-06 — Viajes: itinerario multi-escala + motor de cálculo + mapa + PostGIS ✅
 
 Rediseño completo de **/viajes** (PR aparte `feat/viajes-multiescala`, base `auditoria/fixes-seguros`). La creación pasa de modal a **página completa** con constructor de itinerario; un viaje tiene **varias escalas** y cada escala puede **recoger/entregar/reemplazar** carga (la carga vive por escala).
@@ -693,11 +703,15 @@ Rediseño completo de **/viajes** (PR aparte `feat/viajes-multiescala`, base `au
 
 **Backend (Clean Architecture):** dominio `motor-calculo.ts` (carga máx por tramo + veredictos SOBREPESO/SOBRE_VOLUMEN/TIPO_INCOMPATIBLE/AUTONOMIA_INSUFICIENTE/DATOS_INCOMPLETOS, **9/9 tests**); `MotorViajeService` (distancia geodésica PostGIS `ST_MakeLine/ST_Length` + evaluación de flota con allow-list de compatibilidad); **`POST /viajes/evaluar`**; crear/editar reescritos con escalas+cargas anidadas y snapshot; geocercas por escala con **`ST_DWithin`** (reemplaza Haversine) y alerta `llegada_escala`.
 
-**Frontend:** páginas `/viajes/crear` y `/viajes/[id]/editar` (`ViajeFormPage`, react-hook-form + useFieldArray); `ItinerarioBuilder`/`EscalaCard`; **`MapPickerDialog`** (Leaflet + Nominatim: buscar dirección + pin arrastrable + reverse-geocoding); **`PanelMotor`** (evaluación en vivo con debounce, recomienda unidad); detalle con itinerario + snapshot; se eliminan los modales viejos.
+**Frontend:** páginas `/viajes/crear` y `/viajes/[id]/editar` (`ViajeFormPage`, react-hook-form + useFieldArray); `ItinerarioBuilder`/`EscalaCard`; **`MapPickerDialog`** (Leaflet + Nominatim: buscar dirección + pin arrastrable + reverse-geocoding); **`PanelMotor`** (evaluación en vivo con debounce, recomienda unidad); el **detalle** muestra el itinerario + snapshot, un **mapa con las escalas y la ruta pintada** (`MapaItinerario`) y el **veredicto del motor para la unidad asignada** (`VeredictoUnidadCard`); se eliminan los modales viejos.
 
 **Verificado:** `tsc` API+web en verde, 9/9 tests del motor, smoke en vivo (evaluar/crear/detalle), distancia PostGIS CDMX→QRO→GDL ≈ 500 km, geocerca `ST_DWithin` (en escala detecta, a 5 km no), rutas web 200.
 
-**Pendientes/notas:** geocoding Nominatim client-side (proxy con caché para producción); distancia geodésica (OSRM por carretera futuro); UI de la matriz de compatibilidad (hoy por seed).
+**Auditoría multiagente (4 dimensiones: backend/seguridad, datos/migraciones, frontend, completitud) + correcciones aplicadas (13):** `trackingToken` ya no se expone al conductor; **compatibilidad de refrigerados** (tipos `CAJA_SECA`/`CAJA_REFRIGERADA`; reefer solo en caja refrigerada) + advertencia cuando un tipo de carga no tiene reglas; `editar` bloquea reescribir el itinerario de un viaje ya iniciado (409); `asignar` con `null` **desasigna** (antes reventaba); geocercas **dedup entre lotes** (columna `llegadaNotificadaEn`) y evalúan todos los puntos del lote; el motor no recomienda unidades con `DATOS_INCOMPLETOS`; cliente usa `razonSocial` (salía vacío); + menores (fecha sin corrimiento TZ, "agregar parada" antes del destino, `@ArrayMaxSize`, MapPicker aborta/no auto-busca/no re-centra).
+
+**Dev — Turbopack revertido a webpack:** `next dev --turbo` evalúa react-leaflet (ESM) en el grafo de SSR y corrompe el dispatcher de React (`usePathname`/ErrorBoundary → "Cannot read properties of null (reading 'useContext')"), devolviendo 500 incluso en páginas sin mapa. El `dev` del web vuelve a **webpack** (`next dev`); producción (`next build`) ya usa webpack, no afectada.
+
+**Pendientes/notas (futuro, no bloqueantes):** geocoding Nominatim client-side (proxy con caché para producción); distancia geodésica (OSRM por carretera futuro); UI de la matriz de compatibilidad (hoy por seed); motor evalúa todas las unidades activas (top-N a futuro); búsqueda del listado no cubre escalas intermedias; tests de integración de crear/editar; Carta Porte/Factura (Fase 2) deberán leer `CargaEscala`, no el resumen de `Viaje`.
 
 ---
 
