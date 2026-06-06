@@ -1,0 +1,44 @@
+# Proxy de borde Traefik: termina HTTPS (Let's Encrypt automático) y enruta cada
+# subdominio a la instancia de cliente correspondiente. Se corre UNA vez por VPS.
+#
+# Pasos (ver README.md):
+#   docker network create flotaos-edge
+#   cp .env.example .env   # define ACME_EMAIL
+#   touch acme.json && chmod 600 acme.json
+#   docker compose up -d
+services:
+
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      # Descubre instancias por labels de Docker (solo las que lo pidan).
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=flotaos-edge
+      # 80 redirige a 443; 443 es el entrypoint seguro.
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      # Let's Encrypt por desafío HTTP-01.
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?define ACME_EMAIL en .env}
+      - --certificatesresolvers.le.acme.storage=/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      # PRUEBAS: descomenta para usar el CA de staging y no gastar el rate limit
+      # de producción de Let's Encrypt (5 certs/dominio/semana).
+      # - --certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme.json:/acme.json
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+    name: flotaos-edge

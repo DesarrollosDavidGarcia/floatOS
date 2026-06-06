@@ -1,0 +1,46 @@
+# Overlay para desplegar una instancia DETRÁS de Traefik (TLS + ruteo por
+# subdominio). Traefik termina HTTPS en el borde y enruta directo a web/api,
+# así que en este modo NO se usa el nginx por instancia (queda apagado).
+#
+# Requiere en el .env del cliente:
+#   CLIENT_DOMAIN=cliente-xyz.tudominio.com
+#   CLIENT_NAME=cliente-xyz            # único; usado en los nombres de router
+#
+# Uso (en la carpeta del cliente):
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+#
+# Requiere la red externa flotaos-edge (la crea el stack de infra/traefik).
+services:
+
+  # nginx no arranca en modo Traefik (el proxy de borde lo reemplaza).
+  nginx:
+    profiles: ["sin-traefik"]
+
+  api:
+    networks:
+      - default
+      - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=flotaos-edge"
+      - "traefik.http.routers.${CLIENT_NAME}-api.rule=Host(`${CLIENT_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))"
+      - "traefik.http.routers.${CLIENT_NAME}-api.entrypoints=websecure"
+      - "traefik.http.routers.${CLIENT_NAME}-api.tls.certresolver=le"
+      - "traefik.http.services.${CLIENT_NAME}-api.loadbalancer.server.port=3000"
+
+  web:
+    networks:
+      - default
+      - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=flotaos-edge"
+      - "traefik.http.routers.${CLIENT_NAME}-web.rule=Host(`${CLIENT_DOMAIN}`)"
+      - "traefik.http.routers.${CLIENT_NAME}-web.entrypoints=websecure"
+      - "traefik.http.routers.${CLIENT_NAME}-web.tls.certresolver=le"
+      - "traefik.http.services.${CLIENT_NAME}-web.loadbalancer.server.port=3001"
+
+networks:
+  edge:
+    external: true
+    name: flotaos-edge
