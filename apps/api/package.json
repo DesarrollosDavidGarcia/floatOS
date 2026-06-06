@@ -15,7 +15,8 @@
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "dotenv -e ../../.env -- prisma studio",
-    "seed": "dotenv -e ../../.env -- ts-node prisma/seed.ts"
+    "seed": "dotenv -e ../../.env -- node prisma/seed-admin.mjs",
+    "seed:catalogos": "dotenv -e ../../.env -- node prisma/seed-catalogos.mjs"
   },
   "dependencies": {
     "@flotaos/shared-types": "*",

@@ -1,12 +1,14 @@
+// Seed del usuario admin inicial de una instancia. Node plano (corre dentro del
+// contenedor de producción, que no trae ts-node). Idempotente vía upsert.
+//
+//   node prisma/seed-admin.mjs
+//
+// Variables (con valores por defecto): ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NOMBRE.
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-/**
- * Seed inicial de una instancia: crea el usuario admin.
- * Variables: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NOMBRE (con valores por defecto).
- */
 async function main() {
   const email = process.env.ADMIN_EMAIL ?? 'admin@flotaos.local';
   const password = process.env.ADMIN_PASSWORD ?? 'Admin1234!';

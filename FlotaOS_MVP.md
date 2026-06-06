@@ -300,33 +300,50 @@ WHATSAPP_TOKEN=TOKEN_META
 WHATSAPP_PHONE_ID=ID_NUMERO
 ```
 
+### Modelo de actualización — build central + registry + pull
+
+Las imágenes `api` y `web` se **construyen una sola vez** (tu máquina o CI), se
+etiquetan con la versión (= git tag) y se publican a un **registry**. Cada
+instancia de cliente solo hace `docker compose pull` — no compila nada en el
+VPS. Así todos los clientes corren el mismo binario y actualizar es rápido y
+reversible. La imagen del panel hornea la URL de API/WS como **ruta relativa**,
+por lo que **una sola imagen sirve a todos los clientes** sin recompilar.
+
+`docker-compose.yml` referencia `${IMAGE_REGISTRY}/flotaos-{api,web}:${FLOTAOS_VERSION}`;
+`docker-compose.build.yml` (overlay, solo en la máquina de build) agrega el
+contexto de build. Los scripts viven en `scripts/` (detalle en `scripts/README.md`).
+
 ### Comandos de operación
 
 ```bash
-# Alta de cliente nuevo
-cp -r plantilla-instancia/ clientes/empresa-xyz/
-cd clientes/empresa-xyz/
-cp .env.example .env        # editar con datos del cliente
-docker compose up -d
-docker compose exec api npx prisma migrate deploy
-docker compose exec api node seed.js   # crea usuario admin inicial
+# Publicar una versión nueva (tu máquina / CI)
+git tag v1.1.0
+./scripts/build-publicar.sh 1.1.0 --push
+
+# Alta de cliente nuevo (VPS) — secretos aleatorios + migración + seed + admin
+./scripts/alta-cliente.sh empresa-xyz 1.1.0
+
+# Actualizar (VPS) — backup -> pull -> recrea api/web -> verifica /api/health
+./scripts/actualizar-cliente.sh clientes/empresa-xyz 1.1.0   # una
+./scripts/actualizar-todos.sh 1.1.0                          # todas
 
 # Operación diaria
+cd clientes/empresa-xyz
 docker compose logs -f api             # ver logs
 docker compose restart api             # reiniciar servicio
 
-# Backup de base de datos
-docker compose exec postgres pg_dump -U flotaos_user flotaos > backup-$(date +%F).sql
+# Backup / restaurar base de datos
+docker compose exec -T postgres pg_dump -U flotaos_user flotaos > backups/backup-$(date +%F).sql
+docker compose exec -T postgres psql  -U flotaos_user flotaos < backups/backup-2026-06-06.sql
 
-# Restaurar backup
-docker compose exec -T postgres psql -U flotaos_user flotaos < backup-2025-06-01.sql
-
-# Suspender cliente (pago caído)
+# Suspender (pago caído) / reactivar
 docker compose stop
-
-# Reactivar cliente
 docker compose start
 ```
+
+> El usuario admin inicial se crea con `prisma/seed-admin.mjs` (Node plano, corre
+> dentro de la imagen de producción); las migraciones y el **seed de catálogos**
+> se aplican solos al arrancar el API (idempotentes).
 
 ### Consideraciones de producción
 
@@ -429,7 +446,7 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - [x] Link de seguimiento público para cliente final — *API `GET /tracking/:token` ✅; página pública sin login pendiente*
 - [x] Dashboard del monitorista (Next.js) — *dashboard, mapa en vivo y CRUDs ✅*
 - [x] Docker Compose funcional para dev y producción — *dev verificado; prod definido (Dockerfiles api + web)*
-- [ ] Script de alta de instancia nueva
+- [x] Script de alta de instancia nueva — *`scripts/alta-cliente.sh` + build/registry + actualización (ver `scripts/README.md`)*
 
 ### Fase 2 — Diferenciador fiscal (3–5 meses)
 - [ ] Integración PAC → Carta Porte CFDI 4.0
@@ -639,7 +656,34 @@ Nueva capacidad de **adjuntar varios archivos por unidad**. No existía pipeline
 
 **Marca** y **Modelo** del alta de unidad pasan de texto libre a **dropdowns de catálogo** (`MARCA_UNIDAD`, `MODELO_UNIDAD`), administrables desde la pantalla de **Catálogos**. Se añadieron los grupos a `CATALOGO_GRUPOS` (en `shared-types`, donde la lista de grupos es fija) y al seed (lista inicial editable). La tabla de flota resuelve los códigos con `CatalogoTexto`; **los valores ya escritos se conservan**. (Los demás dropdowns de flota —tipo de unidad, aseguradora, tipo de documento— ya eran catálogos editables.) **Verificado:** 20 grupos en `/catalogos/grupos`, `tsc` web en verde, `/flota` y `/catalogos` 200.
 
-> **Pendiente de cierre de Fase 1:** la **página pública de seguimiento** sin login (`/seguimiento/<token>` — el API ya existe), la **app Flutter** del conductor y el **script de alta de instancia**. Todo lo anterior vive en la rama `auditoria/fixes-seguros` (pendiente de merge a `main`).
+> **Pendiente de cierre de Fase 1:** la **página pública de seguimiento** sin login (`/seguimiento/<token>` — el API ya existe) y la **app Flutter** del conductor. Todo lo anterior vive en la rama `auditoria/fixes-seguros` (pendiente de merge a `main`).
+
+### 2026-06-06 — Despliegue: build central + registry + scripts de operación ✅
+
+Se cerró la administración de actualizaciones del modelo **instancia-por-cliente**. Antes el compose construía las imágenes en cada VPS (`build:`), lo que a escala es lento y no garantiza el mismo binario entre clientes.
+
+**Imágenes y compose:**
+- `api` y `web` pasan de `build:` a **`image:`** (`${IMAGE_REGISTRY}/flotaos-{api,web}:${FLOTAOS_VERSION}`). Cada instancia hace `docker compose pull` en vez de compilar.
+- **`docker-compose.build.yml`** (overlay solo de build): agrega el contexto y hornea la URL de API/WS como **ruta relativa** (`/api` + mismo origen). Resultado clave: **una sola imagen `web` sirve a todos los clientes** sin recompilar por subdominio (antes `NEXT_PUBLIC_API_URL` se horneaba con el dominio del cliente).
+- El override de dev conserva el `build` bajo el perfil `full`.
+
+**Seeds para producción:**
+- `prisma/seed.ts` (requería `ts-node`, devDependency ausente en la imagen) → portado a **`prisma/seed-admin.mjs`** (Node plano: `@prisma/client` + bcrypt, ambos runtime). El alta lo corre con `docker compose exec api node prisma/seed-admin.mjs`.
+- El **seed de catálogos** (`seed-catalogos.mjs`, idempotente) ahora corre en el **CMD del API** junto con `prisma migrate deploy` → tras cada deploy las migraciones y los catálogos quedan al día solos.
+
+**Scripts (`scripts/`, ver `scripts/README.md`):** `build-publicar.sh` (build+tag+push), `alta-cliente.sh` (crea `clientes/<x>/` con secretos aleatorios, levanta y crea admin), `actualizar-cliente.sh` (backup→pull→recrea→health) y `actualizar-todos.sh`. `clientes/` añadido a `.gitignore` (secretos por cliente).
+
+**Verificado:** `docker compose config` válido en prod, build-overlay y dev-`full`; `bash -n` en verde en los 4 scripts; imágenes etiquetadas con versión + `latest`.
+
+**Auditoría del despliegue + correcciones (mismo día):**
+- **A1 (🔴):** el CLI de `prisma` (devDependency) no entraba a la imagen de runtime → `migrate deploy` al arrancar dependía de bajarlo por red. Fix: se copia `node_modules/prisma` + su bin del build stage (solo depende de `@prisma/*`, ya presente).
+- **A2 (🟠):** los defaults de `api.ts`/`socket.ts` apuntaban a `localhost:3000`; ahora son **relativos** (`/api` y mismo origen) → prod correcto aunque no se pasen build-args; dev sigue por `.env.local`.
+- **A3:** `alta-cliente.sh` acepta `[http_port] [https_port]` y los escribe antes del `up` (varias instancias por VPS sin choque de puertos).
+- **A4:** `python3/make/g++` en el Dockerfile (build y runtime efímero) para compilar `bcrypt` nativo en Alpine/musl.
+- **A5:** `build-publicar.sh` verifica `docker login` antes de publicar.
+- **A6:** `actualizar-cliente.sh` aborta si el `pg_dump` queda vacío y guarda la versión previa para imprimir comandos de rollback (imagen / restaurar BD).
+- **A7:** el `ADMIN_PASSWORD` se borra del `.env` del cliente tras crear el admin (ya hasheado en BD).
+- **A8:** el seed de catálogos en el `CMD` es tolerante (un fallo no tumba el API; las migraciones siguen siendo estrictas).
 
 ---
 

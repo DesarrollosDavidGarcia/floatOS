@@ -2,9 +2,12 @@ import { io, type Socket } from 'socket.io-client';
 
 /**
  * URL base del servidor de WebSockets. El namespace '/tracking' se concatena
- * a esta URL. Coincide con el host de la API (sin el prefijo /api).
+ * a esta URL. Default vacío = mismo origen (en producción Nginx enruta
+ * /socket.io al API), de modo que `io('/tracking')` usa el host actual y una
+ * sola imagen sirve a cualquier cliente. En desarrollo se sobreescribe con la
+ * URL absoluta vía apps/web/.env.local.
  */
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3000';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? '';
 
 let socket: Socket | null = null;
 

@@ -33,6 +33,9 @@ logs/
 nginx/certs/*
 !nginx/certs/.gitkeep
 
+# Instancias de cliente (secretos + datos por cliente; no se versionan)
+clientes/
+
 # Flutter
 apps/mobile/.dart_tool/
 apps/mobile/build/

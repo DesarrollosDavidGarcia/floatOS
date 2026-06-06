@@ -1,6 +1,9 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
+// Default relativo: en producción el panel y la API comparten origen (Nginx
+// enruta /api), así una sola imagen sirve a cualquier cliente. En desarrollo se
+// sobreescribe con la URL absoluta vía apps/web/.env.local.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 /**
  * La sesión del panel vive en cookies httpOnly (`flotaos_access`/`flotaos_refresh`)

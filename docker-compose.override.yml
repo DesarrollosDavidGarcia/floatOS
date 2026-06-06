@@ -17,11 +17,22 @@ services:
 
   # En desarrollo levantamos solo los servicios de datos (postgres, redis, minio).
   # api y web se corren con `npm run dev:api` / `npm run dev:web` en el host.
+  # El perfil "full" (docker compose --profile full up) los construye en local
+  # en vez de usar las imágenes publicadas del registry.
   api:
     profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
 
   web:
     profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=/api
+        - NEXT_PUBLIC_WS_URL=
 
   nginx:
     profiles: ["full"]
