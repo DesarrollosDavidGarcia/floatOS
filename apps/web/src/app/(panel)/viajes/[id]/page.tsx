@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +25,19 @@ import { HistorialTimeline } from '@/components/viajes/historial-timeline';
 import { TrackingLink } from '@/components/viajes/tracking-link';
 import { VeredictoUnidadCard } from '@/components/viajes/veredicto-unidad-card';
 import type { Viaje } from '@/components/viajes/types';
+
+// Mapa con Leaflet: usa `window`, se carga solo en cliente.
+const MapaItinerario = dynamic(
+  () => import('@/components/viajes/mapa-itinerario'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid h-full place-items-center text-sm text-muted-foreground">
+        Cargando mapa…
+      </div>
+    ),
+  },
+);
 
 function Dato({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -173,6 +187,20 @@ export default function ViajeDetallePage() {
                   </li>
                 ))}
               </ol>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Mapa del itinerario</CardTitle>
+              <CardDescription>
+                Escalas y ruta en orden (origen → destino).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 w-full">
+                <MapaItinerario escalas={viaje.escalas ?? []} />
+              </div>
             </CardContent>
           </Card>
 
