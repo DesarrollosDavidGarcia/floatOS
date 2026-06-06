@@ -70,6 +70,15 @@ export function defaultsCrear(): ViajeFormValues {
   };
 }
 
+/** ISO → valor para <input type="datetime-local"> en hora LOCAL (sin corrimiento). */
+function aInputLocal(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+
 /** Mapea un Viaje existente al formulario (modo edición). */
 export function defaultsDeViaje(v: Viaje): ViajeFormValues {
   const escalas = (v.escalas ?? []).map((e) => ({
@@ -89,9 +98,7 @@ export function defaultsDeViaje(v: Viaje): ViajeFormValues {
   }));
   return {
     clienteId: v.clienteId,
-    fechaProgramada: v.fechaProgramada
-      ? new Date(v.fechaProgramada).toISOString().slice(0, 16)
-      : '',
+    fechaProgramada: v.fechaProgramada ? aInputLocal(v.fechaProgramada) : '',
     unidadId: v.unidadId ?? NINGUNO,
     conductorId: v.conductorId ?? NINGUNO,
     escalas: escalas.length >= 2 ? escalas : defaultsCrear().escalas,

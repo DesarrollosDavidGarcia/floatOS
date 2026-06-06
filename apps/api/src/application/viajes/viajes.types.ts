@@ -109,10 +109,10 @@ export interface EvaluarViajeInput {
   unidadIds?: string[];
 }
 
-/** Datos para asignar/reasignar unidad y/o conductor. */
+/** Datos para asignar/reasignar unidad y/o conductor. `null` = desasignar. */
 export interface AsignarViajeInput {
-  unidadId?: string;
-  conductorId?: string;
+  unidadId?: string | null;
+  conductorId?: string | null;
 }
 
 /** Datos para cambiar el estado de un viaje. */

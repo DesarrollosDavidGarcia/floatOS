@@ -6,7 +6,7 @@ import type { OpcionCatalogo } from './types';
 
 interface ClienteApi {
   id: string;
-  nombre: string;
+  razonSocial: string;
 }
 interface UnidadApi {
   id: string;
@@ -31,7 +31,7 @@ export function useClientesCatalogo() {
       const { data } = await api.get<PaginadoApi<ClienteApi>>('/clientes', {
         params: { pageSize: 100 },
       });
-      return data.data.map((c) => ({ id: c.id, label: c.nombre }));
+      return data.data.map((c) => ({ id: c.id, label: c.razonSocial }));
     },
   });
 }

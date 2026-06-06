@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -26,10 +27,16 @@ export class EditarViajeUseCase {
     private readonly motor: MotorViajeService,
   ) {}
 
+  // El itinerario solo puede reescribirse antes de iniciar el viaje.
+  private static readonly ESTADOS_EDITABLES: readonly string[] = [
+    'ASIGNADO',
+    'ACEPTADO',
+  ];
+
   async execute(id: string, input: EditarViajeInput) {
     const existe = await this.prisma.viaje.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, estado: true },
     });
     if (!existe) {
       throw new NotFoundException(`Viaje con id ${id} no encontrado`);
@@ -39,6 +46,13 @@ export class EditarViajeUseCase {
       input.fechaProgramada !== undefined
         ? new Date(input.fechaProgramada)
         : undefined;
+
+    if (input.escalas &&
+      !EditarViajeUseCase.ESTADOS_EDITABLES.includes(existe.estado)) {
+      throw new ConflictException(
+        `No se puede modificar el itinerario de un viaje en estado ${existe.estado}`,
+      );
+    }
 
     if (!input.escalas) {
       return this.prisma.viaje.update({

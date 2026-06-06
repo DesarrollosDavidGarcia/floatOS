@@ -49,29 +49,41 @@ export function MapPickerDialog({
   onConfirm: (u: UbicacionElegida) => void;
 }) {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [recenter, setRecenter] = useState<{ lat: number; lng: number } | null>(null);
   const [direccion, setDireccion] = useState('');
   const [q, setQ] = useState('');
   const [resultados, setResultados] = useState<LugarGeocodificado[]>([]);
   const [buscando, setBuscando] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Evita que la dirección precargada dispare una búsqueda al abrir.
+  const skipSearchRef = useRef(false);
 
-  // Reinicia el estado al abrir según los valores iniciales.
+  // Reinicia el estado al abrir; aborta peticiones en vuelo al cerrar.
   useEffect(() => {
-    if (!open) return;
-    setPos(
+    if (!open) {
+      abortRef.current?.abort();
+      return;
+    }
+    const inicialPos =
       inicial?.lat != null && inicial?.lng != null
         ? { lat: inicial.lat, lng: inicial.lng }
-        : null,
-    );
+        : null;
+    setPos(inicialPos);
+    setRecenter(inicialPos);
     setDireccion(inicial?.direccion ?? '');
     setQ(inicial?.direccion ?? '');
     setResultados([]);
+    skipSearchRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Búsqueda con debounce (respeta la política de uso de Nominatim).
   useEffect(() => {
     if (!open) return;
+    if (skipSearchRef.current) {
+      skipSearchRef.current = false;
+      return;
+    }
     const term = q.trim();
     if (term.length < 3) {
       setResultados([]);
@@ -95,14 +107,19 @@ export function MapPickerDialog({
 
   function elegirResultado(r: LugarGeocodificado) {
     setPos({ lat: r.lat, lng: r.lng });
+    setRecenter({ lat: r.lat, lng: r.lng }); // solo aquí se re-centra el mapa
     setDireccion(r.direccion);
     setResultados([]);
   }
 
-  // Al colocar/arrastrar el pin, rellena la dirección por geocodificación inversa.
+  // Al colocar/arrastrar el pin: mueve el marcador y rellena la dirección por
+  // geocodificación inversa (sin re-centrar el mapa).
   async function alColocar(lat: number, lng: number) {
     setPos({ lat, lng });
-    const dir = await reverseGeocode(lat, lng).catch(() => null);
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    const dir = await reverseGeocode(lat, lng, ctrl.signal).catch(() => null);
     if (dir) setDireccion(dir);
   }
 
@@ -149,7 +166,7 @@ export function MapPickerDialog({
           </div>
 
           <div className="h-[320px] w-full overflow-hidden rounded-md border">
-            <MapPickerLeaflet value={pos} onPick={alColocar} />
+            <MapPickerLeaflet value={pos} recenter={recenter} onPick={alColocar} />
           </div>
 
           <div className="space-y-1">

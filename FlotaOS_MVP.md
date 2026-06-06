@@ -685,6 +685,20 @@ Se cerró la administración de actualizaciones del modelo **instancia-por-clien
 - **A7:** el `ADMIN_PASSWORD` se borra del `.env` del cliente tras crear el admin (ya hasheado en BD).
 - **A8:** el seed de catálogos en el `CMD` es tolerante (un fallo no tumba el API; las migraciones siguen siendo estrictas).
 
+### 2026-06-06 — Viajes: itinerario multi-escala + motor de cálculo + mapa + PostGIS ✅
+
+Rediseño completo de **/viajes** (PR aparte `feat/viajes-multiescala`, base `auditoria/fixes-seguros`). La creación pasa de modal a **página completa** con constructor de itinerario; un viaje tiene **varias escalas** y cada escala puede **recoger/entregar/reemplazar** carga (la carga vive por escala).
+
+**Datos/PostGIS:** modelos `EscalaViaje`, `CargaEscala`, `CompatibilidadCargaUnidad`; campos de motor en `Unidad` (capacidadM3, rendimientoKmL, capacidadTanqueL) y snapshot en `Viaje` (distanciaEstimadaKm, pesoMaxKg, volumenMaxM3); columna **`geography(Point,4326)` GENERADA + índice GIST** en `escalas_viaje` (declarada `Unsupported` en Prisma para evitar drift); migración + **backfill** de los viajes existentes; catálogos `TIPO_CARGA`/`ACCION_ESCALA`/`SENTIDO_CARGA` + reglas de compatibilidad. `origen/destino/tipoCarga/pesoKg` de `Viaje` quedan como **resumen derivado**.
+
+**Backend (Clean Architecture):** dominio `motor-calculo.ts` (carga máx por tramo + veredictos SOBREPESO/SOBRE_VOLUMEN/TIPO_INCOMPATIBLE/AUTONOMIA_INSUFICIENTE/DATOS_INCOMPLETOS, **9/9 tests**); `MotorViajeService` (distancia geodésica PostGIS `ST_MakeLine/ST_Length` + evaluación de flota con allow-list de compatibilidad); **`POST /viajes/evaluar`**; crear/editar reescritos con escalas+cargas anidadas y snapshot; geocercas por escala con **`ST_DWithin`** (reemplaza Haversine) y alerta `llegada_escala`.
+
+**Frontend:** páginas `/viajes/crear` y `/viajes/[id]/editar` (`ViajeFormPage`, react-hook-form + useFieldArray); `ItinerarioBuilder`/`EscalaCard`; **`MapPickerDialog`** (Leaflet + Nominatim: buscar dirección + pin arrastrable + reverse-geocoding); **`PanelMotor`** (evaluación en vivo con debounce, recomienda unidad); detalle con itinerario + snapshot; se eliminan los modales viejos.
+
+**Verificado:** `tsc` API+web en verde, 9/9 tests del motor, smoke en vivo (evaluar/crear/detalle), distancia PostGIS CDMX→QRO→GDL ≈ 500 km, geocerca `ST_DWithin` (en escala detecta, a 5 km no), rutas web 200.
+
+**Pendientes/notas:** geocoding Nominatim client-side (proxy con caché para producción); distancia geodésica (OSRM por carretera futuro); UI de la matriz de compatibilidad (hoy por seed).
+
 ---
 
 ## Riesgos técnicos

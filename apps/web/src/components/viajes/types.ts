@@ -3,7 +3,7 @@ import type { EstadoViaje } from '@flotaos/shared-types';
 /** Resumen de cliente que viene embebido en el viaje. */
 export interface ClienteResumen {
   id: string;
-  nombre: string;
+  razonSocial: string;
   rfc?: string | null;
 }
 

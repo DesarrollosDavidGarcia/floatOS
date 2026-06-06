@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsOptional,
@@ -15,6 +16,7 @@ import { EscalaViajeDto } from './escala-viaje.dto';
 export class EvaluarViajeDto {
   @IsArray()
   @ArrayMinSize(1, { message: 'Se requiere al menos una escala' })
+  @ArrayMaxSize(50, { message: 'Máximo 50 escalas' })
   @ValidateNested({ each: true })
   @Type(() => EscalaViajeDto)
   escalas!: EscalaViajeDto[];

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsDateString,
@@ -16,6 +17,7 @@ export class EditarViajeDto {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(2, { message: 'El itinerario requiere al menos origen y destino' })
+  @ArrayMaxSize(50, { message: 'Máximo 50 escalas por viaje' })
   @ValidateNested({ each: true })
   @Type(() => EscalaViajeDto)
   escalas?: EscalaViajeDto[];

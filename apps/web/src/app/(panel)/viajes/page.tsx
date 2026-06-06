@@ -167,7 +167,7 @@ export default function ViajesPage() {
                           #{v.folio}
                         </Link>
                       }
-                      subtitulo={v.cliente?.nombre}
+                      subtitulo={v.cliente?.razonSocial}
                     />
                   </TableCell>
 

@@ -84,32 +84,43 @@ export class RegistrarUbicacionUseCase {
     );
     this.gateway.emitirUbicacion(viajeId, masReciente);
 
-    // Geocercas por escala (PostGIS) sobre el punto más reciente.
-    await this.evaluarGeocercas(viajeId, masReciente);
+    // Geocercas por escala (PostGIS) sobre TODOS los puntos del lote, para no
+    // perder llegadas ocurridas durante la sincronización offline.
+    await this.evaluarGeocercas(viajeId, guardadas, masReciente);
 
     return guardadas;
   }
 
   /**
-   * Busca, vía PostGIS, las escalas del viaje dentro del radio de geocerca del
-   * punto y emite una alerta `llegada_escala` por cada una. Aprovecha el índice
-   * GIST sobre `escalas_viaje.ubicacion`.
+   * Busca, vía PostGIS, las escalas del viaje dentro del radio de geocerca de
+   * CUALQUIER punto del lote y emite `llegada_escala` (una por escala, sin
+   * duplicar dentro del lote). Aprovecha el índice GIST sobre `escalas_viaje.ubicacion`.
+   * Nota: aún no hay estado persistido de "ya llegó", así que lotes distintos
+   * pueden reemitir si el conductor sigue dentro del radio (follow-up).
    */
   private async evaluarGeocercas(
     viajeId: string,
-    ubicacion: UbicacionPublica,
+    puntos: UbicacionPublica[],
+    ubicacionAlerta: UbicacionPublica,
   ): Promise<void> {
+    const lats = puntos.map((p) => p.lat);
+    const lngs = puntos.map((p) => p.lng);
+
     const cercanas = await this.prisma.$queryRaw<EscalaCercana[]>`
-      SELECT "orden", "accion"
-      FROM "escalas_viaje"
-      WHERE "viajeId" = ${viajeId}
-        AND "ubicacion" IS NOT NULL
-        AND ST_DWithin(
-          "ubicacion",
-          ST_SetSRID(ST_MakePoint(${ubicacion.lng}, ${ubicacion.lat}), 4326)::geography,
-          ${RADIO_GEOCERCA_METROS}
+      SELECT DISTINCT e."orden", e."accion"
+      FROM "escalas_viaje" e
+      WHERE e."viajeId" = ${viajeId}
+        AND e."ubicacion" IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM unnest(${lats}::float8[], ${lngs}::float8[]) AS p(lat, lng)
+          WHERE ST_DWithin(
+            e."ubicacion",
+            ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326)::geography,
+            ${RADIO_GEOCERCA_METROS}
+          )
         )
-      ORDER BY "orden"
+      ORDER BY e."orden"
     `;
 
     for (const escala of cercanas) {
@@ -120,7 +131,7 @@ export class RegistrarUbicacionUseCase {
         viajeId,
         escalaOrden: escala.orden,
         escalaAccion: escala.accion,
-        ubicacion,
+        ubicacion: ubicacionAlerta,
         detectadoEn: new Date(),
       });
     }

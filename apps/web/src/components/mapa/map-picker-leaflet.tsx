@@ -37,9 +37,13 @@ function Clicks({ onPick }: { onPick: (lat: number, lng: number) => void }) {
  */
 export default function MapPickerLeaflet({
   value,
+  recenter,
   onPick,
 }: {
+  /** Posición del marcador (cambia también al arrastrar). */
   value: { lat: number; lng: number } | null;
+  /** Punto al que centrar la vista (solo cambia al elegir un resultado de búsqueda). */
+  recenter: { lat: number; lng: number } | null;
   onPick: (lat: number, lng: number) => void;
 }) {
   return (
@@ -55,7 +59,7 @@ export default function MapPickerLeaflet({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Clicks onPick={onPick} />
-      <Recentrar pos={value ? [value.lat, value.lng] : null} />
+      <Recentrar pos={recenter ? [recenter.lat, recenter.lng] : null} />
       {value ? (
         <Marker
           position={[value.lat, value.lng]}

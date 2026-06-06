@@ -189,7 +189,10 @@ export function evaluarFlota(
       return ub - ua;
     });
 
-  const recomendada = veredictos.find((v) => v.apta)?.unidadId;
+  // Recomendable = apta y con datos suficientes para verificar el ajuste.
+  const recomendada = veredictos.find(
+    (v) => v.apta && !v.motivos.some((m) => m.codigo === 'DATOS_INCOMPLETOS'),
+  )?.unidadId;
 
   return {
     resumen: {

@@ -8,7 +8,7 @@ import { escalaVacia, type ViajeFormValues } from './form-types';
 
 export function ItinerarioBuilder() {
   const { control, formState: { errors } } = useFormContext<ViajeFormValues>();
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, insert, remove, move } = useFieldArray({
     control,
     name: 'escalas',
   });
@@ -27,8 +27,11 @@ export function ItinerarioBuilder() {
           variant="outline"
           size="sm"
           onClick={() =>
-            // Inserta una parada intermedia antes del destino.
-            append(escalaVacia('RECOGER_ENTREGAR', 'CARGA'))
+            // Inserta una parada intermedia justo antes del destino (última).
+            insert(
+              Math.max(1, fields.length - 1),
+              escalaVacia('RECOGER_ENTREGAR', 'CARGA'),
+            )
           }
         >
           <Plus className="h-3.5 w-3.5" /> Agregar parada

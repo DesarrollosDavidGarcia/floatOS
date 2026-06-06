@@ -196,7 +196,7 @@ export default function ViajeDetallePage() {
                 <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</p>
-                  <p className="font-medium">{viaje.cliente?.nombre ?? '—'}</p>
+                  <p className="font-medium">{viaje.cliente?.razonSocial ?? '—'}</p>
                   {viaje.cliente?.rfc ? (
                     <p className="text-xs text-muted-foreground">{viaje.cliente.rfc}</p>
                   ) : null}

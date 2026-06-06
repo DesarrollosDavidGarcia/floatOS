@@ -19,19 +19,22 @@ export class AsignarViajeUseCase {
       );
     }
 
-    // Validaciones de existencia independientes en paralelo.
+    // Validaciones de existencia solo cuando se asigna un id (string). `null`
+    // significa desasignar; `undefined` significa no tocar ese campo.
     const [unidad, conductor] = await Promise.all([
-      input.unidadId !== undefined
+      typeof input.unidadId === 'string'
         ? this.prisma.unidad.findUnique({ where: { id: input.unidadId } })
         : Promise.resolve(null),
-      input.conductorId !== undefined
+      typeof input.conductorId === 'string'
         ? this.prisma.conductor.findUnique({ where: { id: input.conductorId } })
         : Promise.resolve(null),
     ]);
 
     const data: Prisma.ViajeUpdateInput = {};
 
-    if (input.unidadId !== undefined) {
+    if (input.unidadId === null) {
+      data.unidad = { disconnect: true };
+    } else if (typeof input.unidadId === 'string') {
       if (!unidad) {
         throw new NotFoundException(
           `Unidad con id ${input.unidadId} no encontrada`,
@@ -45,7 +48,9 @@ export class AsignarViajeUseCase {
       data.unidad = { connect: { id: input.unidadId } };
     }
 
-    if (input.conductorId !== undefined) {
+    if (input.conductorId === null) {
+      data.conductor = { disconnect: true };
+    } else if (typeof input.conductorId === 'string') {
       if (!conductor) {
         throw new NotFoundException(
           `Conductor con id ${input.conductorId} no encontrado`,
