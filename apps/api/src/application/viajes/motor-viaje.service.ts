@@ -87,11 +87,17 @@ export class MotorViajeService {
       };
     });
 
-    const esCompatible = await this.cargarCompatibilidad(sim.tiposCargaPresentes);
+    const { esCompatible, tiposSinReglas } = await this.cargarCompatibilidad(
+      sim.tiposCargaPresentes,
+    );
+    const advertenciasCompat = tiposSinReglas.map(
+      (t) =>
+        `El tipo de carga "${t}" no tiene reglas de compatibilidad: se acepta en cualquier unidad`,
+    );
 
     return evaluarFlota(sim, km, candidatas, esCompatible, {
       metodoDistancia: 'GEODESICA',
-      advertencias,
+      advertencias: [...advertencias, ...advertenciasCompat],
     });
   }
 
@@ -102,8 +108,10 @@ export class MotorViajeService {
    */
   private async cargarCompatibilidad(
     tipos: string[],
-  ): Promise<CompatibilidadFn> {
-    if (tipos.length === 0) return () => true;
+  ): Promise<{ esCompatible: CompatibilidadFn; tiposSinReglas: string[] }> {
+    if (tipos.length === 0) {
+      return { esCompatible: () => true, tiposSinReglas: [] };
+    }
 
     const reglas = await this.prisma.compatibilidadCargaUnidad.findMany({
       where: { tipoCarga: { in: tipos } },
@@ -117,8 +125,13 @@ export class MotorViajeService {
       permitidas.get(r.tipoCarga)!.add(r.tipoUnidad);
     }
 
-    return (tipoCarga, tipoUnidad) =>
+    // Tipos presentes sin ninguna regla configurada (allow-list "fail-open").
+    const tiposSinReglas = tipos.filter((t) => !conReglas.has(t));
+
+    const esCompatible: CompatibilidadFn = (tipoCarga, tipoUnidad) =>
       !conReglas.has(tipoCarga) ||
       (permitidas.get(tipoCarga)?.has(tipoUnidad) ?? false);
+
+    return { esCompatible, tiposSinReglas };
   }
 }

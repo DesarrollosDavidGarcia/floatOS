@@ -22,6 +22,7 @@ import { CambiarEstadoDialog } from '@/components/viajes/cambiar-estado-dialog';
 import { AsignarDialog } from '@/components/viajes/asignar-dialog';
 import { HistorialTimeline } from '@/components/viajes/historial-timeline';
 import { TrackingLink } from '@/components/viajes/tracking-link';
+import { VeredictoUnidadCard } from '@/components/viajes/veredicto-unidad-card';
 import type { Viaje } from '@/components/viajes/types';
 
 function Dato({ label, value }: { label: string; value?: string | null }) {
@@ -229,6 +230,8 @@ export default function ViajeDetallePage() {
               </div>
             </CardContent>
           </Card>
+
+          <VeredictoUnidadCard viaje={viaje} />
 
           {viaje.trackingToken ? (
             <Card>

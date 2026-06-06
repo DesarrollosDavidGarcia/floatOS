@@ -115,6 +115,12 @@ export class CambiarEstadoViajeUseCase {
       registradoPor,
     });
 
+    // No exponer el trackingToken (secreto del link público) al conductor.
+    if (conductorId) {
+      const { trackingToken: _omit, ...sinToken } = actualizado;
+      return sinToken;
+    }
+
     return actualizado;
   }
 }

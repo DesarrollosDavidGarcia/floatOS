@@ -26,6 +26,7 @@ export type TipoAlertaGeocerca = 'llegada_escala';
 
 /** Fila de la consulta PostGIS de escalas dentro del radio de geocerca. */
 export interface EscalaCercana {
+  id: string;
   orden: number;
   accion: string;
 }

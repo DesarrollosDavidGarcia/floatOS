@@ -27,6 +27,12 @@ export class ObtenerViajeUseCase {
       throw new NotFoundException(`Viaje con id ${id} no encontrado`);
     }
 
+    // El trackingToken es el secreto del link público: solo el admin debe verlo.
+    if (conductorId) {
+      const { trackingToken: _omit, ...sinToken } = viaje;
+      return sinToken;
+    }
+
     return viaje;
   }
 

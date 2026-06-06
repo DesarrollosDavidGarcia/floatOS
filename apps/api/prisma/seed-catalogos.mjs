@@ -131,6 +131,8 @@ const CATALOGOS = {
     ['TORTON', 'Tortón'],
     ['RABON', 'Rabón'],
     ['CAMION', 'Camión'],
+    ['CAJA_SECA', 'Caja seca'],
+    ['CAJA_REFRIGERADA', 'Caja refrigerada'],
     ['CAMIONETA', 'Camioneta'],
     ['PLATAFORMA', 'Plataforma'],
     ['PIPA', 'Pipa'],

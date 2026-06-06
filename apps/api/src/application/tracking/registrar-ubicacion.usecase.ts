@@ -106,11 +106,13 @@ export class RegistrarUbicacionUseCase {
     const lats = puntos.map((p) => p.lat);
     const lngs = puntos.map((p) => p.lng);
 
+    // Solo escalas dentro del radio que AÚN no han sido notificadas (dedup entre lotes).
     const cercanas = await this.prisma.$queryRaw<EscalaCercana[]>`
-      SELECT DISTINCT e."orden", e."accion"
+      SELECT DISTINCT e."id", e."orden", e."accion"
       FROM "escalas_viaje" e
       WHERE e."viajeId" = ${viajeId}
         AND e."ubicacion" IS NOT NULL
+        AND e."llegadaNotificadaEn" IS NULL
         AND EXISTS (
           SELECT 1
           FROM unnest(${lats}::float8[], ${lngs}::float8[]) AS p(lat, lng)
@@ -122,6 +124,14 @@ export class RegistrarUbicacionUseCase {
         )
       ORDER BY e."orden"
     `;
+
+    if (cercanas.length === 0) return;
+
+    // Marca las escalas como notificadas para no reemitir en lotes posteriores.
+    await this.prisma.escalaViaje.updateMany({
+      where: { id: { in: cercanas.map((e) => e.id) } },
+      data: { llegadaNotificadaEn: new Date() },
+    });
 
     for (const escala of cercanas) {
       this.gateway.emitirAlerta(viajeId, {

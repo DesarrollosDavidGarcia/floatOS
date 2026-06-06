@@ -728,6 +728,8 @@ model EscalaViaje {
   notas        String?
   ventanaDesde DateTime?
   ventanaHasta DateTime?
+  // Marca de tiempo de la primera alerta de geocerca emitida (dedup entre lotes).
+  llegadaNotificadaEn DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

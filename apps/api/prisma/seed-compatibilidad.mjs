@@ -11,10 +11,11 @@ const prisma = new PrismaClient();
 /** tipoCarga -> tipos de unidad permitidos */
 const REGLAS = {
   LIQUIDA: ['PIPA'],
-  REFRIGERADA: ['TRACTOCAMION', 'TORTON', 'RABON', 'CAMION'],
-  CONGELADA: ['TRACTOCAMION', 'TORTON', 'RABON', 'CAMION'],
+  // Refrigerada/congelada SOLO en caja refrigerada (reefer).
+  REFRIGERADA: ['CAJA_REFRIGERADA'],
+  CONGELADA: ['CAJA_REFRIGERADA'],
   GRANEL: ['TRACTOCAMION', 'TORTON', 'RABON', 'CAMION', 'PLATAFORMA'],
-  PELIGROSA: ['TRACTOCAMION', 'CAMION', 'PIPA'],
+  PELIGROSA: ['TRACTOCAMION', 'CAMION', 'PIPA', 'CAJA_SECA'],
   SOBREDIMENSIONADA: ['PLATAFORMA', 'TRACTOCAMION'],
 };
 
