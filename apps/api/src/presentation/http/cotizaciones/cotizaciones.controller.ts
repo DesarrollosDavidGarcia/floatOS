@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   StreamableFile,
   UseGuards,
@@ -31,6 +32,12 @@ export class CotizacionesController {
   @Post('viajes/:viajeId/cotizaciones')
   crear(@Param('viajeId') viajeId: string, @Body() dto: CrearCotizacionDto) {
     return this.cotizaciones.crear(viajeId, dto.params, dto.notas);
+  }
+
+  /** Edita una cotización (solo si está en borrador). */
+  @Patch('cotizaciones/:id')
+  editar(@Param('id') id: string, @Body() dto: CrearCotizacionDto) {
+    return this.cotizaciones.editar(id, dto.params, dto.notas);
   }
 
   /** Lista las cotizaciones de un viaje. */

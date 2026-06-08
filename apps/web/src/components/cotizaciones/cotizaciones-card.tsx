@@ -71,10 +71,13 @@ export function CotizacionesCard({ viaje }: { viaje: Viaje }) {
                   {format(new Date(c.createdAt), 'd MMM yyyy, HH:mm', { locale: es })}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <Badge variant={ESTADO_COTIZACION_BADGE[c.estado]}>
                   {ESTADO_COTIZACION_LABEL[c.estado]}
                 </Badge>
+                {c.estado === 'BORRADOR' && (
+                  <CotizarDialog viaje={viaje} cotizacion={c} />
+                )}
                 <Button
                   variant="outline"
                   size="sm"

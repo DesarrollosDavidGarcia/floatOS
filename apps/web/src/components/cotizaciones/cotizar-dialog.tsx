@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { FileText } from 'lucide-react';
+import { FileText, Pencil } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { formatearMoneda } from '@/lib/estado-cotizacion';
@@ -23,6 +23,7 @@ import {
 import type { Viaje } from '@/components/viajes/types';
 import {
   PARAMS_COTIZACION_DEFAULT,
+  type Cotizacion,
   type ParamsCotizacion,
   type ResultadoCotizacion,
 } from './types';
@@ -38,10 +39,21 @@ const CAMPOS: Array<{ key: keyof ParamsCotizacion; label: string }> = [
   { key: 'margenPct', label: 'Margen (%)' },
 ];
 
-export function CotizarDialog({ viaje }: { viaje: Viaje }) {
+export function CotizarDialog({
+  viaje,
+  cotizacion,
+}: {
+  viaje: Viaje;
+  cotizacion?: Cotizacion;
+}) {
+  const esEdicion = !!cotizacion;
+  const inicial = (): ParamsCotizacion =>
+    cotizacion
+      ? { ...PARAMS_COTIZACION_DEFAULT, ...cotizacion.params }
+      : PARAMS_COTIZACION_DEFAULT;
   const [open, setOpen] = useState(false);
-  const [params, setParams] = useState<ParamsCotizacion>(PARAMS_COTIZACION_DEFAULT);
-  const [notas, setNotas] = useState('');
+  const [params, setParams] = useState<ParamsCotizacion>(inicial);
+  const [notas, setNotas] = useState(cotizacion?.notas ?? '');
   const qc = useQueryClient();
 
   const datos = {
@@ -66,11 +78,15 @@ export function CotizarDialog({ viaje }: { viaje: Viaje }) {
 
   const guardar = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post(`/viajes/${viaje.id}/cotizaciones`, { params, notas: notas.trim() || undefined });
+      const body = { params, notas: notas.trim() || undefined };
+      const { data } =
+        esEdicion && cotizacion
+          ? await api.patch(`/cotizaciones/${cotizacion.id}`, body)
+          : await api.post(`/viajes/${viaje.id}/cotizaciones`, body);
       return data;
     },
     onSuccess: () => {
-      toast.success('Cotización creada');
+      toast.success(esEdicion ? 'Cotización actualizada' : 'Cotización creada');
       qc.invalidateQueries({ queryKey: ['cotizaciones', viaje.id] });
       invalidarViajes(qc, viaje.id);
       setOpen(false);
@@ -78,20 +94,39 @@ export function CotizarDialog({ viaje }: { viaje: Viaje }) {
     onError: (err) => toast.error(apiError(err)),
   });
 
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setParams(inicial());
+      setNotas(cotizacion?.notas ?? '');
+    }
+  }
+
   const set = (key: keyof ParamsCotizacion, value: number | boolean) =>
     setParams((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <FileText />
-          Nueva cotización
-        </Button>
+        {esEdicion ? (
+          <Button variant="outline" size="sm">
+            <Pencil />
+            Editar
+          </Button>
+        ) : (
+          <Button size="sm">
+            <FileText />
+            Nueva cotización
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Nueva cotización</DialogTitle>
+          <DialogTitle>
+            {esEdicion && cotizacion
+              ? `Editar cotización #${cotizacion.folio}`
+              : 'Nueva cotización'}
+          </DialogTitle>
           <DialogDescription>
             Viaje #{viaje.folio} · {datos.distanciaKm} km · {datos.pesoKg} kg ·{' '}
             {datos.numEscalas} escala(s)
@@ -180,7 +215,11 @@ export function CotizarDialog({ viaje }: { viaje: Viaje }) {
             Cancelar
           </Button>
           <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
-            {guardar.isPending ? 'Guardando…' : 'Guardar cotización'}
+            {guardar.isPending
+              ? 'Guardando…'
+              : esEdicion
+                ? 'Guardar cambios'
+                : 'Guardar cotización'}
           </Button>
         </DialogFooter>
       </DialogContent>

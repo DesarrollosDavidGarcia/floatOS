@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -36,8 +37,8 @@ export class CotizacionesService {
     return cotizar(params, datos);
   }
 
-  /** Crea una cotización tomando los datos (km/kg/escalas) del viaje. */
-  async crear(viajeId: string, params: ParamsCotizacion, notas?: string) {
+  /** Carga y mapea los datos (km/kg/escalas) del viaje para el motor. */
+  private async datosViaje(viajeId: string): Promise<DatosCotizacion> {
     const viaje = await this.prisma.viaje.findUnique({
       where: { id: viajeId },
       select: {
@@ -50,34 +51,67 @@ export class CotizacionesService {
     if (!viaje) {
       throw new NotFoundException(`Viaje con id ${viajeId} no encontrado`);
     }
-
-    const datos: DatosCotizacion = {
+    return {
       distanciaKm: dec(viaje.distanciaEstimadaKm),
       // Mismo criterio que el preview del diálogo (`??`): usa pesoMaxKg si existe
       // —incluido 0—, si no el pesoKg. Evita que preview y guardado difieran.
       pesoKg: viaje.pesoMaxKg != null ? Number(viaje.pesoMaxKg) : dec(viaje.pesoKg),
       numEscalas: viaje._count.escalas,
     };
-    const r = cotizar(params, datos);
+  }
 
+  /** Campos snapshot (params + datos + desglose + totales) para create/update. */
+  private snapshot(
+    params: ParamsCotizacion,
+    datos: DatosCotizacion,
+    notas?: string,
+  ) {
+    const r = cotizar(params, datos);
+    return {
+      params: params as unknown as Prisma.InputJsonValue,
+      distanciaKm: datos.distanciaKm,
+      pesoKg: datos.pesoKg,
+      numEscalas: datos.numEscalas,
+      desglose: {
+        lineas: r.lineas,
+        subtotalConceptos: r.subtotalConceptos,
+        margen: r.margen,
+      } as unknown as Prisma.InputJsonValue,
+      subtotal: r.subtotal,
+      iva: r.iva,
+      retencion: r.retencion,
+      total: r.total,
+      notas: notas ?? null,
+    };
+  }
+
+  /** Crea una cotización tomando los datos (km/kg/escalas) del viaje. */
+  async crear(viajeId: string, params: ParamsCotizacion, notas?: string) {
+    const datos = await this.datosViaje(viajeId);
     return this.prisma.cotizacion.create({
       data: {
         viaje: { connect: { id: viajeId } },
-        params: params as unknown as Prisma.InputJsonValue,
-        distanciaKm: datos.distanciaKm,
-        pesoKg: datos.pesoKg,
-        numEscalas: datos.numEscalas,
-        desglose: {
-          lineas: r.lineas,
-          subtotalConceptos: r.subtotalConceptos,
-          margen: r.margen,
-        } as unknown as Prisma.InputJsonValue,
-        subtotal: r.subtotal,
-        iva: r.iva,
-        retencion: r.retencion,
-        total: r.total,
-        notas: notas ?? null,
+        ...this.snapshot(params, datos, notas),
       },
+    });
+  }
+
+  /** Edita una cotización SOLO si está en BORRADOR; recalcula con datos del viaje. */
+  async editar(id: string, params: ParamsCotizacion, notas?: string) {
+    const cot = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: { estado: true, viajeId: true },
+    });
+    if (!cot) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
+    if (cot.estado !== 'BORRADOR') {
+      throw new ConflictException(
+        `Solo se pueden editar cotizaciones en borrador (estado actual: ${cot.estado}).`,
+      );
+    }
+    const datos = await this.datosViaje(cot.viajeId);
+    return this.prisma.cotizacion.update({
+      where: { id },
+      data: this.snapshot(params, datos, notas),
     });
   }
 

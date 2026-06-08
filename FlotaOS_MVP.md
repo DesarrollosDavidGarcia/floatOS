@@ -803,6 +803,12 @@ Generación del **PDF** de la cotización (server-side con `pdfkit`, sin Chromiu
 
 **Verificado:** `tsc` API+web verde, **41/41 tests**; smoke `calcular` = total **$13,440** (margen $1,600 = 20% s/ servicio $8,000; casetas/combustible a costo); PDF regenerado 1 página; tope DTO diésel 2400 → 400.
 
+### 2026-06-08 — Cotizaciones: editar borradores ✅
+
+`PATCH /cotizaciones/:id` — edita una cotización **solo si está en BORRADOR** (si no, **409**); recalcula con el motor tomando los datos del viaje y actualiza el snapshot. Refactor del servicio: `crear` y `editar` comparten `datosViaje()` + `snapshot()` (sin duplicar). Web: el `CotizarDialog` ahora es reutilizable en modo edición (precarga params/notas, PATCH, etiquetas "Editar"/"Guardar cambios") y la tarjeta muestra el botón **Editar** solo en cotizaciones en borrador.
+
+**Verificado:** `tsc` API+web verde; smoke: editar borrador → 200 (total recalculado, sigue BORRADOR), editar enviada → **409**; detalle web 200.
+
 ---
 
 ## Riesgos técnicos
