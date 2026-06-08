@@ -13,6 +13,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { EscalaViaje } from './types';
 
+const ZOOM_INICIAL = 6;
+const ZOOM_PUNTO_UNICO = 13;
+const PADDING_ENCUADRE: [number, number] = [30, 30];
+
 /** Pin circular con número de escala (sin assets externos). */
 function pinIcon(color: string, label: string): L.DivIcon {
   return L.divIcon({
@@ -34,9 +38,9 @@ function Encuadrar({ puntos }: { puntos: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
     if (puntos.length === 1) {
-      map.setView(puntos[0], 13);
+      map.setView(puntos[0], ZOOM_PUNTO_UNICO);
     } else if (puntos.length > 1) {
-      map.fitBounds(puntos, { padding: [30, 30] });
+      map.fitBounds(puntos, { padding: PADDING_ENCUADRE });
     }
   }, [puntos, map]);
   return null;
@@ -44,14 +48,25 @@ function Encuadrar({ puntos }: { puntos: [number, number][] }) {
 
 /**
  * Mapa del itinerario: dibuja cada escala con coordenadas como marcador numerado
- * y la ruta como polilínea en orden. Usa `window` (Leaflet) → montar con
- * next/dynamic({ ssr:false }).
+ * y la ruta como polilínea. Si llega `geometria` (ruta por carretera de TomTom),
+ * la traza siguiendo los caminos; si no, une las escalas con líneas rectas.
+ * Usa `window` (Leaflet) → montar con next/dynamic({ ssr:false }).
  */
-export default function MapaItinerario({ escalas }: { escalas: EscalaViaje[] }) {
+export default function MapaItinerario({
+  escalas,
+  geometria,
+}: {
+  escalas: EscalaViaje[];
+  geometria?: [number, number][] | null;
+}) {
   const conCoords = [...escalas]
     .sort((a, b) => a.orden - b.orden)
     .filter((e) => e.lat != null && e.lng != null);
   const puntos = conCoords.map((e) => [e.lat as number, e.lng as number] as [number, number]);
+
+  // Ruta por carretera si viene; si no, las escalas en línea recta.
+  const trazo: [number, number][] =
+    geometria && geometria.length >= 2 ? geometria : puntos;
 
   if (puntos.length === 0) {
     return (
@@ -64,7 +79,7 @@ export default function MapaItinerario({ escalas }: { escalas: EscalaViaje[] }) 
   return (
     <MapContainer
       center={puntos[0]}
-      zoom={6}
+      zoom={ZOOM_INICIAL}
       scrollWheelZoom
       style={{ height: '100%', width: '100%' }}
       className="z-0 rounded-lg"
@@ -74,7 +89,7 @@ export default function MapaItinerario({ escalas }: { escalas: EscalaViaje[] }) 
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Encuadrar puntos={puntos} />
-      <Polyline positions={puntos} pathOptions={{ color: '#2563eb', weight: 3, opacity: 0.7 }} />
+      <Polyline positions={trazo} pathOptions={{ color: '#2563eb', weight: 3, opacity: 0.7 }} />
       {conCoords.map((e, i) => (
         <Marker
           key={e.id}

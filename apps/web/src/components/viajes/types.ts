@@ -1,4 +1,5 @@
 import type { EstadoViaje } from '@flotaos/shared-types';
+import type { PlanRutaParams } from './plan-ruta';
 
 /** Resumen de cliente que viene embebido en el viaje. */
 export interface ClienteResumen {
@@ -80,8 +81,14 @@ export interface Viaje {
   pesoKg?: number | null;
   dimensiones?: string | null;
   distanciaEstimadaKm?: number | string | null;
+  /** ETA estimada por carretera en minutos (free-flow); null si geodésica. */
+  tiempoEstimadoMin?: number | null;
   pesoMaxKg?: number | string | null;
   volumenMaxM3?: number | string | null;
+  /** Polilínea de la ruta por carretera ([[lat, lng], ...]); null si geodésica. */
+  rutaGeometria?: [number, number][] | null;
+  /** Plan multi-día asignado por el monitorista (horas/día, descanso, escala, inicio). */
+  planRuta?: PlanRutaParams | null;
   escalas?: EscalaViaje[];
   fechaProgramada?: string | null;
   trackingToken?: string | null;

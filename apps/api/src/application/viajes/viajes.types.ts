@@ -121,6 +121,14 @@ export interface CambiarEstadoInput {
   nota?: string;
 }
 
+/** Plan multi-día que el monitorista asigna al viaje (alimenta la llegada estimada). */
+export interface PlanRutaInput {
+  horasConduccionDia: number;
+  horasDescanso: number;
+  minutosPorEscala: number;
+  horaInicio: number;
+}
+
 /** Filtros y paginación para el listado de viajes. */
 export interface ListarViajesInput {
   estado?: EstadoViaje;

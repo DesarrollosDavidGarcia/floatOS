@@ -62,7 +62,14 @@ export function PanelMotor() {
           <div className="grid grid-cols-3 gap-2 text-center">
             <Resumen valor={`${data.resumen.pesoMaxKg} kg`} etiqueta="Peso máx." />
             <Resumen valor={`${data.resumen.volumenMaxM3} m³`} etiqueta="Volumen máx." />
-            <Resumen valor={`${data.resumen.distanciaTotalKm} km`} etiqueta="Distancia" />
+            <Resumen
+              valor={`${data.resumen.distanciaTotalKm} km`}
+              etiqueta={
+                data.resumen.metodoDistancia === 'RUTA'
+                  ? 'Dist. carretera'
+                  : 'Dist. línea recta'
+              }
+            />
           </div>
 
           {data.resumen.advertencias.map((a, i) => (

@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { ResultadoEvaluacion } from '@flotaos/shared-types';
+import type { MetodoDistancia, ResultadoEvaluacion } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import {
+  RouteService,
+  type OpcionesRuta,
+} from '../../infrastructure/routing/route.service';
+import type { PuntoLatLng } from '../../infrastructure/routing/route-provider';
 import {
   evaluarFlota,
   simularCarga,
@@ -21,15 +26,27 @@ const dec = (v: Prisma.Decimal | null): number | null =>
  */
 @Injectable()
 export class MotorViajeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly route: RouteService,
+  ) {}
 
   /**
-   * Distancia geodésica total (km) sumando los tramos entre escalas consecutivas
-   * con coordenadas, vía PostGIS (ST_MakeLine + ST_Length sobre geography).
+   * Distancia total (km) de los tramos entre escalas consecutivas con
+   * coordenadas. Delega en RouteService: ruta por carretera (TomTom, con caché)
+   * si hay key, o geodésica (PostGIS) como fallback. Las escalas sin coordenadas
+   * se omiten con una advertencia.
    */
   async distanciaKm(
     escalas: EscalaInput[],
-  ): Promise<{ km: number; advertencias: string[] }> {
+    opts?: OpcionesRuta,
+  ): Promise<{
+    km: number;
+    metodo: MetodoDistancia;
+    tiempoMin: number | null;
+    geometria: PuntoLatLng[] | null;
+    advertencias: string[];
+  }> {
     const conCoords = escalas.filter((e) => e.lat != null && e.lng != null);
     const advertencias: string[] = [];
     const sinCoords = escalas.length - conCoords.length;
@@ -38,25 +55,38 @@ export class MotorViajeService {
         `${sinCoords} escala(s) sin coordenadas; sus tramos no se contabilizan en la distancia`,
       );
     }
-    if (conCoords.length < 2) return { km: 0, advertencias };
+    if (conCoords.length < 2) {
+      return {
+        km: 0,
+        metodo: 'GEODESICA',
+        tiempoMin: null,
+        geometria: null,
+        advertencias,
+      };
+    }
 
-    const lats = conCoords.map((e) => e.lat as number);
-    const lngs = conCoords.map((e) => e.lng as number);
-
-    const rows = await this.prisma.$queryRaw<Array<{ km: number }>>`
-      SELECT COALESCE(ST_Length(ST_MakeLine(p.geom ORDER BY p.ord)::geography), 0) / 1000.0 AS km
-      FROM (
-        SELECT ST_SetSRID(ST_MakePoint(lng, lat), 4326) AS geom, ord
-        FROM unnest(${lats}::float8[], ${lngs}::float8[]) WITH ORDINALITY AS t(lat, lng, ord)
-      ) p
-    `;
-    return { km: Number(rows[0]?.km ?? 0), advertencias };
+    const puntos = conCoords.map((e) => ({
+      lat: e.lat as number,
+      lng: e.lng as number,
+    }));
+    const ruta = await this.route.calcular(puntos, opts);
+    return {
+      km: ruta.km,
+      metodo: ruta.metodo,
+      tiempoMin: ruta.tiempoMin,
+      geometria: ruta.geometria,
+      advertencias: [...advertencias, ...ruta.advertencias],
+    };
   }
 
   /** Evalúa el itinerario contra la flota candidata. */
   async evaluar(input: EvaluarViajeInput): Promise<ResultadoEvaluacion> {
     const sim = simularCarga(itemsDeEscalas(input.escalas));
-    const { km, advertencias } = await this.distanciaKm(input.escalas);
+    // En vivo (cada cambio del formulario) usamos geodésica: el valor por
+    // carretera definitivo se calcula al crear/editar. No quema cuota de TomTom.
+    const { km, metodo, advertencias } = await this.distanciaKm(input.escalas, {
+      preferGeodesica: true,
+    });
 
     const unidades = await this.prisma.unidad.findMany({
       where: {
@@ -96,7 +126,7 @@ export class MotorViajeService {
     );
 
     return evaluarFlota(sim, km, candidatas, esCompatible, {
-      metodoDistancia: 'GEODESICA',
+      metodoDistancia: metodo,
       advertencias: [...advertencias, ...advertenciasCompat],
     });
   }

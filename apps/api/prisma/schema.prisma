@@ -605,8 +605,16 @@ model Viaje {
 
   // Snapshot del motor de cálculo (se recalcula al crear/editar).
   distanciaEstimadaKm Decimal? @db.Decimal(10, 2)
+  // ETA estimada por carretera (free-flow, sin tráfico en vivo); null si geodésica.
+  tiempoEstimadoMin   Float?
   pesoMaxKg           Decimal? @db.Decimal(10, 2)
   volumenMaxM3        Decimal? @db.Decimal(10, 3)
+  // Polilínea de la ruta por carretera ([[lat, lng], ...]) para pintar el mapa;
+  // null si se calculó por geodésica (el mapa cae a líneas rectas entre escalas).
+  rutaGeometria       Json?
+  // Plan multi-día que asigna el monitorista (horas de conducción/día, descanso,
+  // tiempo por escala, hora de inicio). Alimenta el cálculo de llegada estimada.
+  planRuta            Json?
 
   estado        EstadoViaje @default(ASIGNADO)
   trackingToken String      @unique // link público; token aleatorio seguro (ver token.util.ts)
@@ -630,8 +638,9 @@ model Viaje {
   gastos      GastoViaje[]
   evidencias  EvidenciaViaje[]
   incidencias IncidenciaConductor[]
-  cartaPorte  CartaPorte?
-  factura     Factura?
+  cartaPorte   CartaPorte?
+  factura      Factura?
+  cotizaciones Cotizacion[]
 
   @@index([clienteId])
   @@index([unidadId])
@@ -814,4 +823,65 @@ model Factura {
   cartaPorte CartaPorte? @relation(fields: [cartaPorteId], references: [id])
 
   @@map("facturas")
+}
+
+// ──────────────────────── Cotizaciones ────────────────────────────
+
+enum EstadoCotizacion {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+}
+
+/// Cotización de un viaje. Congela los parámetros capturados (params), los datos
+/// del viaje usados y el desglose calculado por el motor (domain/cotizacion).
+model Cotizacion {
+  id          String           @id @default(cuid())
+  folio       Int              @unique @default(autoincrement())
+  viajeId     String
+  estado      EstadoCotizacion @default(BORRADOR)
+  moneda      String           @default("MXN")
+  // Parámetros (tarifas) y datos del viaje usados, congelados.
+  params      Json
+  distanciaKm Decimal?         @db.Decimal(10, 2)
+  pesoKg      Decimal?         @db.Decimal(10, 2)
+  numEscalas  Int              @default(0)
+  // Resultado del motor (líneas + subtotales) y totales para consulta rápida.
+  desglose    Json
+  subtotal    Decimal          @db.Decimal(12, 2)
+  iva         Decimal          @db.Decimal(12, 2)
+  retencion   Decimal          @db.Decimal(12, 2)
+  total       Decimal          @db.Decimal(12, 2)
+  notas       String?
+  // Marca de tiempo del envío por correo (Fase 3, Brevo).
+  enviadaEn   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@map("cotizaciones")
+}
+
+// ──────────────────── Caché de ruteo (TomTom) ─────────────────────
+
+/// Caché persistente de rutas calculadas por el proveedor externo (TomTom) para
+/// no repetir llamadas. `clave` es un hash determinista de las coordenadas
+/// ordenadas + perfil (ver routing/route-provider.ts). Las rutas son estables en
+/// el tiempo (traffic=false), así que se reutilizan entre viajes a largo plazo.
+model RutaCache {
+  id          String   @id @default(cuid())
+  clave       String   @unique
+  distanciaKm Float
+  tiempoMin   Float?
+  // Polilínea de la ruta por carretera ([[lat, lng], ...]); null si no se obtuvo.
+  geometria   Json?
+  proveedor   String // TOMTOM
+  createdAt   DateTime @default(now())
+
+  // Índice para la poda por antigüedad (purgarAntiguas en RouteService).
+  @@index([createdAt])
+  @@map("ruta_cache")
 }

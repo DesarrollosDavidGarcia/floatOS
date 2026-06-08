@@ -15,6 +15,7 @@ import { ListarViajesDto } from './dto/listar-viajes.dto';
 import { EditarViajeDto } from './dto/editar-viaje.dto';
 import { AsignarViajeDto } from './dto/asignar-viaje.dto';
 import { CambiarEstadoViajeDto } from './dto/cambiar-estado-viaje.dto';
+import { PlanRutaDto } from './dto/plan-ruta.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import {
@@ -77,6 +78,13 @@ export class ViajesController {
   @UseGuards(AdminGuard)
   asignar(@Param('id') id: string, @Body() dto: AsignarViajeDto) {
     return this.viajes.asignar(id, dto);
+  }
+
+  /** Guarda el plan multi-día del viaje (horas/día, descanso, escala, inicio). */
+  @Patch(':id/plan-ruta')
+  @UseGuards(AdminGuard)
+  actualizarPlan(@Param('id') id: string, @Body() dto: PlanRutaDto) {
+    return this.viajes.actualizarPlan(id, dto);
   }
 
   @Patch(':id/estado')

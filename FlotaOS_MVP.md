@@ -711,7 +711,69 @@ Rediseño completo de **/viajes** (PR aparte `feat/viajes-multiescala`, base `au
 
 **Dev — Turbopack revertido a webpack:** `next dev --turbo` evalúa react-leaflet (ESM) en el grafo de SSR y corrompe el dispatcher de React (`usePathname`/ErrorBoundary → "Cannot read properties of null (reading 'useContext')"), devolviendo 500 incluso en páginas sin mapa. El `dev` del web vuelve a **webpack** (`next dev`); producción (`next build`) ya usa webpack, no afectada.
 
-**Pendientes/notas (futuro, no bloqueantes):** geocoding Nominatim client-side (proxy con caché para producción); distancia geodésica (OSRM por carretera futuro); UI de la matriz de compatibilidad (hoy por seed); motor evalúa todas las unidades activas (top-N a futuro); búsqueda del listado no cubre escalas intermedias; tests de integración de crear/editar; Carta Porte/Factura (Fase 2) deberán leer `CargaEscala`, no el resumen de `Viaje`.
+**Pendientes/notas (futuro, no bloqueantes):** geocoding Nominatim client-side (proxy con caché para producción); ~~distancia geodésica (OSRM por carretera futuro)~~ *(resuelto con TomTom, ver 2026-06-08)*; UI de la matriz de compatibilidad (hoy por seed); motor evalúa todas las unidades activas (top-N a futuro); búsqueda del listado no cubre escalas intermedias; tests de integración de crear/editar; Carta Porte/Factura (Fase 2) deberán leer `CargaEscala`, no el resumen de `Viaje`.
+
+### 2026-06-08 — Viajes: ruteo por carretera con TomTom + caché ✅
+
+Rama `feat/tomtom-ruteo` (base `feat/viajes-multiescala`). El cálculo de distancia del itinerario pasa de **geodésica** (línea recta PostGIS) a **ruta real por carretera** vía **TomTom Routing API**, con degradación elegante.
+
+**Arquitectura (`apps/api/src/infrastructure/routing/`):** interfaz `RouteProvider` con dos implementaciones — `GeodesicaRouteProvider` (PostGIS `ST_MakeLine/ST_Length`, fallback) y `TomTomRouteProvider` (`calculateRoute`, `travelMode=truck`, `traffic=false`) — orquestadas por `RouteService`. `MotorViajeService.distanciaKm` ahora delega en `RouteService` y propaga `metodoDistancia` (`GEODESICA`|`RUTA`) real al resultado (antes fijo en `GEODESICA`).
+
+**Eficiencia / no repetir llamadas:** caché persistente en **`ruta_cache`** (migración `20260608120000_ruta_cache`), keyed por **hash sha1 de coordenadas ordenadas redondeadas a ~11 m** + perfil (`claveRuta`) → un pin movido unos metros pega en caché; rutas estables a largo plazo (traffic off). La key se usa **solo server-side** (nunca al navegador). **Tope diario defensivo** por instancia (`TOMTOM_MAX_DIARIO`, default 2000; free tier = 2500/día) que degrada a geodésica con aviso.
+
+**Modelo de keys (instancia-por-cliente):** **una key de TomTom por cliente** (env `TOMTOM_API_KEY`) → cada instancia tiene su propio free tier (N×2,500/día) y aislamiento. `alta-cliente.sh` la inyecta si se pasa `TOMTOM_API_KEY=...` en el entorno; `.env.example` documentado. Sin key, todo sigue en geodésica (cero cambios de comportamiento).
+
+**Frontend:** `PanelMotor` muestra etiqueta dinámica de distancia (**"Dist. carretera"** vs **"Dist. línea recta"**) según `metodoDistancia`.
+
+**Verificado:** `tsc` API+web en verde; **18/18 tests** (9 motor + 9 nuevos de `route.service`: clave determinista/redondeo/orden, cache hit/miss, fallback por error y por tope diario); smoke en vivo `/viajes/evaluar` CDMX→QRO = 183.51 km `GEODESICA` (sin key en dev, fallback correcto).
+
+**Trazo real + ETA (mismo día):** se extrae la **geometría** de la ruta (`legs[].points`) y se guarda en `ruta_cache.geometria` y como snapshot en `viajes.rutaGeometria` (migración `20260608130000_ruta_geometria`); el `MapaItinerario` la pinta siguiendo carreteras (fallback a líneas rectas si geodésica). Smoke real con key: crear CDMX→QRO = 216.76 km `RUTA`, polilínea persistida; 2ª llamada idéntica = cache hit (0 transacciones extra).
+
+### 2026-06-08 — Viajes/ruteo: auditoría multiagente + 12 fixes ✅
+
+Auditoría multiagente (4 dimensiones: funcionalidad/optimización, seguridad, datos/escalabilidad, código/mantenibilidad + síntesis) sobre la feature de TomTom. Hallazgo clave que el self-review subestimó: **`/viajes/evaluar` llamaba a TomTom en cada teclazo** del formulario (cada pin movido = cache miss = llamada real), quemando la cuota durante la edición. 12 fixes aplicados:
+
+- **(Alta) Evaluar usa geodésica siempre:** flag `preferGeodesica` en `RouteService.calcular`/`distanciaKm`; el cálculo por carretera definitivo se hace solo al crear/editar. *Verificado: evaluar → `GEODESICA`, `ruta_cache` queda vacía.*
+- **(Alta) Test de `TomTomRouteProvider`** (mock de `fetch`): parseo, dedup de tramos, errores HTTP/sin-ruta, tope diario con reset por día.
+- **(Media) Poda de `ruta_cache`:** `@@index([createdAt])` + `purgarAntiguas(180d)` disparado oportunistamente 1×/día.
+- **(Media) Geometría más liviana:** dedup del waypoint compartido entre tramos + simplificación Douglas-Peucker + redondeo a 6 decimales → **2,673 → 584 puntos (−78%)**.
+- **(Media) ETA:** `tiempoMin` deja de ser dato muerto; se persiste en `viajes.tiempoEstimadoMin` y se muestra en el detalle (free-flow, sin tráfico en vivo).
+- **(Media) `LimiteDiarioError`** (clase) en vez de control de flujo por string; **type guard `esGeometria`** para JSONB de caché; logging de errores de caché (P2002 distinguido).
+- **(Baja) Contador diario best-effort** sembrado desde la BD (sobrevive reinicios); URL TomTom endurecida (`toFixed(6)`, key nunca logueada); helper `snapshotRuta` (DRY crear/editar); constantes nombradas; migración nueva idempotente (`IF NOT EXISTS`).
+
+**Verificado:** `tsc` API+web en verde; **27/27 tests** (9 motor + 11 `route.service` + 7 `tomtom.provider`); migración `20260608140000_ruta_eta_retencion` aplicada; smoke en vivo: evaluar `GEODESICA` sin tocar caché, crear `RUTA` 216.76 km + ETA 197 min + geometría 584 puntos.
+
+### 2026-06-08 — Viajes/ruteo: `departAt` con tráfico predicho ✅
+
+La planeación usa tráfico **histórico/predicho** de TomTom para la **fecha programada** del viaje (sin romper el caché). Si `fechaProgramada` es **futura**, el ruteo va con `traffic=true&departAt=<ISO>` → ruta y ETA dependientes de la franja horaria; si es pasada o ausente, **flujo libre** (`traffic=false`, como antes). La evaluación en vivo del formulario sigue en geodésica (no toca TomTom).
+
+**Cómo:** `OpcionesRuta.departAt` + `CalcularOpts.departAt` se threadean desde crear/editar (`fechaProgramada` efectiva: la nueva o la guardada) → `MotorViajeService.distanciaKm` → `RouteService` (valida que sea futura con `departAtValido`; **segmenta la clave de caché por hora** `TOMTOM|t=YYYY-MM-DDTHH` para que rutas de horas distintas no colisionen) → `TomTomRouteProvider` (arma la URL con `traffic`/`departAt`). Sin cambios de schema.
+
+**Verificado:** `tsc` verde; **31/31 tests** (+4: URL con/sin `departAt`, forwarding y descarte de fecha pasada); smoke en vivo CDMX→QRO domingo 14:00 = **216.76 km / ETA 199 min** (predicho) vs **217.14 km / 209 min** (flujo libre) → 2 entradas de caché distintas, sin colisión. *(Hazard resuelto: el watcher había re-arrancado la API bajo Node 16 —sin `fetch` global—; se fija Node 20 con la ruta concreta en el PATH. Ver [[flotaos-entorno-node]].)*
+
+### 2026-06-08 — Viajes: plan multi-día (llegada estimada) que asigna el monitorista ✅
+
+El detalle del viaje muestra la **fecha/hora estimada de llegada** repartiendo el tiempo de conducción en jornadas, y el **monitorista asigna por viaje** los parámetros: horas de conducción/día, descanso entre días, tiempo por escala y hora de inicio diaria.
+
+**Backend:** columna `Viaje.planRuta` (JSONB, migración `20260608150000_viaje_plan_ruta`); `PATCH /viajes/:id/plan-ruta` (`PlanRutaDto` con rangos validados; `AdminGuard`) → `ActualizarPlanRutaUseCase` (se puede ajustar en cualquier estado; no toca itinerario ni snapshot). Cableado en `ViajesService`/módulo/controller.
+
+**Frontend:** modelo puro `plan-ruta.ts` (`planificarRuta` en hora **local** del navegador: reparte la conducción en jornadas de ≤`horasConduccionDia`, descanso reanudando a `horaInicio`, + `minutosPorEscala`×escalas; defaults 9h/11h/60min/08:00); `PlanRutaDialog` con **previsualización en vivo** de la llegada; tarjeta "Plan de viaje" en el detalle (llegada, días de conducción, desglose conducción/descansos/escalas). El grid del snapshot ahora rotula la conducción pura como **"Conducción"**.
+
+**Verificado:** `tsc` API+web verde, 31/31 tests; sanity-check del modelo (CDMX→QRO 1 jornada llega 13:37; 30 h → 4 jornadas, 45 h descanso; 45 h → 5 jornadas); smoke en vivo: `PATCH plan-ruta` persiste el JSON y valida (`horaInicio=24` → 400); detalle web 200.
+
+### 2026-06-08 — Cotizaciones: motor de cálculo + crear/previsualizar (Fase 1) ✅
+
+Cotización de un viaje con **motor de cálculo "mixto configurable"**. Fase 1 de 3 (Fase 2: documento PDF; Fase 3: envío por correo con Brevo —scaffold pendiente—).
+
+**Motor (dominio puro, `domain/cotizacion/motor-cotizacion.ts`, 6/6 tests):** arma líneas de concepto — flete base + $/km + $/kg + **combustible** (distancia ÷ rendimiento × precio diésel) + casetas + maniobras×escalas — aplica **margen %**, luego **IVA 16%** y **retención 4%** (ISR flete). Todos los parámetros se capturan por cotización.
+
+**Datos:** modelo `Cotizacion` (`folio`, `estado` BORRADOR/ENVIADA/ACEPTADA/RECHAZADA, `params`/`desglose` JSONB, totales Decimal, FK a Viaje; migración `20260608160000_cotizaciones`). El create congela los datos del viaje (km/kg/escalas) y el desglose.
+
+**API:** `CotizacionesModule` — `POST /cotizaciones/calcular` (previsualización sin persistir), `POST /viajes/:id/cotizaciones` (crea tomando datos del viaje), `GET /viajes/:id/cotizaciones`, `GET /cotizaciones/:id` (`JwtAuthGuard + AdminGuard`).
+
+**Web:** `CotizarDialog` (form de tarifas + **previsualización del desglose en vivo** vía `/calcular` con debounce) y `CotizacionesCard` en el detalle del viaje (lista + estado + total en MXN).
+
+**Verificado:** `tsc` API+web verde, **37/37 tests**; smoke en vivo: `calcular` = total $13,977.60 (= test unitario); `crear` congela datos reales del viaje (folio 1, total $14,737.79); lista OK; detalle web 200.
 
 ---
 

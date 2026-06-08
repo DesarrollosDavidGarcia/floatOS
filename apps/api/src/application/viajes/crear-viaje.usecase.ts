@@ -13,6 +13,7 @@ import {
   derivarResumen,
   itemsDeEscalas,
   nestedEscalasCreate,
+  snapshotRuta,
 } from './viaje-escalas.helper';
 import { CrearViajeInput, RELACIONES_DETALLE } from './viajes.types';
 
@@ -76,13 +77,16 @@ export class CrearViajeUseCase {
     }
 
     const sim = simularCarga(itemsDeEscalas(input.escalas));
-    const { km } = await this.motor.distanciaKm(input.escalas);
+    // La fecha programada (si es futura) hace que TomTom use tráfico predicho.
+    const ruta = await this.motor.distanciaKm(input.escalas, {
+      departAt: input.fechaProgramada,
+    });
     const resumen = derivarResumen(input.escalas, sim);
 
     const data: Prisma.ViajeCreateInput = {
       cliente: { connect: { id: input.clienteId } },
       ...resumen,
-      distanciaEstimadaKm: km,
+      ...snapshotRuta(ruta),
       fechaProgramada: input.fechaProgramada
         ? new Date(input.fechaProgramada)
         : undefined,

@@ -12,6 +12,7 @@ import {
   derivarResumen,
   itemsDeEscalas,
   nestedEscalasCreate,
+  snapshotRuta,
 } from './viaje-escalas.helper';
 import { EditarViajeInput, RELACIONES_DETALLE } from './viajes.types';
 
@@ -36,7 +37,7 @@ export class EditarViajeUseCase {
   async execute(id: string, input: EditarViajeInput) {
     const existe = await this.prisma.viaje.findUnique({
       where: { id },
-      select: { id: true, estado: true },
+      select: { id: true, estado: true, fechaProgramada: true },
     });
     if (!existe) {
       throw new NotFoundException(`Viaje con id ${id} no encontrado`);
@@ -69,12 +70,14 @@ export class EditarViajeUseCase {
     }
 
     const sim = simularCarga(itemsDeEscalas(input.escalas));
-    const { km } = await this.motor.distanciaKm(input.escalas);
+    // departAt = fecha programada efectiva (la nueva o la ya guardada) → tráfico predicho.
+    const departAt = (fechaProgramada ?? existe.fechaProgramada)?.toISOString();
+    const ruta = await this.motor.distanciaKm(input.escalas, { departAt });
     const resumen = derivarResumen(input.escalas, sim);
 
     const data: Prisma.ViajeUpdateInput = {
       ...resumen,
-      distanciaEstimadaKm: km,
+      ...snapshotRuta(ruta),
       fechaProgramada,
       escalas: { create: nestedEscalasCreate(input.escalas) },
     };

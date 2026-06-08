@@ -24,6 +24,9 @@ import { AsignarDialog } from '@/components/viajes/asignar-dialog';
 import { HistorialTimeline } from '@/components/viajes/historial-timeline';
 import { TrackingLink } from '@/components/viajes/tracking-link';
 import { VeredictoUnidadCard } from '@/components/viajes/veredicto-unidad-card';
+import { CotizacionesCard } from '@/components/cotizaciones/cotizaciones-card';
+import { PlanRutaDialog } from '@/components/viajes/plan-ruta-dialog';
+import { formatearDuracion, planificarRuta } from '@/components/viajes/plan-ruta';
 import type { Viaje } from '@/components/viajes/types';
 
 // Mapa con Leaflet: usa `window`, se carga solo en cliente.
@@ -98,6 +101,19 @@ export default function ViajeDetallePage() {
     );
   }
 
+  const salidaPlan = viaje.fechaProgramada ? new Date(viaje.fechaProgramada) : null;
+  const plan =
+    salidaPlan &&
+    viaje.tiempoEstimadoMin != null &&
+    !Number.isNaN(salidaPlan.getTime())
+      ? planificarRuta(
+          salidaPlan,
+          viaje.tiempoEstimadoMin,
+          viaje.escalas?.length ?? 0,
+          viaje.planRuta,
+        )
+      : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -148,8 +164,9 @@ export default function ViajeDetallePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Snapshot del motor de cálculo */}
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
                 <Dato label="Distancia" value={viaje.distanciaEstimadaKm != null ? `${viaje.distanciaEstimadaKm} km` : null} />
+                <Dato label="Conducción" value={viaje.tiempoEstimadoMin != null ? formatearDuracion(viaje.tiempoEstimadoMin) : null} />
                 <Dato label="Peso máx." value={viaje.pesoMaxKg != null ? `${viaje.pesoMaxKg} kg` : null} />
                 <Dato label="Volumen máx." value={viaje.volumenMaxM3 != null ? `${viaje.volumenMaxM3} m³` : null} />
               </div>
@@ -199,7 +216,10 @@ export default function ViajeDetallePage() {
             </CardHeader>
             <CardContent>
               <div className="h-80 w-full">
-                <MapaItinerario escalas={viaje.escalas ?? []} />
+                <MapaItinerario
+                  escalas={viaje.escalas ?? []}
+                  geometria={viaje.rutaGeometria ?? null}
+                />
               </div>
             </CardContent>
           </Card>
@@ -258,6 +278,47 @@ export default function ViajeDetallePage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-lg">Plan de viaje</CardTitle>
+                <CardDescription>Llegada estimada multi-día</CardDescription>
+              </div>
+              <PlanRutaDialog viaje={viaje} />
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {plan ? (
+                <>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Llegada estimada
+                    </p>
+                    <p className="font-medium">{fechaLarga(plan.llegada.toISOString())}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Dato label="Días de conducción" value={`${plan.diasConduccion}`} />
+                    <Dato label="Duración total" value={formatearDuracion(plan.totalMin)} />
+                    <Dato label="Al volante" value={formatearDuracion(plan.conduccionMin)} />
+                    <Dato label="Descansos" value={formatearDuracion(plan.descansoMin)} />
+                    <Dato label="Escalas" value={formatearDuracion(plan.servicioMin)} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {(viaje.planRuta?.horasConduccionDia ?? 9)} h/día · descanso{' '}
+                    {(viaje.planRuta?.horasDescanso ?? 11)} h · {(viaje.planRuta?.minutosPorEscala ?? 60)} min/escala
+                    {' '}· inicia {String(viaje.planRuta?.horaInicio ?? 8).padStart(2, '0')}:00
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  Asigna una <strong>fecha programada</strong> y calcula la ruta por
+                  carretera (TomTom) para estimar la llegada multi-día.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <CotizacionesCard viaje={viaje} />
 
           <VeredictoUnidadCard viaje={viaje} />
 

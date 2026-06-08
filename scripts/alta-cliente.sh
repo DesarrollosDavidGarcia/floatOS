@@ -11,6 +11,11 @@ set -euo pipefail
 #
 # Para varias instancias en el mismo VPS dale puertos distintos a cada una y
 # enruta por subdominio en el Nginx del host.
+#
+# Ruteo por carretera (opcional): exporta TOMTOM_API_KEY con la key de la
+# "Application" de ESTE cliente (una por instancia) antes de correr el script:
+#   TOMTOM_API_KEY=xxxxx ./scripts/alta-cliente.sh empresa-xyz 1.1.0
+# Sin ella, el motor usa distancia geodésica (línea recta).
 
 cd "$(dirname "$0")/.."
 
@@ -53,6 +58,8 @@ set_env ADMIN_EMAIL "$ADMIN_EMAIL"
 set_env ADMIN_PASSWORD "$ADMIN_PASS"
 set_env NGINX_HTTP_PORT "$HTTP_PORT"
 set_env NGINX_HTTPS_PORT "$HTTPS_PORT"
+# Ruteo por carretera: solo si se pasó TOMTOM_API_KEY en el entorno.
+[ -n "${TOMTOM_API_KEY:-}" ] && set_env TOMTOM_API_KEY "$TOMTOM_API_KEY"
 
 cd "$DEST"
 

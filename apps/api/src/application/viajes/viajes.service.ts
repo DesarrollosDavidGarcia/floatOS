@@ -5,6 +5,7 @@ import { ObtenerViajeUseCase } from './obtener-viaje.usecase';
 import { EditarViajeUseCase } from './editar-viaje.usecase';
 import { AsignarViajeUseCase } from './asignar-viaje.usecase';
 import { CambiarEstadoViajeUseCase } from './cambiar-estado-viaje.usecase';
+import { ActualizarPlanRutaUseCase } from './actualizar-plan-ruta.usecase';
 import { MotorViajeService } from './motor-viaje.service';
 import {
   AsignarViajeInput,
@@ -13,6 +14,7 @@ import {
   EditarViajeInput,
   EvaluarViajeInput,
   ListarViajesInput,
+  PlanRutaInput,
 } from './viajes.types';
 
 /**
@@ -28,6 +30,7 @@ export class ViajesService {
     private readonly editarViaje: EditarViajeUseCase,
     private readonly asignarViaje: AsignarViajeUseCase,
     private readonly cambiarEstadoViaje: CambiarEstadoViajeUseCase,
+    private readonly actualizarPlanRuta: ActualizarPlanRutaUseCase,
     private readonly motor: MotorViajeService,
   ) {}
 
@@ -63,6 +66,11 @@ export class ViajesService {
 
   asignar(id: string, input: AsignarViajeInput) {
     return this.asignarViaje.execute(id, input);
+  }
+
+  /** Guarda el plan multi-día del viaje (planeación de la llegada estimada). */
+  actualizarPlan(id: string, input: PlanRutaInput) {
+    return this.actualizarPlanRuta.execute(id, input);
   }
 
   cambiarEstado(

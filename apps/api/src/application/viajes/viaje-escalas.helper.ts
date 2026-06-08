@@ -51,6 +51,30 @@ export function derivarResumen(escalas: EscalaInput[], sim: CargaSimulada) {
   };
 }
 
+/** Resultado del motor de cálculo de ruta que se vuelca al snapshot del viaje. */
+interface ResultadoRuta {
+  km: number;
+  tiempoMin: number | null;
+  geometria: [number, number][] | null;
+}
+
+/**
+ * Campos snapshot de ruta para el create/update del Viaje. Centraliza el mapeo
+ * (geometría ausente → JsonNull) usado por crear y editar. La geometría ya viene
+ * simplificada/redondeada desde el proveedor de ruteo.
+ */
+export function snapshotRuta(ruta: ResultadoRuta): {
+  distanciaEstimadaKm: number;
+  tiempoEstimadoMin: number | null;
+  rutaGeometria: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+} {
+  return {
+    distanciaEstimadaKm: ruta.km,
+    tiempoEstimadoMin: ruta.tiempoMin,
+    rutaGeometria: ruta.geometria ?? Prisma.JsonNull,
+  };
+}
+
 /** Construye el `create` anidado de escalas (+ cargas) para Prisma. */
 export function nestedEscalasCreate(
   escalas: EscalaInput[],

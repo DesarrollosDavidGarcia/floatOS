@@ -7,7 +7,9 @@ import { ObtenerViajeUseCase } from '../../../application/viajes/obtener-viaje.u
 import { EditarViajeUseCase } from '../../../application/viajes/editar-viaje.usecase';
 import { AsignarViajeUseCase } from '../../../application/viajes/asignar-viaje.usecase';
 import { CambiarEstadoViajeUseCase } from '../../../application/viajes/cambiar-estado-viaje.usecase';
+import { ActualizarPlanRutaUseCase } from '../../../application/viajes/actualizar-plan-ruta.usecase';
 import { MotorViajeService } from '../../../application/viajes/motor-viaje.service';
+import { RoutingModule } from '../../../infrastructure/routing/routing.module';
 import { TrackingModule } from '../../ws/tracking/tracking.module';
 
 /**
@@ -18,7 +20,7 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
  * Exporta ViajesService para que el módulo de tracking pueda inyectarlo.
  */
 @Module({
-  imports: [TrackingModule],
+  imports: [TrackingModule, RoutingModule],
   controllers: [ViajesController],
   providers: [
     ViajesService,
@@ -29,6 +31,7 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
     EditarViajeUseCase,
     AsignarViajeUseCase,
     CambiarEstadoViajeUseCase,
+    ActualizarPlanRutaUseCase,
   ],
   exports: [ViajesService],
 })

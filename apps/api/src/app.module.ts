@@ -15,6 +15,7 @@ import { ConductoresModule } from './presentation/http/conductores/conductores.m
 import { ExpedienteModule } from './presentation/http/conductores/expediente/expediente.module';
 import { CatalogosModule } from './presentation/http/catalogos/catalogos.module';
 import { ViajesModule } from './presentation/http/viajes/viajes.module';
+import { CotizacionesModule } from './presentation/http/cotizaciones/cotizaciones.module';
 import { TrackingModule } from './presentation/ws/tracking/tracking.module';
 import { AlertasModule } from './presentation/http/alertas/alertas.module';
 
@@ -35,6 +36,7 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     ExpedienteModule,
     CatalogosModule,
     ViajesModule,
+    CotizacionesModule,
     TrackingModule,
     AlertasModule,
   ],
