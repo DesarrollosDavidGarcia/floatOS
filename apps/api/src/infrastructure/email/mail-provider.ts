@@ -7,7 +7,8 @@ export interface AdjuntoCorreo {
 
 /** Mensaje de correo independiente del proveedor. */
 export interface MensajeCorreo {
-  to: string;
+  /** Uno o varios destinatarios. */
+  to: string | string[];
   subject: string;
   text: string;
   html?: string;

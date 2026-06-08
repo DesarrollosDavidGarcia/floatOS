@@ -10,7 +10,7 @@ import { invalidarViajes } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { NumberField } from '@/components/ui/number-field';
 import {
   Dialog,
   DialogContent,
@@ -95,15 +95,10 @@ export function PlanRutaDialog({ viaje }: { viaje: Viaje }) {
           {CAMPOS.map((c) => (
             <div key={c.key} className="space-y-1.5">
               <Label htmlFor={c.key}>{c.label}</Label>
-              <Input
+              <NumberField
                 id={c.key}
-                type="number"
-                min={c.min}
-                max={c.max}
                 value={plan[c.key]}
-                onChange={(e) =>
-                  setPlan((prev) => ({ ...prev, [c.key]: Number(e.target.value) }))
-                }
+                onChange={(n) => setPlan((prev) => ({ ...prev, [c.key]: n }))}
               />
               <p className="text-xs text-muted-foreground">{c.hint}</p>
             </div>

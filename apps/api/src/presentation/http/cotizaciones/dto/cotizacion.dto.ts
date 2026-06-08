@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsInt,
@@ -48,7 +50,11 @@ export class CrearCotizacionDto {
   @IsOptional() @IsString() notas?: string;
 }
 
-/** Enviar cotización por correo. Si `to` se omite, usa el correo del cliente. */
+/** Enviar cotización por correo. Si `to` se omite/vacío, usa el correo del cliente. */
 export class EnviarCotizacionDto {
-  @IsOptional() @IsEmail({}, { message: 'Correo destino inválido' }) to?: string;
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20, { message: 'Máximo 20 destinatarios' })
+  @IsEmail({}, { each: true, message: 'Correo destino inválido' })
+  to?: string[];
 }

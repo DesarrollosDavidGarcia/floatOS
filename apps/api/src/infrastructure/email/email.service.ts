@@ -42,22 +42,23 @@ export class EmailService {
 
   /** Envía un correo con el proveedor activo. `false` si no hay proveedor o falló. */
   async enviar(mensaje: MensajeCorreo): Promise<boolean> {
+    const to = Array.isArray(mensaje.to) ? mensaje.to.join(', ') : mensaje.to;
     const provider = this.activo();
     if (!provider) {
       this.logger.log(
-        `[correo deshabilitado] a ${mensaje.to} — "${mensaje.subject}" (sin Brevo/SMTP)`,
+        `[correo deshabilitado] a ${to} — "${mensaje.subject}" (sin Brevo/SMTP)`,
       );
       return false;
     }
     try {
       await provider.enviar(mensaje, this.from);
       this.logger.log(
-        `Correo enviado vía ${provider.nombre} a ${mensaje.to}: "${mensaje.subject}"`,
+        `Correo enviado vía ${provider.nombre} a ${to}: "${mensaje.subject}"`,
       );
       return true;
     } catch (e) {
       this.logger.error(
-        `Falló el envío vía ${provider.nombre} a ${mensaje.to}: ${(e as Error).message}`,
+        `Falló el envío vía ${provider.nombre} a ${to}: ${(e as Error).message}`,
       );
       return false;
     }

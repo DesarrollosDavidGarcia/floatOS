@@ -193,9 +193,10 @@ export class CotizacionesService {
 
   /**
    * Envía la cotización por correo (PDF adjunto) vía EmailService (Brevo/SMTP).
-   * Destinatario: `to` o el correo de contacto del cliente. Marca ENVIADA si sale.
+   * Destinatarios: la lista `to`, o el correo de contacto del cliente si va vacía.
+   * Marca ENVIADA si sale.
    */
-  async enviar(id: string, to?: string) {
+  async enviar(id: string, to?: string[]) {
     const info = await this.prisma.cotizacion.findUnique({
       where: { id },
       select: {
@@ -205,10 +206,16 @@ export class CotizacionesService {
     });
     if (!info) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
 
-    const destinatario = to?.trim() || info.viaje.cliente?.contactoEmail || '';
-    if (!destinatario) {
+    const capturados = [...new Set((to ?? []).map((s) => s.trim()).filter(Boolean))];
+    const fallbackCliente = info.viaje.cliente?.contactoEmail;
+    const destinatarios = capturados.length
+      ? capturados
+      : fallbackCliente
+        ? [fallbackCliente]
+        : [];
+    if (!destinatarios.length) {
       throw new BadRequestException(
-        'No hay correo destino: captúralo o registra el correo de contacto del cliente.',
+        'No hay correo destino: captura al menos uno o registra el correo de contacto del cliente.',
       );
     }
 
@@ -221,7 +228,7 @@ export class CotizacionesService {
       `<p>Saludos,<br/>${empresa}</p>`;
 
     const enviado = await this.email.enviar({
-      to: destinatario,
+      to: destinatarios,
       subject,
       text,
       html,

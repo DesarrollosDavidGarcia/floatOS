@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { NumberField } from '@/components/ui/number-field';
 import {
   Dialog,
   DialogContent,
@@ -137,13 +138,10 @@ export function CotizarDialog({
           {CAMPOS.map((c) => (
             <div key={c.key} className="space-y-1.5">
               <Label htmlFor={c.key}>{c.label}</Label>
-              <Input
+              <NumberField
                 id={c.key}
-                type="number"
-                min={0}
-                step="0.01"
                 value={params[c.key] as number}
-                onChange={(e) => set(c.key, Number(e.target.value))}
+                onChange={(n) => set(c.key, n)}
               />
             </div>
           ))}

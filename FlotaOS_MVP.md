@@ -809,6 +809,14 @@ Generación del **PDF** de la cotización (server-side con `pdfkit`, sin Chromiu
 
 **Verificado:** `tsc` API+web verde; smoke: editar borrador → 200 (total recalculado, sigue BORRADOR), editar enviada → **409**; detalle web 200.
 
+### 2026-06-08 — Cotizaciones: input numérico robusto + envío a varios correos ✅
+
+**`NumberField` (UI):** componente reutilizable de input numérico que arranca **vacío** cuando el valor es 0 (placeholder "0") y maneja su propio texto mientras está enfocado → se acabó el "05334" al editar (el `select()` en focus no bastaba: el clic de mouse lo deshacía). Permite vaciar y teclear decimales. Aplicado a los inputs del diálogo de cotización y del plan de viaje.
+
+**Envío a múltiples destinatarios:** `EnviarCotizacionDto.to` pasa de `string` a `string[]` (`@IsEmail each`, `@ArrayMaxSize(20)`); el `MensajeCorreo.to` del servicio de correo reutilizable acepta `string | string[]` (Brevo → array de `{email}`; SMTP → join por comas). El servicio dedup y cae al `contactoEmail` del cliente si la lista va vacía. Web: el diálogo "Enviar" ahora es un **multi-correo** (input + "Agregar" + chips removibles).
+
+**Verificado:** `tsc` API+web verde; smoke en vivo: envío a **2 correos** vía Brevo (201, ENVIADA; log confirma ambos destinatarios), correo inválido en la lista → 400.
+
 ---
 
 ## Riesgos técnicos

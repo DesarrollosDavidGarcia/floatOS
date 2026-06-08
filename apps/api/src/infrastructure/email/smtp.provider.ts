@@ -45,7 +45,7 @@ export class SmtpMailProvider implements MailProvider {
     if (!this.transporter) throw new Error('SMTP no configurado');
     await this.transporter.sendMail({
       from,
-      to: m.to,
+      to: Array.isArray(m.to) ? m.to.join(', ') : m.to,
       subject: m.subject,
       text: m.text,
       html: m.html,
