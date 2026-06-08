@@ -146,6 +146,9 @@ export function CotizarDialog({ viaje }: { viaje: Viaje }) {
                 <li key={i} className="flex justify-between gap-2">
                   <span>
                     {l.concepto}
+                    {l.pasaCosto ? (
+                      <span className="text-xs font-medium text-amber-600"> · a costo</span>
+                    ) : null}
                     {l.detalle ? (
                       <span className="text-xs text-muted-foreground"> · {l.detalle}</span>
                     ) : null}
@@ -156,7 +159,7 @@ export function CotizarDialog({ viaje }: { viaje: Viaje }) {
             </ul>
             <div className="mt-2 space-y-1 border-t pt-2 text-muted-foreground">
               <Renglon label="Subtotal conceptos" valor={preview.subtotalConceptos} />
-              <Renglon label={`Margen (${params.margenPct}%)`} valor={preview.margen} />
+              <Renglon label={`Margen ${params.margenPct}% (s/ servicio)`} valor={preview.margen} />
               <Renglon label="Subtotal" valor={preview.subtotal} />
               {preview.iva > 0 && <Renglon label="IVA 16%" valor={preview.iva} />}
               {preview.retencion > 0 && (

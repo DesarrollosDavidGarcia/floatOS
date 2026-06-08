@@ -791,7 +791,17 @@ Generación del **PDF** de la cotización (server-side con `pdfkit`, sin Chromiu
 
 **Envío de cotización:** `POST /cotizaciones/:id/enviar` (`EnviarCotizacionDto` con `to` opcional → default al `contactoEmail` del cliente) genera el PDF, lo adjunta y envía vía `EmailService`; si sale, marca `estado=ENVIADA` + `enviadaEn`. Web: diálogo **"Enviar"** por cotización. `.env.example`: `EMAIL_FROM`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL/NAME`.
 
-**Verificado:** `tsc` API+web verde, 37/37 tests; API bootea con el módulo compartido (DI OK); smoke: envío sin Brevo/mailserver dev → **503 limpio** identificando el proveedor activo (no marca ENVIADA), correo inválido → 400. Falta solo una `BREVO_API_KEY` real + remitente verificado para envío en vivo.
+**Verificado:** `tsc` API+web verde, 37/37 tests; API bootea con el módulo compartido (DI OK); smoke: envío sin Brevo/mailserver dev → **503 limpio** identificando el proveedor activo (no marca ENVIADA), correo inválido → 400. **Envío en vivo OK (2026-06-08):** con `BREVO_API_KEY` real + remitente verificado (`desarrollosdavidg@gmail.com`), correo enviado vía Brevo con el PDF adjunto, cotización marcada ENVIADA. *(La cuenta tenía restricción de "IPs autorizadas"; se autorizó la IP.)*
+
+### 2026-06-08 — Cotizaciones: PDF (UI) + auditoría del motor + pass-through ✅
+
+**PDF (UI/UX):** direcciones origen/destino en fuente menor (8 pt) y etiquetadas; la tabla arranca dinámicamente debajo del bloque cliente/viaje (`heightOfString`, ya no se encima con direcciones largas); tabla de conceptos rediseñada (banda de encabezado, filas zebra, columna de importe alineada, alto de fila dinámico).
+
+**Auditoría del motor de cotización + fixes:** C3 preview↔guardado del peso unificado (`??` en ambos); C4 detalle de combustible como fórmula (consistente con el monto); C6 topes superiores en el DTO (frenan typos, p. ej. diésel→400); C8 +3 tests (NaN/negativos, todo-en-0, redondeo). El motor estaba correcto en lo esencial (matemática, orden, base de IVA/retención, arquitectura pura sin duplicar).
+
+**Cambio de negocio — margen solo al servicio:** el margen aplica únicamente al **servicio** (flete + km + kg + maniobras); **combustible y casetas van a costo** (pass-through, flag `pasaCosto`, sin margen pero suman al total). Se refleja en el desglose del diálogo y el PDF ("a costo" / "Margen s/ servicio").
+
+**Verificado:** `tsc` API+web verde, **41/41 tests**; smoke `calcular` = total **$13,440** (margen $1,600 = 20% s/ servicio $8,000; casetas/combustible a costo); PDF regenerado 1 página; tope DTO diésel 2400 → 400.
 
 ---
 

@@ -18,6 +18,8 @@ export interface LineaCotizacion {
   concepto: string;
   monto: number;
   detalle?: string;
+  /** true = pass-through (a costo, sin margen). */
+  pasaCosto?: boolean;
 }
 
 /** Resultado del motor (lo devuelve /cotizaciones/calcular). */

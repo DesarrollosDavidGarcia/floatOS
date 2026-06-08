@@ -1,9 +1,14 @@
 /**
  * Motor de cotización (TS puro, sin Nest/Prisma). Modelo "mixto configurable":
  * arma líneas de concepto (flete base + $/km + $/kg + combustible + casetas +
- * maniobras), aplica margen y luego IVA y retención. Todos los parámetros se
+ * maniobras). El **margen aplica solo al servicio** (flete + km + kg + maniobras);
+ * **combustible y casetas van a costo** (pass-through, sin margen) pero suman al
+ * total. Luego IVA y retención sobre la base gravable. Todos los parámetros se
  * capturan por cotización; los datos del viaje (km, kg, escalas) se inyectan.
  */
+
+/** Conceptos pass-through: se cobran a costo (el margen NO aplica sobre ellos). */
+const CONCEPTOS_A_COSTO = new Set(['Combustible', 'Casetas']);
 
 export const IVA_TASA = 0.16;
 /** Retención de ISR por servicios de autotransporte de carga (cliente moral). */
@@ -36,6 +41,8 @@ export interface LineaCotizacion {
   concepto: string;
   monto: number;
   detalle?: string;
+  /** true = pass-through (a costo, sin margen). */
+  pasaCosto?: boolean;
 }
 
 /** Resultado del motor: líneas + subtotales + impuestos + total. */
@@ -65,7 +72,9 @@ export function cotizar(
   const lineas: LineaCotizacion[] = [];
   const agregar = (concepto: string, monto: number, detalle?: string): void => {
     const m = r2(num(monto));
-    if (m > 0) lineas.push({ concepto, monto: m, detalle });
+    if (m > 0) {
+      lineas.push({ concepto, monto: m, detalle, pasaCosto: CONCEPTOS_A_COSTO.has(concepto) });
+    }
   };
 
   agregar('Flete base', p.tarifaBase);
@@ -73,7 +82,13 @@ export function cotizar(
   agregar('Peso', num(p.precioPorKg) * kg, `${kg} kg × $${num(p.precioPorKg)}/kg`);
   if (num(p.rendimientoKmL) > 0 && num(p.precioDiesel) > 0) {
     const litros = km / p.rendimientoKmL;
-    agregar('Combustible', litros * p.precioDiesel, `${r2(litros)} L × $${num(p.precioDiesel)}/L`);
+    // Detalle como fórmula (km ÷ rendimiento × precio) para que sea consistente
+    // con el monto sin mostrar un producto intermedio redondeado que no cuadre.
+    agregar(
+      'Combustible',
+      litros * p.precioDiesel,
+      `${km} km ÷ ${num(p.rendimientoKmL)} km/L × $${num(p.precioDiesel)}/L`,
+    );
   }
   agregar('Casetas', p.casetas);
   agregar(
@@ -83,7 +98,11 @@ export function cotizar(
   );
 
   const subtotalConceptos = r2(lineas.reduce((s, l) => s + l.monto, 0));
-  const margen = r2(subtotalConceptos * (num(p.margenPct) / 100));
+  // El margen aplica solo al servicio (excluye los conceptos a costo).
+  const baseServicio = r2(
+    lineas.filter((l) => !l.pasaCosto).reduce((s, l) => s + l.monto, 0),
+  );
+  const margen = r2(baseServicio * (num(p.margenPct) / 100));
   const subtotal = r2(subtotalConceptos + margen);
   const iva = p.aplicaIva ? r2(subtotal * IVA_TASA) : 0;
   const retencion = p.aplicaRetencion ? r2(subtotal * RETENCION_TASA) : 0;

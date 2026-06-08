@@ -11,15 +11,19 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-/** Tarifas/parámetros capturados para la cotización (modelo mixto configurable). */
+/**
+ * Tarifas/parámetros capturados para la cotización (modelo mixto configurable).
+ * Los topes superiores son sanity-checks contra capturas erróneas (no límites de
+ * negocio): frenan typos absurdos sin estorbar valores reales de flete.
+ */
 export class ParamsCotizacionDto {
-  @IsNumber() @Min(0) tarifaBase!: number;
-  @IsNumber() @Min(0) precioPorKm!: number;
-  @IsNumber() @Min(0) precioPorKg!: number;
-  @IsNumber() @Min(0) precioDiesel!: number;
-  @IsNumber() @Min(0) rendimientoKmL!: number;
-  @IsNumber() @Min(0) casetas!: number;
-  @IsNumber() @Min(0) maniobrasPorEscala!: number;
+  @IsNumber() @Min(0) @Max(10_000_000) tarifaBase!: number;
+  @IsNumber() @Min(0) @Max(100_000) precioPorKm!: number;
+  @IsNumber() @Min(0) @Max(100_000) precioPorKg!: number;
+  @IsNumber() @Min(0) @Max(1_000) precioDiesel!: number;
+  @IsNumber() @Min(0) @Max(100) rendimientoKmL!: number;
+  @IsNumber() @Min(0) @Max(1_000_000) casetas!: number;
+  @IsNumber() @Min(0) @Max(1_000_000) maniobrasPorEscala!: number;
   @IsNumber() @Min(0) @Max(500) margenPct!: number;
   @IsBoolean() aplicaIva!: boolean;
   @IsBoolean() aplicaRetencion!: boolean;

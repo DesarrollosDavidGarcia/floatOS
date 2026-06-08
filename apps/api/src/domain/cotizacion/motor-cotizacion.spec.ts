@@ -15,15 +15,27 @@ const BASE: ParamsCotizacion = {
 const DATOS = { distanciaKm: 200, pesoKg: 1000, numEscalas: 2 };
 
 describe('cotizar', () => {
-  it('desglosa conceptos, margen, IVA y retención', () => {
+  it('desglosa conceptos, margen (solo servicio), IVA y retención', () => {
     const r = cotizar(BASE, DATOS);
-    // Flete 2000 + Distancia 5000 + Combustible 1600 + Casetas 800 + Maniobras 1000
+    // Conceptos: Flete 2000 + Distancia 5000 + Combustible 1600 + Casetas 800 + Maniobras 1000
     expect(r.subtotalConceptos).toBe(10400);
-    expect(r.margen).toBe(2080); // 20%
-    expect(r.subtotal).toBe(12480);
-    expect(r.iva).toBe(1996.8); // 16%
-    expect(r.retencion).toBe(499.2); // 4%
-    expect(r.total).toBe(13977.6); // subtotal + IVA - retención
+    // Margen 20% SOLO sobre servicio (Flete+Distancia+Maniobras = 8000), no casetas/combustible.
+    expect(r.margen).toBe(1600);
+    expect(r.subtotal).toBe(12000); // 10400 + 1600
+    expect(r.iva).toBe(1920); // 16%
+    expect(r.retencion).toBe(480); // 4%
+    expect(r.total).toBe(13440); // subtotal + IVA - retención
+  });
+
+  it('casetas y combustible van a costo (sin margen)', () => {
+    const r = cotizar(
+      { ...BASE, tarifaBase: 0, precioPorKm: 0, precioPorKg: 0, maniobrasPorEscala: 0, margenPct: 50, aplicaIva: false, aplicaRetencion: false },
+      DATOS,
+    );
+    // Solo quedan Combustible (1600) + Casetas (800), ambos pass-through.
+    expect(r.lineas.every((l) => l.pasaCosto)).toBe(true);
+    expect(r.margen).toBe(0);
+    expect(r.subtotal).toBe(2400);
   });
 
   it('omite la línea de peso cuando $/kg = 0', () => {
@@ -53,5 +65,43 @@ describe('cotizar', () => {
     const r = cotizar(BASE, DATOS);
     const comb = r.lineas.find((l) => l.concepto === 'Combustible');
     expect(comb?.monto).toBe(1600); // 200/3 L × $24
+  });
+
+  it('inputs negativos o NaN se tratan como 0 (línea omitida)', () => {
+    const r = cotizar(
+      { ...BASE, precioPorKm: -10, casetas: NaN as unknown as number, tarifaBase: 1000 },
+      DATOS,
+    );
+    expect(r.lineas.find((l) => l.concepto === 'Distancia')).toBeUndefined();
+    expect(r.lineas.find((l) => l.concepto === 'Casetas')).toBeUndefined();
+    expect(r.lineas.find((l) => l.concepto === 'Flete base')?.monto).toBe(1000);
+  });
+
+  it('todos los parámetros en 0 → cotización vacía con total 0', () => {
+    const cero = {
+      tarifaBase: 0,
+      precioPorKm: 0,
+      precioPorKg: 0,
+      precioDiesel: 0,
+      rendimientoKmL: 0,
+      casetas: 0,
+      maniobrasPorEscala: 0,
+      margenPct: 0,
+      aplicaIva: true,
+      aplicaRetencion: true,
+    };
+    const r = cotizar(cero, DATOS);
+    expect(r.lineas).toHaveLength(0);
+    expect(r.subtotalConceptos).toBe(0);
+    expect(r.total).toBe(0);
+  });
+
+  it('redondea con margen fraccionario', () => {
+    const r = cotizar(
+      { ...BASE, margenPct: 12.5, aplicaIva: false, aplicaRetencion: false },
+      DATOS,
+    );
+    expect(r.margen).toBe(1000); // 8000 (servicio) × 12.5%
+    expect(r.total).toBe(11400); // 10400 + 1000
   });
 });

@@ -22,7 +22,12 @@ export interface DatosCotizacionPdf {
     folio: number;
     fecha: Date;
     moneda: string;
-    lineas: Array<{ concepto: string; monto: number; detalle?: string }>;
+    lineas: Array<{
+      concepto: string;
+      monto: number;
+      detalle?: string;
+      pasaCosto?: boolean;
+    }>;
     subtotalConceptos: number;
     margen: number;
     subtotal: number;
@@ -87,49 +92,112 @@ export function generarCotizacionPdf(d: DatosCotizacionPdf): Promise<Buffer> {
     doc.fillColor('#000000');
     linea(doc, 120);
 
-    // ── Cliente + viaje ──
-    let y = 135;
-    doc.fontSize(9).fillColor(GRIS).text('CLIENTE', COL_IZQ, y);
-    doc.fontSize(11).fillColor('#000000').font('Helvetica-Bold').text(d.cliente.razonSocial, COL_IZQ, y + 12);
-    if (d.cliente.rfc) {
-      doc.fontSize(9).font('Helvetica').fillColor(GRIS).text(`RFC: ${d.cliente.rfc}`, COL_IZQ, y + 28);
-    }
+    // ── Cliente (izq) + viaje (der) ──
+    const bloqueY = 135;
+    const VIAJE_X = 320;
+    const colW = COL_DER - VIAJE_X;
 
-    doc.fontSize(9).fillColor(GRIS).font('Helvetica').text('VIAJE', 320, y);
-    doc.fontSize(10).fillColor('#000000').text(`#${d.viaje.folio}  ${d.viaje.origen} → ${d.viaje.destino}`, 320, y + 12, { width: COL_DER - 320 });
+    doc.fontSize(9).fillColor(GRIS).font('Helvetica').text('CLIENTE', COL_IZQ, bloqueY);
+    doc
+      .fontSize(11)
+      .fillColor('#000000')
+      .font('Helvetica-Bold')
+      .text(d.cliente.razonSocial, COL_IZQ, bloqueY + 12, { width: VIAJE_X - COL_IZQ - 20 });
+    if (d.cliente.rfc) {
+      doc.fontSize(9).font('Helvetica').fillColor(GRIS).text(`RFC: ${d.cliente.rfc}`, COL_IZQ);
+    }
+    const clienteBottom = doc.y;
+
+    doc.fontSize(9).fillColor(GRIS).font('Helvetica').text('VIAJE', VIAJE_X, bloqueY);
+    doc
+      .fontSize(9)
+      .fillColor('#000000')
+      .font('Helvetica-Bold')
+      .text(`#${d.viaje.folio}`, VIAJE_X, bloqueY + 12);
+    // Direcciones en fuente menor (8 pt) para que no abarquen tanto.
+    const direccion = (etiqueta: string, valor: string): void => {
+      doc
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .fillColor(GRIS)
+        .text(etiqueta, VIAJE_X, undefined, { width: colW, continued: true })
+        .font('Helvetica')
+        .fillColor('#000000')
+        .text(valor);
+    };
+    direccion('Origen  ', d.viaje.origen);
+    direccion('Destino  ', d.viaje.destino);
     const meta = [
       d.viaje.distanciaKm != null ? `${d.viaje.distanciaKm} km` : null,
       d.viaje.pesoKg != null ? `${d.viaje.pesoKg} kg` : null,
       `${d.viaje.numEscalas} escala(s)`,
-    ].filter(Boolean).join(' · ');
-    doc.fontSize(9).fillColor(GRIS).text(meta, 320, undefined, { width: COL_DER - 320 });
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    doc.fontSize(8).fillColor(GRIS).font('Helvetica').text(meta, VIAJE_X, undefined, { width: colW });
+    const viajeBottom = doc.y;
 
     // ── Tabla de conceptos ──
-    y = 200;
-    doc.fontSize(9).fillColor(GRIS).font('Helvetica-Bold');
-    doc.text('CONCEPTO', COL_IZQ, y);
-    doc.text('IMPORTE', 350, y, { width: COL_DER - 350, align: 'right' });
-    linea(doc, y + 14);
-    y += 22;
+    let y = Math.max(clienteBottom, viajeBottom) + 18;
 
-    doc.font('Helvetica').fillColor('#000000');
-    for (const l of d.cotizacion.lineas) {
-      doc.fontSize(10).fillColor('#000000').text(l.concepto, COL_IZQ, y, { width: 290 });
-      doc.text(mxn.format(l.monto), 350, y, { width: COL_DER - 350, align: 'right' });
-      let alto = 14;
-      if (l.detalle) {
-        doc.fontSize(8).fillColor(GRIS).text(l.detalle, COL_IZQ, y + 12, { width: 290 });
-        alto = 26;
+    const PAD = 8;
+    const IMP_W = 110;
+    const CONC_X = COL_IZQ + PAD;
+    const CONC_W = COL_DER - COL_IZQ - IMP_W - PAD * 3;
+    const IMP_X = COL_DER - IMP_W - PAD;
+    const HEAD_H = 18;
+
+    // Encabezado con banda.
+    doc.rect(COL_IZQ, y, COL_DER - COL_IZQ, HEAD_H).fill('#eef0f2');
+    doc.fillColor(GRIS).font('Helvetica-Bold').fontSize(9);
+    doc.text('CONCEPTO', CONC_X, y + 5);
+    doc.text('IMPORTE', IMP_X, y + 5, { width: IMP_W, align: 'right' });
+    y += HEAD_H;
+
+    // Filas con alto dinámico y zebra.
+    d.cotizacion.lineas.forEach((l, i) => {
+      // En pass-through, el detalle antepone "a costo".
+      const detalle = l.pasaCosto
+        ? ['a costo', l.detalle].filter(Boolean).join(' · ')
+        : l.detalle;
+      doc.font('Helvetica').fontSize(10);
+      const hConcepto = doc.heightOfString(l.concepto, { width: CONC_W });
+      let hDetalle = 0;
+      if (detalle) {
+        doc.fontSize(8);
+        hDetalle = doc.heightOfString(detalle, { width: CONC_W });
       }
-      y += alto;
-    }
+      const rowH = Math.max(20, hConcepto + hDetalle + 8);
+
+      if (i % 2 === 1) {
+        doc.rect(COL_IZQ, y, COL_DER - COL_IZQ, rowH).fill('#fafafa');
+      }
+      doc
+        .fillColor('#000000')
+        .font('Helvetica')
+        .fontSize(10)
+        .text(l.concepto, CONC_X, y + 5, { width: CONC_W });
+      if (detalle) {
+        doc
+          .fillColor(l.pasaCosto ? '#b45309' : GRIS)
+          .font('Helvetica')
+          .fontSize(8)
+          .text(detalle, CONC_X, y + 5 + hConcepto, { width: CONC_W });
+      }
+      doc
+        .fillColor('#000000')
+        .font('Helvetica')
+        .fontSize(10)
+        .text(mxn.format(l.monto), IMP_X, y + 5, { width: IMP_W, align: 'right' });
+      y += rowH;
+    });
 
     // ── Totales (bloque derecho) ──
     linea(doc, y + 2);
-    y += 10;
+    y += 12;
     const c = d.cotizacion;
     y = total(doc, y, 'Subtotal conceptos', mxn.format(c.subtotalConceptos));
-    y = total(doc, y, 'Margen', mxn.format(c.margen));
+    y = total(doc, y, 'Margen (s/ servicio)', mxn.format(c.margen));
     y = total(doc, y, 'Subtotal', mxn.format(c.subtotal));
     if (c.iva > 0) y = total(doc, y, 'IVA 16%', mxn.format(c.iva));
     if (c.retencion > 0) y = total(doc, y, 'Retención 4%', `- ${mxn.format(c.retencion)}`);

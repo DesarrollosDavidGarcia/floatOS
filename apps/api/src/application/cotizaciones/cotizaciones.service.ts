@@ -53,7 +53,9 @@ export class CotizacionesService {
 
     const datos: DatosCotizacion = {
       distanciaKm: dec(viaje.distanciaEstimadaKm),
-      pesoKg: dec(viaje.pesoMaxKg) || dec(viaje.pesoKg),
+      // Mismo criterio que el preview del diálogo (`??`): usa pesoMaxKg si existe
+      // —incluido 0—, si no el pesoKg. Evita que preview y guardado difieran.
+      pesoKg: viaje.pesoMaxKg != null ? Number(viaje.pesoMaxKg) : dec(viaje.pesoKg),
       numEscalas: viaje._count.escalas,
     };
     const r = cotizar(params, datos);
