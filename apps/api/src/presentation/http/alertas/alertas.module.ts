@@ -1,6 +1,6 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { EscaneoVencimientosService } from '../../../application/alertas/escaneo-vencimientos.service';
-import { EmailService } from '../../../infrastructure/email/email.service';
+import { EmailModule } from '../../../infrastructure/email/email.module';
 import { AlertasQueue } from '../../../infrastructure/queues/alertas.queue';
 import { AlertasWorker } from '../../../infrastructure/queues/alertas.worker';
 import { AlertasController } from './alertas.controller';
@@ -18,13 +18,9 @@ import { AlertasController } from './alertas.controller';
  * PrismaModule es @Global: PrismaService se inyecta sin importarlo aquí.
  */
 @Module({
+  imports: [EmailModule],
   controllers: [AlertasController],
-  providers: [
-    EscaneoVencimientosService,
-    EmailService,
-    AlertasQueue,
-    AlertasWorker,
-  ],
+  providers: [EscaneoVencimientosService, AlertasQueue, AlertasWorker],
   exports: [EscaneoVencimientosService],
 })
 export class AlertasModule implements OnModuleInit {

@@ -1,90 +1,65 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import { Injectable, Logger } from '@nestjs/common';
+import { BrevoMailProvider } from './brevo.provider';
+import { SmtpMailProvider } from './smtp.provider';
+import type { MailProvider, MensajeCorreo } from './mail-provider';
 
 /**
- * Servicio de envío de correo vía SMTP (Nodemailer).
- *
- * Configuración por variables de entorno:
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM.
- *
- * Si el SMTP no está configurado (falta host), el servicio NO truena: solo
- * registra en consola lo que habría enviado. Esto permite correr el sistema
- * en desarrollo sin un servidor de correo.
+ * Servicio de correo reutilizable. Elige el proveedor activo (Brevo si hay key,
+ * si no SMTP) y expone `enviar()` con soporte de adjuntos. No propaga errores:
+ * registra y devuelve si se envió, para que ninguna feature se caiga por correo.
  */
 @Injectable()
-export class EmailService implements OnModuleInit {
+export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter | null = null;
-  private from = '';
 
-  onModuleInit(): void {
-    const host = process.env.SMTP_HOST;
-    if (!host) {
-      this.logger.warn(
-        'SMTP no configurado (falta SMTP_HOST). Los correos se registrarán en consola sin enviarse.',
-      );
-      return;
-    }
+  constructor(
+    private readonly brevo: BrevoMailProvider,
+    private readonly smtp: SmtpMailProvider,
+  ) {}
 
-    const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASSWORD;
-    this.from = process.env.SMTP_FROM ?? user ?? 'no-reply@flotaos.local';
-
-    try {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        // 465 implica conexión TLS implícita; el resto usa STARTTLS.
-        secure: port === 465,
-        auth: user && pass ? { user, pass } : undefined,
-      });
-      this.logger.log(`SMTP configurado: ${host}:${port}`);
-    } catch (error) {
-      this.transporter = null;
-      this.logger.error(
-        `No se pudo inicializar el transporte SMTP: ${(error as Error).message}`,
-      );
-    }
+  private get from(): string {
+    return (
+      process.env.EMAIL_FROM ||
+      process.env.SMTP_FROM ||
+      'no-reply@flotaos.local'
+    );
   }
 
-  /** Indica si hay un transporte SMTP listo para enviar. */
+  /** Proveedor activo: Brevo si hay key; si no, SMTP; null si ninguno. */
+  private activo(): MailProvider | null {
+    if (this.brevo.disponible()) return this.brevo;
+    if (this.smtp.disponible()) return this.smtp;
+    return null;
+  }
+
   estaConfigurado(): boolean {
-    return this.transporter !== null;
+    return this.activo() !== null;
   }
 
-  /**
-   * Envía un correo. Si no hay SMTP configurado, solo lo registra (no truena).
-   * Si el envío falla, registra el error y NO lo propaga (las alertas no deben
-   * tumbar el job).
-   */
-  async enviar(opciones: {
-    to: string;
-    subject: string;
-    text: string;
-    html?: string;
-  }): Promise<void> {
-    if (!this.transporter) {
-      this.logger.log(
-        `[SMTP deshabilitado] Correo NO enviado a ${opciones.to} — Asunto: "${opciones.subject}"`,
-      );
-      return;
-    }
+  proveedorActivo(): string {
+    return this.activo()?.nombre ?? 'ninguno';
+  }
 
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
-        to: opciones.to,
-        subject: opciones.subject,
-        text: opciones.text,
-        html: opciones.html,
-      });
-      this.logger.log(`Correo enviado a ${opciones.to}: "${opciones.subject}"`);
-    } catch (error) {
-      this.logger.error(
-        `Falló el envío de correo a ${opciones.to}: ${(error as Error).message}`,
+  /** Envía un correo con el proveedor activo. `false` si no hay proveedor o falló. */
+  async enviar(mensaje: MensajeCorreo): Promise<boolean> {
+    const provider = this.activo();
+    if (!provider) {
+      this.logger.log(
+        `[correo deshabilitado] a ${mensaje.to} — "${mensaje.subject}" (sin Brevo/SMTP)`,
       );
+      return false;
+    }
+    try {
+      await provider.enviar(mensaje, this.from);
+      this.logger.log(
+        `Correo enviado vía ${provider.nombre} a ${mensaje.to}: "${mensaje.subject}"`,
+      );
+      return true;
+    } catch (e) {
+      this.logger.error(
+        `Falló el envío vía ${provider.nombre} a ${mensaje.to}: ${(e as Error).message}`,
+      );
+      return false;
     }
   }
 }

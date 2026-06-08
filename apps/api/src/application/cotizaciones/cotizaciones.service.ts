@@ -1,11 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { EmailService } from '../../infrastructure/email/email.service';
 import {
   cotizar,
   type DatosCotizacion,
+  type LineaCotizacion,
   type ParamsCotizacion,
 } from '../../domain/cotizacion/motor-cotizacion';
+import {
+  generarCotizacionPdf,
+  type DatosCotizacionPdf,
+} from '../../infrastructure/pdf/cotizacion-pdf';
 
 const dec = (v: Prisma.Decimal | null): number => (v == null ? 0 : Number(v));
 
@@ -15,7 +26,10 @@ const dec = (v: Prisma.Decimal | null): number => (v == null ? 0 : Number(v));
  */
 @Injectable()
 export class CotizacionesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   /** Previsualización (no persiste): corre el motor con params + datos dados. */
   calcular(params: ParamsCotizacion, datos: DatosCotizacion) {
@@ -77,5 +91,122 @@ export class CotizacionesService {
     const cot = await this.prisma.cotizacion.findUnique({ where: { id } });
     if (!cot) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
     return cot;
+  }
+
+  /** Genera el PDF de una cotización (datos del emisor por env, por instancia). */
+  async generarPdf(id: string): Promise<{ buffer: Buffer; folio: number }> {
+    const cot = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      include: {
+        viaje: {
+          select: {
+            folio: true,
+            origenDireccion: true,
+            destinoDireccion: true,
+            cliente: { select: { razonSocial: true, rfc: true } },
+          },
+        },
+      },
+    });
+    if (!cot) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
+
+    const desglose = cot.desglose as unknown as {
+      lineas: LineaCotizacion[];
+      subtotalConceptos: number;
+      margen: number;
+    };
+
+    const datos: DatosCotizacionPdf = {
+      emisor: {
+        nombre: process.env.EMPRESA_NOMBRE || 'Transportista',
+        rfc: process.env.EMPRESA_RFC || undefined,
+        direccion: process.env.EMPRESA_DIRECCION || undefined,
+        telefono: process.env.EMPRESA_TELEFONO || undefined,
+        email: process.env.EMPRESA_EMAIL || undefined,
+      },
+      cliente: {
+        razonSocial: cot.viaje.cliente?.razonSocial ?? 'Cliente',
+        rfc: cot.viaje.cliente?.rfc,
+      },
+      viaje: {
+        folio: cot.viaje.folio,
+        origen: cot.viaje.origenDireccion,
+        destino: cot.viaje.destinoDireccion,
+        distanciaKm: dec(cot.distanciaKm),
+        pesoKg: dec(cot.pesoKg),
+        numEscalas: cot.numEscalas,
+      },
+      cotizacion: {
+        folio: cot.folio,
+        fecha: cot.createdAt,
+        moneda: cot.moneda,
+        lineas: desglose.lineas ?? [],
+        subtotalConceptos: desglose.subtotalConceptos ?? 0,
+        margen: desglose.margen ?? 0,
+        subtotal: dec(cot.subtotal),
+        iva: dec(cot.iva),
+        retencion: dec(cot.retencion),
+        total: dec(cot.total),
+        notas: cot.notas,
+      },
+    };
+
+    const buffer = await generarCotizacionPdf(datos);
+    return { buffer, folio: cot.folio };
+  }
+
+  /**
+   * Envía la cotización por correo (PDF adjunto) vía EmailService (Brevo/SMTP).
+   * Destinatario: `to` o el correo de contacto del cliente. Marca ENVIADA si sale.
+   */
+  async enviar(id: string, to?: string) {
+    const info = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: {
+        folio: true,
+        viaje: { select: { cliente: { select: { contactoEmail: true } } } },
+      },
+    });
+    if (!info) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
+
+    const destinatario = to?.trim() || info.viaje.cliente?.contactoEmail || '';
+    if (!destinatario) {
+      throw new BadRequestException(
+        'No hay correo destino: captúralo o registra el correo de contacto del cliente.',
+      );
+    }
+
+    const { buffer, folio } = await this.generarPdf(id);
+    const empresa = process.env.EMPRESA_NOMBRE || 'Transportista';
+    const subject = `Cotización #${folio} — ${empresa}`;
+    const text = `Hola,\n\nAdjuntamos la cotización #${folio} para su revisión.\n\nSaludos,\n${empresa}`;
+    const html =
+      `<p>Hola,</p><p>Adjuntamos la <strong>cotización #${folio}</strong> para su revisión.</p>` +
+      `<p>Saludos,<br/>${empresa}</p>`;
+
+    const enviado = await this.email.enviar({
+      to: destinatario,
+      subject,
+      text,
+      html,
+      attachments: [
+        {
+          filename: `cotizacion-${folio}.pdf`,
+          content: buffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    });
+
+    if (!enviado) {
+      throw new ServiceUnavailableException(
+        `No se pudo enviar el correo (proveedor: ${this.email.proveedorActivo()}). Configura Brevo (BREVO_API_KEY) o SMTP.`,
+      );
+    }
+
+    return this.prisma.cotizacion.update({
+      where: { id },
+      data: { estado: 'ENVIADA', enviadaEn: new Date() },
+    });
   }
 }

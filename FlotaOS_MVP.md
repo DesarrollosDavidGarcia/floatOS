@@ -775,6 +775,24 @@ Cotización de un viaje con **motor de cálculo "mixto configurable"**. Fase 1 d
 
 **Verificado:** `tsc` API+web verde, **37/37 tests**; smoke en vivo: `calcular` = total $13,977.60 (= test unitario); `crear` congela datos reales del viaje (folio 1, total $14,737.79); lista OK; detalle web 200.
 
+### 2026-06-08 — Cotizaciones: documento PDF (Fase 2) ✅
+
+Generación del **PDF** de la cotización (server-side con `pdfkit`, sin Chromium → apto para el Docker Alpine).
+
+- `infrastructure/pdf/cotizacion-pdf.ts`: encabezado del **emisor** (datos por **env por instancia**: `EMPRESA_NOMBRE/RFC/DIRECCION/TELEFONO/EMAIL`), datos del **cliente** (del viaje), resumen del viaje (origen→destino, km, peso, escalas), tabla de conceptos con detalle, totales (subtotal/margen/IVA/retención/total) y disclaimer "no es CFDI".
+- `GET /cotizaciones/:id/pdf` → `StreamableFile` (`application/pdf`, `inline; filename`). Web: botón **PDF** por cotización que lo descarga vía blob autenticado.
+- `.env.example` + `.env` dev con las vars `EMPRESA_*`.
+
+**Verificado:** `tsc` API+web verde; smoke en vivo: PDF **1 página**, `%PDF-1.3`, Content-Type/Disposition correctos; `pdftotext` confirma emisor (env), cliente+RFC, folio/fecha y totales.
+
+### 2026-06-08 — Correo reutilizable + envío de cotización con Brevo (Fase 3) ✅
+
+**Servicio de correo reutilizable** (`EmailModule`, sin duplicar código): se refactorizó el `EmailService` (antes SMTP suelto en AlertasModule) a un módulo con **providers intercambiables** — `SmtpMailProvider` (Nodemailer) y `BrevoMailProvider` (API transaccional) — detrás de la interfaz `MailProvider`. `EmailService` elige el activo (**Brevo si hay `BREVO_API_KEY`, si no SMTP**), soporta **adjuntos** y nunca propaga errores (devuelve `boolean`). `AlertasModule` y `CotizacionesModule` ahora **importan `EmailModule`** (alertas dejó de re-proveerlo).
+
+**Envío de cotización:** `POST /cotizaciones/:id/enviar` (`EnviarCotizacionDto` con `to` opcional → default al `contactoEmail` del cliente) genera el PDF, lo adjunta y envía vía `EmailService`; si sale, marca `estado=ENVIADA` + `enviadaEn`. Web: diálogo **"Enviar"** por cotización. `.env.example`: `EMAIL_FROM`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL/NAME`.
+
+**Verificado:** `tsc` API+web verde, 37/37 tests; API bootea con el módulo compartido (DI OK); smoke: envío sin Brevo/mailserver dev → **503 limpio** identificando el proveedor activo (no marca ENVIADA), correo inválido → 400. Falta solo una `BREVO_API_KEY` real + remitente verificado para envío en vivo.
+
 ---
 
 ## Riesgos técnicos

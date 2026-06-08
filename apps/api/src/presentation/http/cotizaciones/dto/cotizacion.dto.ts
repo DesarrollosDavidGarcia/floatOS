@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEmail,
   IsInt,
   IsNumber,
   IsOptional,
@@ -41,4 +42,9 @@ export class CalcularCotizacionDto {
 export class CrearCotizacionDto {
   @ValidateNested() @Type(() => ParamsCotizacionDto) params!: ParamsCotizacionDto;
   @IsOptional() @IsString() notas?: string;
+}
+
+/** Enviar cotización por correo. Si `to` se omite, usa el correo del cliente. */
+export class EnviarCotizacionDto {
+  @IsOptional() @IsEmail({}, { message: 'Correo destino inválido' }) to?: string;
 }
