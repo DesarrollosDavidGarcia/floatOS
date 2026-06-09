@@ -384,7 +384,9 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - Historial de viajes por conductor
 
 ### 4. Gestión de viajes
-- Creación: origen, destino, tipo de carga, peso, dimensiones, cliente
+- Creación con **itinerario multi-escala**: varias paradas, carga por escala (recoger/entregar/reemplazar) y motor de evaluación de unidad
+- **Ruteo por carretera (TomTom)** con caché: distancia y **ETA** reales, **trazo de la ruta** en el mapa; `departAt` con tráfico predicho; fallback geodésico (PostGIS)
+- **Plan multi-día**: el monitorista define la jornada (horas/día, descanso, escala, hora de inicio) → **fecha de llegada estimada**
 - Asignación de unidad y conductor
 - Estados: `asignado → aceptado → en camino al origen → cargando → en tránsito → entregado → facturado`
 - Historial y búsqueda
@@ -415,10 +417,9 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - Estados: `borrador → pendiente timbrar → timbrado → cancelado`
 - Vinculación 1:1 con el viaje
 
-### 8. Facturas y cuentas por cobrar (registro, no cobro)
-- Generación de cotización / factura
-- Estados: `borrador → enviada → pagada → vencida`
-- Registro manual de pago (el dinero fluye directo entre partes)
+### 8. Cotizaciones, facturas y cuentas por cobrar (registro, no cobro)
+- **Cotizaciones ✅ (implementado):** motor de cálculo **mixto configurable** (margen solo al servicio; combustible y casetas a costo), **PDF** y **envío por correo** (Brevo/SMTP, multi-destinatario). Por viaje; estados `borrador → enviada → aceptada → rechazada`. Editar solo borradores.
+- Facturas (pendiente Fase 2): estados `borrador → enviada → pagada → vencida`; registro manual de pago (el dinero fluye directo entre partes)
 - Vinculación factura ↔ viaje ↔ Carta Porte
 
 ### 9. Panel del admin / monitorista (Next.js)
@@ -452,13 +453,13 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - [ ] Integración PAC → Carta Porte CFDI 4.0
 - [ ] POD: foto, firma digital, geolocalización
 - [ ] Registro de gastos por viaje con foto de ticket
-- [ ] Facturas y cuentas por cobrar
+- [~] Facturas y cuentas por cobrar — *Cotizaciones ✅ (motor + PDF + envío Brevo, 2026-06-08); facturas/CxC pendientes*
 - [ ] Notificaciones WhatsApp al cliente
 - [ ] Modo offline Flutter (SQLite + sync)
 - [ ] Roles y permisos básicos (monitorista, solo lectura)
 
 ### Fase 3 — Retención y escala (5+ meses)
-- [ ] Cálculo de rutas y casetas
+- [~] Cálculo de rutas y casetas — *ruteo por carretera con TomTom ✅ (2026-06-08); casetas: captura manual en cotización, estimación automática pendiente*
 - [ ] Mantenimiento preventivo de unidades
 - [ ] Checklist de inspección pre-viaje
 - [ ] Reportes de rentabilidad por viaje / unidad
@@ -712,6 +713,17 @@ Rediseño completo de **/viajes** (PR aparte `feat/viajes-multiescala`, base `au
 **Dev — Turbopack revertido a webpack:** `next dev --turbo` evalúa react-leaflet (ESM) en el grafo de SSR y corrompe el dispatcher de React (`usePathname`/ErrorBoundary → "Cannot read properties of null (reading 'useContext')"), devolviendo 500 incluso en páginas sin mapa. El `dev` del web vuelve a **webpack** (`next dev`); producción (`next build`) ya usa webpack, no afectada.
 
 **Pendientes/notas (futuro, no bloqueantes):** geocoding Nominatim client-side (proxy con caché para producción); ~~distancia geodésica (OSRM por carretera futuro)~~ *(resuelto con TomTom, ver 2026-06-08)*; UI de la matriz de compatibilidad (hoy por seed); motor evalúa todas las unidades activas (top-N a futuro); búsqueda del listado no cubre escalas intermedias; tests de integración de crear/editar; Carta Porte/Factura (Fase 2) deberán leer `CargaEscala`, no el resumen de `Viaje`.
+
+### 2026-06-08 — Resumen de la sesión 📌
+
+Sesión grande sobre **Viajes** (ruteo + planeación) y un **módulo nuevo de Cotizaciones** (extremo a extremo). Detalle en las entradas siguientes:
+
+- **Ruteo por carretera (TomTom):** la distancia del itinerario pasa de geodésica a **ruta real por carretera** (`RouteProvider` geodésica/TomTom + caché persistente `ruta_cache`, **trazo real** en el mapa, **ETA**, fallback y tope diario). **Auditoría multiagente** (4 dimensiones) + **12 fixes**. `departAt` con **tráfico predicho** por franja horaria.
+- **Plan multi-día (llegada estimada):** el monitorista asigna por viaje horas de conducción/día, descanso, tiempo por escala y hora de inicio → fecha/hora de llegada repartiendo la conducción en jornadas.
+- **Cotizaciones (módulo nuevo):** motor de cálculo **mixto configurable** (margen solo al servicio; combustible y casetas a costo) — auditado; documento **PDF** (pdfkit); **servicio de correo reutilizable** (`EmailModule` con providers SMTP + **Brevo**, adjuntos) y **envío del PDF probado en vivo con Brevo**. Crear, **editar (solo borradores)**, **envío a varios correos** con precarga del correo del cliente. Componente `NumberField` para inputs numéricos.
+- **Infra/entorno:** Node debe correr en **v20** (el watcher re-spawnea con el `node` del PATH; si nvm revierte a v16 falla con `fetch/Request is not defined`) — se lanza con la ruta concreta de v20 en el PATH. Ver [[flotaos-entorno-node]].
+
+**Verificado:** `tsc` API+web en verde, **41/41 tests**, migraciones aplicadas, smokes en vivo de cada flujo. Commits: `9b22012`, `3923141`, `85ba573`, `624a38e`, `42b7e95`, `024ec90`.
 
 ### 2026-06-08 — Viajes: ruteo por carretera con TomTom + caché ✅
 
