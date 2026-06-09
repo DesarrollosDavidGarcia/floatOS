@@ -90,6 +90,7 @@ export function CotizacionesCard({ viaje }: { viaje: Viaje }) {
                   cotizacionId={c.id}
                   folio={c.folio}
                   viajeId={viaje.id}
+                  clienteEmail={viaje.cliente?.contactoEmail ?? null}
                 />
               </div>
             </div>

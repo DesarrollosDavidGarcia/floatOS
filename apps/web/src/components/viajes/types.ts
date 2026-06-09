@@ -6,6 +6,7 @@ export interface ClienteResumen {
   id: string;
   razonSocial: string;
   rfc?: string | null;
+  contactoEmail?: string | null;
 }
 
 /** Resumen de unidad embebido en el viaje. */

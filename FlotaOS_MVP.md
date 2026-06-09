@@ -817,6 +817,10 @@ Generación del **PDF** de la cotización (server-side con `pdfkit`, sin Chromiu
 
 **Verificado:** `tsc` API+web verde; smoke en vivo: envío a **2 correos** vía Brevo (201, ENVIADA; log confirma ambos destinatarios), correo inválido en la lista → 400.
 
+### 2026-06-08 — Cotizaciones: envío precarga el correo del cliente ✅
+
+El diálogo "Enviar" ahora **precarga automáticamente** el correo de contacto del cliente del viaje como primer destinatario (se puede quitar; se agregan más). Para ello se añadió `contactoEmail` al `select` del cliente en `RELACIONES_RESUMEN` (viaje) y al tipo `ClienteResumen` del web; la tarjeta lo pasa al diálogo, que lo precarga al abrir (validado). **Verificado:** `tsc` API+web verde; `GET /viajes/:id` devuelve `cliente.contactoEmail`; detalle web 200.
+
 ---
 
 ## Riesgos técnicos

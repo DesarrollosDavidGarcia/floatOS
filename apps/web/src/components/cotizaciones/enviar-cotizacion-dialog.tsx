@@ -26,13 +26,19 @@ export function EnviarCotizacionDialog({
   cotizacionId,
   folio,
   viajeId,
+  clienteEmail,
 }: {
   cotizacionId: string;
   folio: number;
   viajeId: string;
+  clienteEmail?: string | null;
 }) {
+  const prefill = (): string[] => {
+    const e = clienteEmail?.trim().toLowerCase();
+    return e && EMAIL_RE.test(e) ? [e] : [];
+  };
   const [open, setOpen] = useState(false);
-  const [correos, setCorreos] = useState<string[]>([]);
+  const [correos, setCorreos] = useState<string[]>(prefill);
   const [nuevo, setNuevo] = useState('');
   const qc = useQueryClient();
 
@@ -65,10 +71,8 @@ export function EnviarCotizacionDialog({
 
   function onOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) {
-      setCorreos([]);
-      setNuevo('');
-    }
+    setNuevo('');
+    setCorreos(next ? prefill() : []);
   }
 
   return (
@@ -83,8 +87,8 @@ export function EnviarCotizacionDialog({
         <DialogHeader>
           <DialogTitle>Enviar cotización #{folio}</DialogTitle>
           <DialogDescription>
-            Agrega uno o varios correos. Si no agregas ninguno, se usa el correo de
-            contacto del cliente.
+            Se precarga el correo del cliente del viaje. Quita o agrega los que
+            necesites (uno o varios).
           </DialogDescription>
         </DialogHeader>
 

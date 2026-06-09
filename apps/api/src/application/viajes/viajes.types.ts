@@ -4,7 +4,7 @@ import { EstadoViaje } from '@flotaos/shared-types';
 /** Selección resumida de relaciones para listados y detalle. */
 export const RELACIONES_RESUMEN = {
   cliente: {
-    select: { id: true, razonSocial: true, rfc: true },
+    select: { id: true, razonSocial: true, rfc: true, contactoEmail: true },
   },
   unidad: {
     select: { id: true, placas: true, tipo: true, marca: true, modelo: true },
