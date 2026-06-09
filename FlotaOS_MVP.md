@@ -721,10 +721,20 @@ Sesión grande sobre **Viajes** (ruteo + planeación) y un **módulo nuevo de Co
 
 - **Ruteo por carretera (TomTom):** la distancia del itinerario pasa de geodésica a **ruta real por carretera** (`RouteProvider` geodésica/TomTom + caché persistente `ruta_cache`, **trazo real** en el mapa, **ETA**, fallback y tope diario). **Auditoría multiagente** (4 dimensiones) + **12 fixes**. `departAt` con **tráfico predicho** por franja horaria.
 - **Plan multi-día (llegada estimada):** el monitorista asigna por viaje horas de conducción/día, descanso, tiempo por escala y hora de inicio → fecha/hora de llegada repartiendo la conducción en jornadas.
+- **Duplicar viaje:** copia itinerario + cliente + fecha + plan (sin asignación), reutilizando el flujo de crear.
 - **Cotizaciones (módulo nuevo):** motor de cálculo **mixto configurable** (margen solo al servicio; combustible y casetas a costo) — auditado; documento **PDF** (pdfkit); **servicio de correo reutilizable** (`EmailModule` con providers SMTP + **Brevo**, adjuntos) y **envío del PDF probado en vivo con Brevo**. Crear, **editar (solo borradores)**, **envío a varios correos** con precarga del correo del cliente. Componente `NumberField` para inputs numéricos.
 - **Infra/entorno:** Node debe correr en **v20** (el watcher re-spawnea con el `node` del PATH; si nvm revierte a v16 falla con `fetch/Request is not defined`) — se lanza con la ruta concreta de v20 en el PATH. Ver [[flotaos-entorno-node]].
 
-**Verificado:** `tsc` API+web en verde, **41/41 tests**, migraciones aplicadas, smokes en vivo de cada flujo. Commits: `9b22012`, `3923141`, `85ba573`, `624a38e`, `42b7e95`, `024ec90`.
+**Verificado:** `tsc` API+web en verde, **41/41 tests**, migraciones aplicadas, smokes en vivo de cada flujo. Toda la sesión vive en la rama **`feat/tomtom-ruteo`** (ver `git log`).
+
+**Para continuar (próxima sesión):**
+- **Mergear `feat/tomtom-ruteo` → `main`** (abrir PR o merge directo; toda la sesión está ahí).
+- **Rotar la API key de Brevo** (se compartió por chat) y poner los **datos fiscales reales del emisor** (`EMPRESA_*`) y/o logo en el PDF de la cotización (hoy son de ejemplo).
+- **Duplicar viaje** también desde la **lista** (hoy solo en el detalle).
+- **Cotizaciones:** estados **Aceptada/Rechazada** desde la UI; **eliminar/duplicar** borradores; asunto/mensaje del correo editables; CC/CCO.
+- **Fiscal (Fase 2):** la **retención 4%** debería excluir las casetas pass-through de su base al llegar a CFDI/Carta Porte.
+- **Pendientes de Fase 1:** **página pública de seguimiento** (`/seguimiento/<token>`, API ya existe); **app Flutter** del conductor.
+- **Ruteo (no bloqueantes):** geocoding Nominatim con **proxy/caché** para producción; **UI de la matriz de compatibilidad**; **top-N** unidades en el motor; búsqueda que cubra **escalas intermedias**; **tests de integración** de crear/editar/duplicar.
 
 ### 2026-06-08 — Viajes: ruteo por carretera con TomTom + caché ✅
 
