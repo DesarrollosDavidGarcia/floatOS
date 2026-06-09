@@ -34,6 +34,13 @@ export class ViajesController {
     return this.viajes.crear(dto, user.sub);
   }
 
+  /** Duplica un viaje existente (itinerario + cliente + fecha + plan). */
+  @Post(':id/duplicar')
+  @UseGuards(AdminGuard)
+  duplicar(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    return this.viajes.duplicar(id, user.sub);
+  }
+
   /** Motor de cálculo: evalúa un itinerario contra la flota (no persiste). */
   @Post('evaluar')
   @UseGuards(AdminGuard)

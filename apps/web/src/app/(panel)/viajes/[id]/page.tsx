@@ -2,12 +2,13 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, Building2, MapPin, Pencil, Truck, User } from 'lucide-react';
-import { api } from '@/lib/api';
+import { ArrowLeft, Building2, Copy, MapPin, Pencil, Truck, User } from 'lucide-react';
+import { api, apiError } from '@/lib/api';
+import { toast } from '@/components/ui/sonner';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,8 @@ export default function ViajeDetallePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
+  const router = useRouter();
+
   const { data: viaje, isLoading, isError } = useQuery<Viaje>({
     queryKey: ['viaje', id],
     queryFn: async () => {
@@ -69,6 +72,15 @@ export default function ViajeDetallePage() {
       return data;
     },
     enabled: Boolean(id),
+  });
+
+  const duplicar = useMutation({
+    mutationFn: async () => (await api.post<Viaje>(`/viajes/${id}/duplicar`)).data,
+    onSuccess: (nuevo) => {
+      toast.success(`Viaje duplicado (#${nuevo.folio})`);
+      router.push(`/viajes/${nuevo.id}`);
+    },
+    onError: (err) => toast.error(apiError(err)),
   });
 
   if (isLoading) {
@@ -147,6 +159,14 @@ export default function ViajeDetallePage() {
                 <Pencil />
                 Editar
               </Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => duplicar.mutate()}
+              disabled={duplicar.isPending}
+            >
+              <Copy />
+              {duplicar.isPending ? 'Duplicando…' : 'Duplicar'}
             </Button>
           </div>
         </div>

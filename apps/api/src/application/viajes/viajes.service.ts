@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CrearViajeUseCase } from './crear-viaje.usecase';
+import { DuplicarViajeUseCase } from './duplicar-viaje.usecase';
 import { ListarViajesUseCase } from './listar-viajes.usecase';
 import { ObtenerViajeUseCase } from './obtener-viaje.usecase';
 import { EditarViajeUseCase } from './editar-viaje.usecase';
@@ -25,6 +26,7 @@ import {
 export class ViajesService {
   constructor(
     private readonly crearViaje: CrearViajeUseCase,
+    private readonly duplicarViaje: DuplicarViajeUseCase,
     private readonly listarViajes: ListarViajesUseCase,
     private readonly obtenerViaje: ObtenerViajeUseCase,
     private readonly editarViaje: EditarViajeUseCase,
@@ -36,6 +38,11 @@ export class ViajesService {
 
   crear(input: CrearViajeInput, registradoPor: string) {
     return this.crearViaje.execute(input, registradoPor);
+  }
+
+  /** Duplica un viaje (itinerario + cliente + fecha + plan; sin asignación). */
+  duplicar(id: string, registradoPor: string) {
+    return this.duplicarViaje.execute(id, registradoPor);
   }
 
   /** Motor de cálculo: evalúa un itinerario contra la flota. */

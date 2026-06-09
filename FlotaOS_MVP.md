@@ -388,6 +388,7 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - **Ruteo por carretera (TomTom)** con caché: distancia y **ETA** reales, **trazo de la ruta** en el mapa; `departAt` con tráfico predicho; fallback geodésico (PostGIS)
 - **Plan multi-día**: el monitorista define la jornada (horas/día, descanso, escala, hora de inicio) → **fecha de llegada estimada**
 - Asignación de unidad y conductor
+- **Duplicar viaje** (copia itinerario + cliente + fecha + plan; sin asignación)
 - Estados: `asignado → aceptado → en camino al origen → cargando → en tránsito → entregado → facturado`
 - Historial y búsqueda
 
@@ -832,6 +833,10 @@ Generación del **PDF** de la cotización (server-side con `pdfkit`, sin Chromiu
 ### 2026-06-08 — Cotizaciones: envío precarga el correo del cliente ✅
 
 El diálogo "Enviar" ahora **precarga automáticamente** el correo de contacto del cliente del viaje como primer destinatario (se puede quitar; se agregan más). Para ello se añadió `contactoEmail` al `select` del cliente en `RELACIONES_RESUMEN` (viaje) y al tipo `ClienteResumen` del web; la tarjeta lo pasa al diálogo, que lo precarga al abrir (validado). **Verificado:** `tsc` API+web verde; `GET /viajes/:id` devuelve `cliente.contactoEmail`; detalle web 200.
+
+### 2026-06-08 — Viajes: duplicar viaje ✅
+
+`POST /viajes/:id/duplicar` (`DuplicarViajeUseCase`, `AdminGuard`): copia itinerario (escalas + cargas), cliente, fecha programada y plan multi-día, y **reutiliza `CrearViajeUseCase`** (recalcula ruta/snapshot, folio/token nuevos, estado inicial, historial fresco). **No** copia unidad/conductor (nace sin asignar). Web: botón **Duplicar** en el detalle → navega al viaje nuevo. **Verificado:** `tsc` API+web verde; smoke: origen #15 → nuevo #17 con 2 escalas/2 cargas, plan copiado, sin asignación, historial nuevo; detalle web 200.
 
 ---
 
