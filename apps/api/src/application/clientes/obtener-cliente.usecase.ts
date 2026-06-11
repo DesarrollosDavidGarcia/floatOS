@@ -8,7 +8,15 @@ export class ObtenerClienteUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
   async execute(id: string): Promise<Cliente> {
-    const cliente = await this.prisma.cliente.findUnique({ where: { id } });
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id },
+      include: {
+        contactos: { orderBy: { orden: 'asc' } },
+        sucursales: {
+          orderBy: [{ esPrincipal: 'desc' }, { orden: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
     if (!cliente) {
       throw new NotFoundException(`Cliente con id ${id} no encontrado`);
     }

@@ -378,8 +378,9 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - Alertas automáticas de vencimiento vía BullMQ (7, 3 y 1 día antes)
 
 ### 3. Gestión de conductores
-- Perfil: datos personales, foto, contacto
-- Documentos: licencia federal, vigencia, examen médico
+- **Alta y expediente unificados en una sola pantalla** (pestaña *Datos* con todos los campos escalares: generales, acceso a la app, contratación y RH); el resto del expediente (documentación, médico, certificaciones, etc.) se habilita al guardar
+- **Tipo de contratación: de planta / freelance / terciarizado** (otra empresa) — con datos de la empresa proveedora, vigencia del contrato y **alertas de vencimiento de vigencia** (BullMQ 7/3/1 días)
+- Documentos del conductor (licencia federal, examen médico, etc.) con **N archivos adjuntos por documento** (PDF o imagen en MinIO)
 - Alertas de vencimiento de documentos
 - Historial de viajes por conductor
 
@@ -730,8 +731,8 @@ Sesión grande sobre **Viajes** (ruteo + planeación) y un **módulo nuevo de Co
 **Para continuar (próxima sesión):**
 - **Mergear `feat/tomtom-ruteo` → `main`** (abrir PR o merge directo; toda la sesión está ahí).
 - **Rotar la API key de Brevo** (se compartió por chat) y poner los **datos fiscales reales del emisor** (`EMPRESA_*`) y/o logo en el PDF de la cotización (hoy son de ejemplo).
-- **Duplicar viaje** también desde la **lista** (hoy solo en el detalle).
-- **Cotizaciones:** estados **Aceptada/Rechazada** desde la UI; **eliminar/duplicar** borradores; asunto/mensaje del correo editables; CC/CCO.
+- ~~**Duplicar viaje** también desde la **lista** (hoy solo en el detalle).~~ *(resuelto 2026-06-09: ítem "Duplicar" en el menú de acciones de la lista)*
+- ~~**Cotizaciones:** estados **Aceptada/Rechazada** desde la UI; **eliminar/duplicar** borradores; asunto/mensaje del correo editables; CC/CCO.~~ *(resuelto 2026-06-09, ver entrada al final)*
 - **Fiscal (Fase 2):** la **retención 4%** debería excluir las casetas pass-through de su base al llegar a CFDI/Carta Porte.
 - **Pendientes de Fase 1:** **página pública de seguimiento** (`/seguimiento/<token>`, API ya existe); **app Flutter** del conductor.
 - **Ruteo (no bloqueantes):** geocoding Nominatim con **proxy/caché** para producción; **UI de la matriz de compatibilidad**; **top-N** unidades en el motor; búsqueda que cubra **escalas intermedias**; **tests de integración** de crear/editar/duplicar.
@@ -847,6 +848,145 @@ El diálogo "Enviar" ahora **precarga automáticamente** el correo de contacto d
 ### 2026-06-08 — Viajes: duplicar viaje ✅
 
 `POST /viajes/:id/duplicar` (`DuplicarViajeUseCase`, `AdminGuard`): copia itinerario (escalas + cargas), cliente, fecha programada y plan multi-día, y **reutiliza `CrearViajeUseCase`** (recalcula ruta/snapshot, folio/token nuevos, estado inicial, historial fresco). **No** copia unidad/conductor (nace sin asignar). Web: botón **Duplicar** en el detalle → navega al viaje nuevo. **Verificado:** `tsc` API+web verde; smoke: origen #15 → nuevo #17 con 2 escalas/2 cargas, plan copiado, sin asignación, historial nuevo; detalle web 200.
+
+### 2026-06-09 — Cotizaciones: estados desde UI + eliminar/duplicar + correo editable (CC/CCO) ✅
+
+Rama `feat/tomtom-ruteo`. Mejoras de usabilidad sobre el módulo de cotizaciones ya existente; sin cambios de schema.
+
+**Estados desde la UI:** `PATCH /cotizaciones/:id/estado` (`CambiarEstadoCotizacionDto`, solo destinos ENVIADA/ACEPTADA/RECHAZADA) validado contra un mapa `TRANSICIONES_COTIZACION` (BORRADOR→{ENVIADA,ACEPTADA,RECHAZADA}; ENVIADA→{ACEPTADA,RECHAZADA}; ACEPTADA/RECHAZADA↔ENVIADA para cambiar la decisión/reabrir; sin vuelta a BORRADOR → 409). Al pasar a ENVIADA por marcado manual sella `enviadaEn` si estaba vacío.
+
+**Eliminar/duplicar:** `DELETE /cotizaciones/:id` solo si BORRADOR (si no, 409); `POST /cotizaciones/:id/duplicar` crea un BORRADOR nuevo del mismo viaje **recalculando con los datos actuales** (reusa `crear` con los params congelados de la original; folio nuevo).
+
+**Correo editable + CC/CCO:** `EnviarCotizacionDto` ampliado con `cc`/`bcc` (email[], `@ArrayMaxSize(20)`), `subject` y `mensaje` opcionales; si van vacíos se usan los textos por defecto (asunto con nombre de empresa, cuerpo estándar). El mensaje del usuario se **escapa** antes de interpolarse en el HTML (anti-inyección) y respeta saltos de línea. `cc`/`bcc` se deduplican y se quitan los que ya estén en `to`. Soporte de `cc`/`bcc` agregado a la capa de correo reutilizable (`MensajeCorreo` + providers Brevo y SMTP).
+
+**Frontend:** `CotizacionAcciones` (menú `⋯` con cambios de estado contextuales, Duplicar y Eliminar con `ConfirmDialog`) en cada renglón de `CotizacionesCard`; `EnviarCotizacionDialog` rehecho con sub-componente `ChipsCorreo` reutilizable (Para/CC/CCO), asunto y mensaje (nuevo `ui/textarea`), CC/CCO ocultos tras un toggle. Espejo del mapa de transiciones en `lib/estado-cotizacion.ts`.
+
+**Verificado:** `tsc` API+web en verde, **41/41 tests**; smoke en vivo: crear→BORRADOR, BORRADOR→ACEPTADA (200, `enviadaEn` null), ACEPTADA→ENVIADA reabrir (200, sella `enviadaEn`), →BORRADOR 400, eliminar ENVIADA 409, duplicar→BORRADOR nuevo, eliminar BORRADOR 200; envío: cc inválido→400, envío con asunto/mensaje/cc/cco→201 vía Brevo. *(Nota: el `.env` de dev tiene `BREVO_API_KEY` real → el smoke de envío manda correos de verdad; usar direcciones propias al probar. Recordatorio vigente: rotar esa key.)*
+
+### 2026-06-09 — Clientes: página completa + datos fiscales CFDI 4.0 + lista de contactos ✅
+
+Rama `feat/tomtom-ruteo`. El alta/edición de cliente pasa de **modal** a **página completa** (estilo Viajes), se agregan **datos fiscales** y el contacto único embebido se reemplaza por una **lista de contactos**.
+
+**Datos/Prisma (migración `20260609170000_cliente_fiscal_contactos`):** en `Cliente` se quitan `contactoNombre/Telefono/Email` y se agregan fiscales `regimenFiscal`, `usoCfdi`, `cpFiscal`, `emailFacturacion` (CFDI 4.0); nuevo modelo **`ContactoCliente`** (`nombre`, `email?`, `telefono?`, `esPrincipal`, `orden`, FK `onDelete: Cascade`). Migración escrita a mano + `migrate deploy` (el shadow DB de `migrate dev` no tiene PostGIS y revienta con la columna `geography`). **Catálogos SAT nuevos** en `seed-catalogos.mjs`: `REGIMEN_FISCAL` (19) y `USO_CFDI` (12), consumidos por `CatalogoSelect`.
+
+**Backend:** DTOs con `ContactoClienteDto` anidado (`ValidateNested`, `@ArrayMaxSize(30)`); helper `contactosACreate` normaliza `orden` y garantiza **un único principal** (el marcado, o el primero). Crear usa `contactos.create`; actualizar **reemplaza** la lista (`deleteMany + create`); obtener/listar incluyen contactos (listar trae solo el principal para la tabla). Integración: `RELACIONES_RESUMEN` de viajes y el fallback de correo de **Cotizaciones** ahora leen el **contacto principal** (`contactos[0]` ordenado por `esPrincipal desc, orden asc`).
+
+**Frontend:** páginas `/clientes/crear` y `/clientes/[id]/editar` con `ClienteFormPage` (secciones **Datos generales** / **Datos fiscales** con `CatalogoSelect` de Régimen y Uso CFDI / **Contactos** con `useFieldArray`: nombre+correo+celular, botón ⭐ de principal único, agregar/quitar); la lista navega a esas páginas (se elimina el modal `cliente-form-dialog`) y muestra el contacto principal. Validación: RFC 12-13, CP 5 dígitos, celular 10 dígitos, correos.
+
+**Verificado:** `tsc` API+web verde, **41/41 tests**, migración aplicada y catálogos sembrados (19+12); smoke en vivo: crear con fiscales+2 contactos (principal respetado, orden asignado), obtener/listar devuelven el principal, actualizar reemplaza contactos (queda 1, auto-principal), contacto sin nombre→400, eliminar→204 con cascade (sin huérfanos); rutas web `/clientes` y `/clientes/crear`→200.
+
+### 2026-06-09 — Conductores: alta en página completa + tipo de contratación (planta/freelance/terciarizado) ✅
+
+Rama `feat/tomtom-ruteo`. El alta/edición de conductor pasa de **modal** a **página completa** y se agrega el concepto de **contratación** (de planta, freelance o terciarizado por otra empresa) para soportar conductores externos.
+
+**Datos/Prisma (migración `20260609180000_conductor_contratacion`):** `Conductor` gana `tipoContratacion` (catálogo `TIPO_CONTRATACION`, default PLANTA) + datos del proveedor externo (`empresaProveedor`, `empresaProveedorRfc`, `proveedorContactoNombre`, `proveedorContactoTelefono`), vigencia (`vigenciaDesde`, `vigenciaHasta`) y `notasContratacion`. Credenciales (usuario/contraseña) **siguen obligatorias** para todos (decisión del usuario). Catálogo nuevo `TIPO_CONTRATACION` (PLANTA/FREELANCE/TERCIARIZADO) en `seed-catalogos.mjs`.
+
+**Reglas de consistencia (backend, fuente de verdad):** la empresa proveedora solo se guarda para **TERCIARIZADO**; la vigencia/notas para cualquier **externo** (freelance o terciarizado); **PLANTA** no lleva nada de esto. Tanto crear como actualizar **limpian** los campos que no corresponden al tipo (al cambiar a un tipo más restrictivo se anulan empresa/vigencia → no quedan datos colgados ni alertas fantasma).
+
+**Alertas de vigencia:** `EscaneoVencimientosService` (job diario BullMQ 7/3/1 días + endpoint on-demand) ahora también escanea `conductores.vigenciaHasta` y emite alertas `tipoDocumento='Vigencia de contrato'`, junto a los vencimientos de documentos de unidad/conductor.
+
+**Frontend:** páginas `/conductores/crear` y `/conductores/[id]/editar` con `ConductorFormPage` (secciones Datos generales / Acceso a la app / Contratación; el bloque externo aparece según el tipo, con empresa proveedora solo en terciarizado y vigencia+notas en cualquier externo; validación condicional con zod: empresa requerida en terciarizado, vigenciaHasta ≥ vigenciaDesde, password requerida solo al crear). La lista navega a esas páginas (se elimina el modal `conductor-form-dialog`) y muestra un badge del tipo; el expediente también muestra el badge. El expediente (11 pestañas de RH/médico/etc.) se mantiene intacto.
+
+**Verificado:** `tsc` API+web verde, **41/41 tests**, migración aplicada y catálogo sembrado; smoke en vivo: crear TERCIARIZADO con empresa+vigencia (alerta de vigencia aparece a 3 días), cambiar a PLANTA limpia empresa+vigencia y **remueve la alerta**, FREELANCE ignora la empresa pero guarda vigencia; rutas web `/conductores` y `/conductores/crear`→200.
+
+### 2026-06-09 — Conductores: unificación alta ↔ expediente (una sola pantalla) ✅
+
+Rama `feat/tomtom-ruteo`. **Refactor solo de frontend** (el backend ya aceptaba todos los campos RH en crear/editar). El alta y el expediente pasan a ser **la misma pantalla** con el mismo layout de pestañas.
+
+- Nuevo shell `ConductorExpediente` (`mode: crear | editar`) usado por `/conductores/crear` y `/conductores/[id]`. La pestaña **"Datos"** es ahora un **formulario único** (`ConductorDatosForm`) con **todos** los campos escalares: generales, acceso a la app, contratación (con bloque externo condicional), datos personales, fiscales/IMSS, empleo, licencia y contacto de emergencia.
+- Al **crear**, las pestañas de colecciones (documentación, médico, certificaciones, etc.) se muestran **deshabilitadas** (necesitan un conductor guardado); al guardar, `router.replace` lleva al expediente con todo habilitado, en la misma pestaña Datos.
+- El expediente Datos dejó de tener el toggle ver/editar: es un formulario siempre editable con botón Guardar (re-sincroniza tras guardar).
+- Se eliminan `conductor-form-page.tsx`, `datos-tab.tsx` y la ruta `/conductores/[id]/editar` (su función la absorbe el expediente). La lista: "Editar datos" ahora abre `/conductores/[id]`.
+
+**Verificado:** `tsc` API+web verde; smoke en vivo: crear con generales+contratación+**RH juntos** en una sola llamada (CURP/NSS/puesto/licencia/empleo/emergencia persistidos), GET los devuelve, PATCH de RH desde el mismo flujo OK; rutas `/conductores` y `/conductores/crear`→200.
+
+### 2026-06-09 — Conductores/expediente: N archivos por documento (PDF/imagen) ✅
+
+Rama `feat/tomtom-ruteo`. En la pestaña **Documentación** del expediente, cada documento puede tener **varios archivos adjuntos** (PDF o imagen) en MinIO — reemplaza el `archivoKey` único.
+
+**Datos/Prisma (migración `20260609190000_archivos_documento_conductor`):** se quita `archivoKey` de `DocumentoConductor` y se agrega la tabla **`ArchivoDocumentoConductor`** (`nombre`, `key`, `contentType`, `tamanoBytes`, FK `documentoId` `onDelete: Cascade`), espejo de `ArchivoUnidad`. El listado de documentos incluye `_count.archivos` para la UI.
+
+**Backend:** `ArchivosDocumentoConductorUseCase` (reusa el `StorageService`/MinIO global) con subir (multi-archivo, valida PDF/JPG/PNG/WEBP y ≤10 MB), listar, URL de descarga (presigned) y eliminar (objeto + registro); valida que el documento pertenezca al conductor. Endpoints en `ConductoresController` con `FilesInterceptor('archivos', 10)`: `POST/GET/DELETE …/documentos/:docId/archivos[/:archivoId][/url]`.
+
+**Frontend:** `ArchivosDocumentoDialog` (subir varios, lista con tamaño/fecha, descargar en pestaña nueva, eliminar con confirmación) — patrón espejo del de flota. En `DocumentosTab` cada fila tiene un botón **📎 N** que abre el diálogo; subir/eliminar refresca el conteo de la tabla.
+
+**Verificado:** `tsc` API+web verde, **41/41 tests**, migración aplicada; smoke en vivo: subir **2 archivos (PDF+PNG)** a un documento → 201, listado con contentType/tamaño, `_count.archivos=2`, URL firmada OK, borrar uno → queda 1, subir `.txt` → **400**; cascade al borrar el conductor.
+
+### 2026-06-09 — Resumen de la sesión 📌
+
+Sesión enfocada en **CRUDs del panel** (Clientes y Conductores a página completa + robustez) y cierre de pendientes de Cotizaciones. Todo en la rama **`feat/tomtom-ruteo`** (sin commitear aún). Detalle en las entradas de arriba:
+
+- **Limpieza de BD:** se vació todo lo operativo dejando solo el usuario admin y los catálogos (backup en `backups/pre-limpieza-2026-06-09.sql`).
+- **Cotizaciones (cierre):** estados Aceptada/Rechazada desde la UI, eliminar/duplicar borradores, y envío con **asunto/mensaje editables + CC/CCO**.
+- **Clientes:** alta/edición en **página completa**, **datos fiscales CFDI 4.0** (régimen, uso CFDI, CP, correo de facturación — catálogos SAT) y **lista de contactos** (con principal).
+- **Conductores:** **tipo de contratación** (planta/freelance/terciarizado) con empresa proveedora, vigencia y **alertas de vigencia**; **alta ↔ expediente unificados** en una sola pantalla; **N archivos (PDF/imagen) por documento** en la documentación.
+- **Viajes:** duplicar también desde la lista.
+
+**Verificado globalmente:** `tsc` API+web en verde, **41/41 tests**, migraciones aplicadas (`cliente_fiscal_contactos`, `conductor_contratacion`, `archivos_documento_conductor`) y catálogos sembrados; smokes en vivo de cada flujo.
+
+**Para continuar (próxima sesión):**
+- **Mergear `feat/tomtom-ruteo` → `main`** (toda la sesión, y las anteriores, viven ahí).
+- **Rotar la API key de Brevo** (se compartió por chat) y poner los **datos fiscales reales del emisor** (`EMPRESA_*`) y/o logo en el PDF de cotización.
+- **Pendientes de Fase 1:** **página pública de seguimiento** (`/seguimiento/<token>`, API ya existe); **app Flutter** del conductor.
+- **Fiscal (Fase 2):** la **retención 4%** debería excluir las casetas pass-through de su base al llegar a CFDI/Carta Porte.
+- **No bloqueantes:** geocoding Nominatim con proxy/caché para producción; UI de la matriz de compatibilidad; top-N unidades en el motor; búsqueda que cubra escalas intermedias; tests de integración de crear/editar/duplicar.
+
+### 2026-06-10 — Expediente: N archivos de evidencia por sección (médico, certificaciones, etc.) ✅
+
+Rama `feat/tomtom-ruteo`. Las 6 secciones de colecciones del expediente —**Médico, Certificaciones, Capacitaciones, Control de confianza, Incidencias, Evaluaciones**— ahora aceptan **varios archivos de evidencia (PDF o imagen)** por registro en MinIO. En vez de 6 tablas casi idénticas, se usó una **tabla genérica** con FK a conductor (cero huérfanos al borrar el conductor).
+
+**Datos/Prisma (migración `20260610170000_archivos_expediente`):** modelo `ArchivoExpediente` (enum `SeccionExpediente` + `registroId` + nombre/key/contentType/tamaño) con FK `conductorId` `onDelete: Cascade` e índices `(seccion, registroId)` y `conductorId`.
+
+**Backend:** `ArchivosExpedienteUseCase` (subir/listar/url/eliminar/conteos) que valida que el registro pertenezca al conductor; mapa slug→enum por sección. Endpoints bajo `/conductores/:id/expediente/:seccion/:registroId/archivos` (+ `/archivos/conteos`) reusando `StorageService`/`FilesInterceptor` (PDF/JPG/PNG/WEBP ≤10 MB; nunca expone la object key). Al borrar un registro individual se limpian sus archivos (llamada en los `eliminar` de las 6 secciones; el cascade del conductor cubre el borrado total).
+
+**Web:** `ArchivosExpedienteDialog` + `ArchivosExpedienteButton`/`useConteosArchivosExpediente` reutilizables (espejo del de documentos); botón **📎 N** en la celda de acciones de las 6 pestañas. **Extra UX:** **iconos** en las 11 pestañas del expediente.
+
+**Verificado (en vivo):** `tsc` API+web verde; subir 2 (PDF+PNG)→201, listar/conteos, URL firmada, borrar uno, `.txt`→400, sección inválida→404, registro ajeno→404, **cascade al borrar conductor 1→0 filas**.
+
+### 2026-06-10 — Viajes/ruteo: aviso de fallback geodésico + buscador de ubicación estructurado ✅
+
+**Diagnóstico (no era bug del trazo):** un viaje salía con **línea recta** porque su pin de destino caía **fuera de carretera** → TomTom respondía `MAP_MATCHING_FAILURE` y el ruteo degradaba a geodésica (correcto), pero **en silencio**. Crear/editar/duplicar sí calculan y persisten la geometría por carretera cuando los pines son ruteables (verificado CDMX→QRO 216.76 km / 584 puntos).
+
+**Aviso de fallback:** `MapaItinerario` pinta la ruta real **sólida azul** y la aproximación geodésica **punteada ámbar**; el detalle del viaje muestra un **banner ámbar** ("ruta aproximada en línea recta… edita y reubica el pin") cuando hay ≥2 escalas con coordenadas pero sin geometría por carretera.
+
+**Buscador de ubicación estructurado (`MapPickerDialog`):** el input único se reemplazó por campos **calle, número, colonia, CP, municipio, ciudad, estado, país**. `geocoding.ts` hace búsqueda **estructurada** (params oficiales de Nominatim, sin meter colonia en `street`) con **cascada de relajación** que acumula candidatos de varios niveles (calle → colonia → CP → ciudad) cuando la dirección exacta no está en OSM. **Buscar posiciona el mapa** en la mejor coincidencia (no confirma nada hasta "Usar esta ubicación"). Fix: el botón Buscar era `type="submit"` dentro de un `<form>` anidado en el del viaje → enviaba el formulario del viaje; ahora `type="button"` (Enter manual).
+
+**Verificado:** `tsc` web verde; pruebas en vivo contra Nominatim (estructurada + cascada); detalle y crear/editar de viaje 200.
+
+### 2026-06-10 — Casetas en la cotización: investigación de fuentes (feature pospuesto) 🔎
+
+Se evaluó alimentar las casetas con montos reales. Hallazgo: **no hay API gratuita y confiable del monto exacto de casetas MX** (TomTom marca tramos de cuota pero no da el peso). Fuentes: **CapuFe Datos Abiertos** (CSV `Tarifas-Vigentes.csv`, por ejes de camión, ~96 plazas de la Red Propia, montos algo desactualizados), **TollGuru API** (de pago, cobertura nacional por ruta) y **SCT "Traza Tu Ruta"/SIBUAC** (gratis, completo, API no oficial/frágil). Se **pospuso** el feature; el motor de cotización mantiene casetas como campo manual pass-through.
+
+### 2026-06-10 — Configuración (Parte A): Mi Empresa + datos fiscales/PAC + Sucursales de cliente ✅
+
+Inicio del **diferenciador fiscal (Fase 2)**: la base de configuración para poder timbrar Carta Porte (sin el timbrado en sí, que es la Parte B). Decisiones del usuario: sucursales **del cliente**, alcance **solo configuración**, PAC **SW Sapien**.
+
+**Datos/Prisma (migración `20260610180000_empresa_sucursales`):** modelo **`Empresa`** (singleton: datos generales/fiscales, domicilio fiscal, datos de Carta Porte —permiso SCT, seguro de resp. civil— y credenciales **PAC/CSD**) + modelo **`SucursalCliente`** (varias por cliente: domicilio + coordenadas + principal) con FK cascade. Catálogo nuevo `TIPO_PERMISO_SCT` (c_TipoPermiso) en el seed.
+
+**Backend:** `EmpresaModule` — `GET/PATCH /empresa` (singleton vía `upsert` a id fijo), subida de **logo** y **CSD** (.cer/.key) a MinIO; los **secretos** (token/contraseña PAC, contraseña CSD) son **write-only**: la API nunca los devuelve (solo banderas `tiene*`). El emisor del **PDF de cotización** ahora sale de `Empresa` (fallback a `EMPRESA_*`). Sucursales: CRUD bajo `/clientes/:id/sucursales` con **principal único** (atómico en `$transaction`), incluidas en el detalle del cliente.
+
+**Web:** página **/configuracion** (sidebar → Sistema) con secciones Mi empresa + logo, Domicilio fiscal, Carta Porte y Timbrado (PAC/CSD). Sección **Sucursales** en la edición de cliente (diálogo con MapPicker opcional para coordenadas).
+
+**Auditoría + fixes (mismo día):** (🔴 confirmado en vivo) **carrera del singleton** `findFirst`+`create` creaba filas duplicadas (la página dispara 2 GET concurrentes) → `upsert` a id fijo (10 concurrentes → 1 fila); (🟠) **principal único no atómico** → `$transaction`; (🟠) **CSD sin validar tipo** → valida extensión `.cer`/`.key`.
+
+**Cifrado de secretos en reposo:** `SecretCryptoService` (**AES-256-GCM**, sobre `v1:iv:tag:ct`) con llave por instancia (`SECRETS_KEY`, o derivada de `JWT_SECRET` con aviso). `EmpresaUseCase` cifra al guardar y descifra solo para uso interno (`obtenerCredenciales`, Parte B). Verificado: la BD guarda ciphertext `v1:…` (no texto plano) y el **round-trip** descifra correcto.
+
+**Verificado:** `tsc` API+web verde; migraciones aplicadas y catálogos (27 grupos); smokes en vivo de empresa (GET/PATCH/logo/CSD + enmascarado), sucursales (CRUD + principal único + cascade + 404 ajeno) y cifrado; páginas `/configuracion` y `/clientes/[id]/editar` 200.
+
+### 2026-06-10 — Resumen de la sesión 📌
+
+Sesión sobre **expediente (evidencias)**, **ruteo/ubicación** y el arranque del **fiscal (Configuración, Parte A)**. Todo en la rama `feat/tomtom-ruteo` (sin commitear aún).
+
+- **Expediente:** N archivos de evidencia (PDF/imagen) por registro en 6 secciones; iconos en las pestañas.
+- **Viajes:** aviso de fallback geodésico (línea punteada + banner) y **buscador de ubicación estructurado** con cascada de relajación.
+- **Casetas:** investigadas las fuentes (CapuFe/TollGuru/SCT); feature pospuesto.
+- **Configuración (Parte A):** **Mi Empresa** (emisor + domicilio fiscal + Carta Porte), **config PAC (SW Sapien) + CSD**, y **sucursales de cliente** — con auditoría, fixes y **cifrado de secretos en reposo**.
+
+**Para continuar (próxima sesión):**
+- **Mergear `feat/tomtom-ruteo` → `main`**.
+- **Fase 2 — Parte B (timbrado Carta Porte):** generar XML CFDI 4.0 + complemento Carta Porte, timbrar vía **SW Sapien** (ya hay emisor, permiso SCT, CSD y credenciales cifradas), descargar XML/PDF, cancelar.
+- **Recomendaciones de auditoría pendientes:** validar RFC/CP del emisor contra catálogos SAT; consolidar `ArchivoSubido` duplicado; reemplazo logo/CSD transaccional con MinIO.
+- **Pendientes de Fase 1:** página pública de seguimiento (`/seguimiento/<token>`, API ya existe); app Flutter del conductor.
 
 ---
 

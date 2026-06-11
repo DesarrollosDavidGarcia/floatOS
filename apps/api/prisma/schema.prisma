@@ -223,6 +223,52 @@ model Usuario {
   @@map("usuarios")
 }
 
+/// Configuración de la empresa transportista (emisor). Singleton: una sola fila
+/// por instancia. Reúne datos generales/fiscales, domicilio fiscal, datos para
+/// Carta Porte (permiso SCT, seguro) y credenciales de PAC/CSD para timbrado
+/// (Fase 2). Los secretos (token/clave del PAC y contraseña del CSD) NUNCA se
+/// exponen en las respuestas de la API (la capa de aplicación los enmascara).
+model Empresa {
+  id            String  @id @default(cuid())
+  // Datos generales / fiscales del emisor
+  razonSocial   String?
+  rfc           String?
+  regimenFiscal String? // catálogo REGIMEN_FISCAL (c_RegimenFiscal)
+  telefono      String?
+  email         String?
+  logoKey       String? // logo en MinIO (para PDF / documentos)
+  // Domicilio fiscal
+  calle     String?
+  numeroExt String?
+  numeroInt String?
+  colonia   String?
+  cp        String?
+  municipio String?
+  estado    String?
+  pais      String? @default("México")
+  // Carta Porte — datos del emisor / autotransporte
+  permisoSctTipo       String? // catálogo TIPO_PERMISO_SCT (c_TipoPermiso)
+  permisoSctNumero     String?
+  aseguradoraRespCivil String?
+  polizaRespCivil      String?
+  // PAC / timbrado (SW Sapien por defecto)
+  pacProveedor String? @default("SW")
+  pacAmbiente  String? @default("PRUEBAS") // PRUEBAS | PRODUCCION
+  pacUsuario   String?
+  pacToken     String? // secreto — no se expone
+  pacPassword  String? // secreto — no se expone
+  // Certificado de Sello Digital (CSD)
+  csdNumero   String?
+  csdCerKey   String? // .cer en MinIO
+  csdKeyKey   String? // .key en MinIO
+  csdPassword String? // secreto — no se expone
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("empresa")
+}
+
 /// Conductor: credenciales separadas para la app Flutter.
 /// Incluye los datos de RH del expediente formal (las secciones detalladas
 /// viven en modelos relacionados: médico, certificaciones, incidencias, etc.).
@@ -254,6 +300,18 @@ model Conductor {
   emergenciaTelefono  String?
   emergenciaRelacion  String?
 
+  // ── Contratación (planta / freelance / terciarizado) ──
+  tipoContratacion          String?   @default("PLANTA") // catálogo TIPO_CONTRATACION
+  // Datos de la empresa que presta al conductor (solo terciarizado/externo)
+  empresaProveedor          String?
+  empresaProveedorRfc       String?
+  proveedorContactoNombre   String?
+  proveedorContactoTelefono String?
+  // Vigencia del contrato temporal/externo (engancha alertas de vencimiento)
+  vigenciaDesde             DateTime?
+  vigenciaHasta             DateTime?
+  notasContratacion         String?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -270,6 +328,7 @@ model Conductor {
   controlesConfianza ControlConfianzaConductor[]
   evaluaciones      EvaluacionDesempenoConductor[]
   ausencias         AusenciaConductor[]
+  archivosExpediente ArchivoExpediente[]
 
   @@map("conductores")
 }
@@ -351,15 +410,31 @@ model DocumentoConductor {
   numero          String?
   fechaEmision    DateTime?
   fechaVencimiento DateTime
-  archivoKey      String?
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  conductor Conductor                     @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  archivos  ArchivoDocumentoConductor[]
 
   @@index([conductorId])
   @@index([fechaVencimiento])
   @@map("documentos_conductor")
+}
+
+/// Archivo adjunto a un documento del conductor (PDF o imagen). N por documento.
+model ArchivoDocumentoConductor {
+  id          String   @id @default(cuid())
+  documentoId String
+  nombre      String // nombre original del archivo
+  key         String // object key en MinIO
+  contentType String
+  tamanoBytes Int
+  createdAt   DateTime @default(now())
+
+  documento DocumentoConductor @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@index([documentoId])
+  @@map("archivos_documento_conductor")
 }
 
 // ───────────────── Expediente del conductor ──────────────────────
@@ -559,6 +634,40 @@ model AusenciaConductor {
   @@map("ausencias_conductor")
 }
 
+/// Sección del expediente a la que pertenece un archivo de evidencia.
+enum SeccionExpediente {
+  EXAMEN_MEDICO
+  CERTIFICACION
+  CAPACITACION
+  CONTROL_CONFIANZA
+  INCIDENCIA
+  EVALUACION
+}
+
+/// Archivo de evidencia (PDF o imagen) adjunto a un registro de una sección del
+/// expediente del conductor (médico, certificación, capacitación, control de
+/// confianza, incidencia o evaluación). N por registro; el binario vive en MinIO
+/// bajo `key`. `registroId` apunta al id del registro de su `seccion`; el FK a
+/// Conductor garantiza el cascade al borrar el conductor (el borrado de un
+/// registro individual limpia sus archivos en la capa de aplicación).
+model ArchivoExpediente {
+  id          String            @id @default(cuid())
+  conductorId String
+  seccion     SeccionExpediente
+  registroId  String
+  nombre      String // nombre original del archivo
+  key         String // object key en MinIO
+  contentType String
+  tamanoBytes Int
+  createdAt   DateTime          @default(now())
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@index([seccion, registroId])
+  @@map("archivos_expediente")
+}
+
 // ──────────────────────── Clientes finales ───────────────────────
 
 /// Cliente del transportista (a quien se le presta el servicio de viaje).
@@ -566,16 +675,70 @@ model Cliente {
   id               String   @id @default(cuid())
   razonSocial      String
   rfc              String?
-  contactoNombre   String?
-  contactoTelefono String?
-  contactoEmail    String?
+  // Datos fiscales (CFDI 4.0) — códigos de catálogo SAT (grupos REGIMEN_FISCAL / USO_CFDI).
+  regimenFiscal    String?
+  usoCfdi          String?
+  cpFiscal         String?
+  emailFacturacion String?
   direccion        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  viajes Viaje[]
+  contactos  ContactoCliente[]
+  sucursales SucursalCliente[]
+  viajes     Viaje[]
 
   @@map("clientes")
+}
+
+/// Sucursal (domicilio adicional) de un cliente: punto de recolección/entrega.
+/// Un cliente puede tener varias. Sirve como origen/destino de viajes y como
+/// domicilio del receptor en Carta Porte.
+model SucursalCliente {
+  id        String  @id @default(cuid())
+  clienteId String
+  nombre    String
+  rfc       String? // normalmente el del cliente
+  // Domicilio
+  calle     String?
+  numeroExt String?
+  numeroInt String?
+  colonia   String?
+  cp        String?
+  municipio String?
+  estado    String?
+  pais      String? @default("México")
+  lat       Float?
+  lng       Float?
+  esPrincipal Boolean @default(false)
+  orden       Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("sucursales_cliente")
+}
+
+/// Contacto del cliente (lista). Uno puede marcarse como principal: es el
+/// destinatario por defecto al cotizar/enviar correo. Si ninguno lo está, se
+/// usa el de menor `orden`.
+model ContactoCliente {
+  id          String   @id @default(cuid())
+  clienteId   String
+  nombre      String
+  email       String?
+  telefono    String? // celular
+  esPrincipal Boolean  @default(false)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("contactos_cliente")
 }
 
 // ───────────────────────────── Viajes ────────────────────────────

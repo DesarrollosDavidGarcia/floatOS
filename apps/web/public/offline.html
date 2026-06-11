@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Sin conexión — FlotaOS</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+        background: #0f172a;
+        color: #f8fafc;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+      }
+      .card { max-width: 380px; }
+      .logo {
+        width: 72px; height: 72px;
+        margin: 0 auto 20px;
+        border-radius: 18px;
+        background: #1e293b;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 38px; font-weight: 800; color: #f8fafc;
+      }
+      h1 { font-size: 20px; margin: 0 0 8px; }
+      p { color: #94a3b8; line-height: 1.5; margin: 0 0 24px; font-size: 14px; }
+      button {
+        background: #f8fafc; color: #0f172a;
+        border: 0; border-radius: 10px;
+        padding: 11px 20px; font-size: 14px; font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover { background: #e2e8f0; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo">F</div>
+      <h1>Sin conexión</h1>
+      <p>
+        No pudimos conectar con FlotaOS. Revisa tu conexión a internet e
+        inténtalo de nuevo.
+      </p>
+      <button onclick="location.reload()">Reintentar</button>
+    </div>
+  </body>
+</html>

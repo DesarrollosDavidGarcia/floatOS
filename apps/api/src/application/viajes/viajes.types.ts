@@ -4,7 +4,17 @@ import { EstadoViaje } from '@flotaos/shared-types';
 /** Selección resumida de relaciones para listados y detalle. */
 export const RELACIONES_RESUMEN = {
   cliente: {
-    select: { id: true, razonSocial: true, rfc: true, contactoEmail: true },
+    select: {
+      id: true,
+      razonSocial: true,
+      rfc: true,
+      // Contacto principal (o el primero): destinatario por defecto al cotizar.
+      contactos: {
+        orderBy: [{ esPrincipal: 'desc' }, { orden: 'asc' }],
+        take: 1,
+        select: { nombre: true, email: true, telefono: true },
+      },
+    },
   },
   unidad: {
     select: { id: true, placas: true, tipo: true, marca: true, modelo: true },

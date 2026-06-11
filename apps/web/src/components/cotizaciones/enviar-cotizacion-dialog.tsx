@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,76 @@ import {
 } from '@/components/ui/dialog';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Input con chips de correos (validación + agregar/quitar), maneja su propio borrador. */
+function ChipsCorreo({
+  id,
+  label,
+  valores,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  valores: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}) {
+  const [nuevo, setNuevo] = useState('');
+
+  function agregar() {
+    const email = nuevo.trim().toLowerCase();
+    if (!email) return;
+    if (!EMAIL_RE.test(email)) {
+      toast.error('Correo inválido');
+      return;
+    }
+    if (!valores.includes(email)) onChange([...valores, email]);
+    setNuevo('');
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          id={id}
+          type="email"
+          value={nuevo}
+          onChange={(e) => setNuevo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              agregar();
+            }
+          }}
+          placeholder={placeholder ?? 'correo@dominio.com'}
+        />
+        <Button type="button" variant="outline" onClick={agregar} disabled={!nuevo.trim()}>
+          <Plus />
+          Agregar
+        </Button>
+      </div>
+      {valores.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {valores.map((email) => (
+            <Badge key={email} variant="secondary" className="gap-1">
+              {email}
+              <button
+                type="button"
+                onClick={() => onChange(valores.filter((x) => x !== email))}
+                className="ml-0.5 rounded-sm hover:text-destructive"
+                aria-label={`Quitar ${email}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function EnviarCotizacionDialog({
   cotizacionId,
@@ -39,27 +110,24 @@ export function EnviarCotizacionDialog({
   };
   const [open, setOpen] = useState(false);
   const [correos, setCorreos] = useState<string[]>(prefill);
-  const [nuevo, setNuevo] = useState('');
+  const [cc, setCc] = useState<string[]>([]);
+  const [bcc, setBcc] = useState<string[]>([]);
+  const [mostrarCopia, setMostrarCopia] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const qc = useQueryClient();
-
-  function agregar() {
-    const email = nuevo.trim().toLowerCase();
-    if (!email) return;
-    if (!EMAIL_RE.test(email)) {
-      toast.error('Correo inválido');
-      return;
-    }
-    if (!correos.includes(email)) setCorreos((c) => [...c, email]);
-    setNuevo('');
-  }
-
-  function quitar(email: string) {
-    setCorreos((c) => c.filter((x) => x !== email));
-  }
 
   const enviar = useMutation({
     mutationFn: async () =>
-      (await api.post(`/cotizaciones/${cotizacionId}/enviar`, { to: correos })).data,
+      (
+        await api.post(`/cotizaciones/${cotizacionId}/enviar`, {
+          to: correos,
+          cc: cc.length ? cc : undefined,
+          bcc: bcc.length ? bcc : undefined,
+          subject: subject.trim() || undefined,
+          mensaje: mensaje.trim() || undefined,
+        })
+      ).data,
     onSuccess: () => {
       toast.success('Cotización enviada');
       qc.invalidateQueries({ queryKey: ['cotizaciones', viajeId] });
@@ -71,8 +139,16 @@ export function EnviarCotizacionDialog({
 
   function onOpenChange(next: boolean) {
     setOpen(next);
-    setNuevo('');
-    setCorreos(next ? prefill() : []);
+    if (next) {
+      setCorreos(prefill());
+    } else {
+      setCorreos([]);
+    }
+    setCc([]);
+    setBcc([]);
+    setMostrarCopia(false);
+    setSubject('');
+    setMensaje('');
   }
 
   return (
@@ -83,53 +159,62 @@ export function EnviarCotizacionDialog({
           Enviar
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Enviar cotización #{folio}</DialogTitle>
           <DialogDescription>
-            Se precarga el correo del cliente del viaje. Quita o agrega los que
-            necesites (uno o varios).
+            Se precarga el correo del cliente del viaje. Personaliza destinatarios,
+            asunto y mensaje (todo opcional).
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
-          <Label htmlFor="to">Correos destino</Label>
-          <div className="flex gap-2">
-            <Input
-              id="to"
-              type="email"
-              value={nuevo}
-              onChange={(e) => setNuevo(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  agregar();
-                }
-              }}
-              placeholder="cliente@correo.com"
+        <ChipsCorreo
+          id="to"
+          label="Para"
+          valores={correos}
+          onChange={setCorreos}
+          placeholder="cliente@correo.com"
+        />
+
+        {mostrarCopia ? (
+          <>
+            <ChipsCorreo id="cc" label="CC (copia)" valores={cc} onChange={setCc} />
+            <ChipsCorreo
+              id="bcc"
+              label="CCO (copia oculta)"
+              valores={bcc}
+              onChange={setBcc}
             />
-            <Button type="button" variant="outline" onClick={agregar} disabled={!nuevo.trim()}>
-              <Plus />
-              Agregar
-            </Button>
-          </div>
-          {correos.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {correos.map((email) => (
-                <Badge key={email} variant="secondary" className="gap-1">
-                  {email}
-                  <button
-                    type="button"
-                    onClick={() => quitar(email)}
-                    className="ml-0.5 rounded-sm hover:text-destructive"
-                    aria-label={`Quitar ${email}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMostrarCopia(true)}
+            className="self-start text-sm text-muted-foreground underline-offset-2 hover:underline"
+          >
+            + Agregar CC / CCO
+          </button>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="asunto">Asunto</Label>
+          <Input
+            id="asunto"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder={`Cotización #${folio} — (nombre de tu empresa)`}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="mensaje">Mensaje</Label>
+          <Textarea
+            id="mensaje"
+            value={mensaje}
+            onChange={(e) => setMensaje(e.target.value)}
+            placeholder="Si lo dejas vacío se envía un mensaje estándar con la cotización adjunta."
+            rows={4}
+          />
         </div>
 
         <DialogFooter>

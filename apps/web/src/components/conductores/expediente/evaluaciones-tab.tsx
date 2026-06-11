@@ -37,6 +37,10 @@ import {
   RangoFechas,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import {
+  ArchivosExpedienteButton,
+  useConteosArchivosExpediente,
+} from '@/components/conductores/expediente/archivos-expediente-button';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -305,6 +309,8 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
     enabled: Boolean(conductorId),
   });
 
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'evaluaciones');
+
   const eliminar = useMutation({
     mutationFn: async (evaluacionId: string) => {
       await api.delete(`/conductores/${conductorId}/evaluaciones/${evaluacionId}`);
@@ -408,6 +414,13 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
                     <TableCell className="hidden lg:table-cell">{ev.viajesCompletados ?? '—'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <ArchivosExpedienteButton
+                          conductorId={conductorId}
+                          seccion="evaluaciones"
+                          registroId={ev.id}
+                          titulo={`Evaluación ${isoADate(ev.periodoInicio)}`}
+                          count={conteos?.[ev.id]}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"

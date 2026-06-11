@@ -6,7 +6,8 @@ export interface ClienteResumen {
   id: string;
   razonSocial: string;
   rfc?: string | null;
-  contactoEmail?: string | null;
+  /** Contacto principal (o el primero); destinatario por defecto al cotizar. */
+  contactos?: { nombre: string; email?: string | null; telefono?: string | null }[];
 }
 
 /** Resumen de unidad embebido en el viaje. */

@@ -5,6 +5,7 @@ import {
 import { CertificacionConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearCertificacionInput {
   tipo: string;
@@ -28,7 +29,10 @@ export interface ActualizarCertificacionInput {
 
 @Injectable()
 export class CertificacionesUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
   private asegurarConductor(conductorId: string): Promise<void> {
     return asegurarConductorExiste(this.prisma, conductorId);
@@ -106,6 +110,7 @@ export class CertificacionesUseCase {
 
   async eliminar(conductorId: string, certId: string): Promise<void> {
     await this.obtener(conductorId, certId);
+    await this.archivos.eliminarDeRegistro('CERTIFICACION', certId);
     await this.prisma.certificacionConductor.delete({ where: { id: certId } });
   }
 }

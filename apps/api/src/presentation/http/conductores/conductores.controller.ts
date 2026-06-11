@@ -9,8 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { DocumentoConductor } from '@prisma/client';
 import { Paginado } from '@flotaos/shared-types';
 import { PaginacionDto } from '../shared/paginacion.dto';
@@ -24,6 +27,12 @@ import {
   DocumentosConductorUseCase,
   DocumentoConductorPorVencer,
 } from '../../../application/conductores/documentos-conductor.usecase';
+import {
+  ArchivosDocumentoConductorUseCase,
+  ArchivoSubido,
+  TAMANO_MAX_BYTES,
+} from '../../../application/conductores/archivos-documento-conductor.usecase';
+import { ArchivosExpedienteUseCase } from '../../../application/conductores/archivos-expediente.usecase';
 import { ConductorPublico } from '../../../application/conductores/conductores.types';
 import { CrearConductorDto } from './dto/crear-conductor.dto';
 import { ActualizarConductorDto } from './dto/actualizar-conductor.dto';
@@ -45,6 +54,8 @@ export class ConductoresController {
     private readonly eliminarConductor: EliminarConductorUseCase,
     private readonly listarViajesConductor: ListarViajesConductorUseCase,
     private readonly documentos: DocumentosConductorUseCase,
+    private readonly archivosDocumento: ArchivosDocumentoConductorUseCase,
+    private readonly archivosExpediente: ArchivosExpedienteUseCase,
   ) {}
 
   // ─────────────────────────── Conductores ───────────────────────────
@@ -142,5 +153,126 @@ export class ConductoresController {
     @Param('docId') docId: string,
   ): Promise<void> {
     return this.documentos.eliminar(conductorId, docId);
+  }
+
+  // ──────────── Archivos adjuntos de un documento (PDF/imagen) ────────────
+
+  /** Sube uno o varios archivos (PDF o imagen) a un documento del conductor. */
+  @Post(':conductorId/documentos/:docId/archivos')
+  @UseInterceptors(
+    FilesInterceptor('archivos', 10, { limits: { fileSize: TAMANO_MAX_BYTES } }),
+  )
+  subirArchivos(
+    @Param('conductorId') conductorId: string,
+    @Param('docId') docId: string,
+    @UploadedFiles() archivos: ArchivoSubido[],
+  ) {
+    return this.archivosDocumento.subir(conductorId, docId, archivos ?? []);
+  }
+
+  @Get(':conductorId/documentos/:docId/archivos')
+  listarArchivos(
+    @Param('conductorId') conductorId: string,
+    @Param('docId') docId: string,
+  ) {
+    return this.archivosDocumento.listar(conductorId, docId);
+  }
+
+  @Get(':conductorId/documentos/:docId/archivos/:archivoId/url')
+  urlArchivo(
+    @Param('conductorId') conductorId: string,
+    @Param('docId') docId: string,
+    @Param('archivoId') archivoId: string,
+  ) {
+    return this.archivosDocumento.urlDescarga(conductorId, docId, archivoId);
+  }
+
+  @Delete(':conductorId/documentos/:docId/archivos/:archivoId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async eliminarArchivo(
+    @Param('conductorId') conductorId: string,
+    @Param('docId') docId: string,
+    @Param('archivoId') archivoId: string,
+  ): Promise<void> {
+    await this.archivosDocumento.eliminar(conductorId, docId, archivoId);
+  }
+
+  // ───── Archivos de evidencia de las secciones del expediente (PDF/imagen) ─────
+  // `:seccion` es el slug de la sección (examenes-medicos, certificaciones,
+  // capacitaciones, control-confianza, incidencias, evaluaciones); N por registro.
+
+  /** Conteo de archivos por registro de una sección (para el badge del listado). */
+  @Get(':conductorId/expediente/:seccion/archivos/conteos')
+  conteosArchivosExpediente(
+    @Param('conductorId') conductorId: string,
+    @Param('seccion') seccion: string,
+  ): Promise<Record<string, number>> {
+    return this.archivosExpediente.conteos(
+      conductorId,
+      this.archivosExpediente.resolverSeccion(seccion),
+    );
+  }
+
+  /** Sube uno o varios archivos (PDF o imagen) a un registro del expediente. */
+  @Post(':conductorId/expediente/:seccion/:registroId/archivos')
+  @UseInterceptors(
+    FilesInterceptor('archivos', 10, { limits: { fileSize: TAMANO_MAX_BYTES } }),
+  )
+  subirArchivosExpediente(
+    @Param('conductorId') conductorId: string,
+    @Param('seccion') seccion: string,
+    @Param('registroId') registroId: string,
+    @UploadedFiles() archivos: ArchivoSubido[],
+  ) {
+    return this.archivosExpediente.subir(
+      conductorId,
+      this.archivosExpediente.resolverSeccion(seccion),
+      registroId,
+      archivos ?? [],
+    );
+  }
+
+  @Get(':conductorId/expediente/:seccion/:registroId/archivos')
+  listarArchivosExpediente(
+    @Param('conductorId') conductorId: string,
+    @Param('seccion') seccion: string,
+    @Param('registroId') registroId: string,
+  ) {
+    return this.archivosExpediente.listar(
+      conductorId,
+      this.archivosExpediente.resolverSeccion(seccion),
+      registroId,
+    );
+  }
+
+  @Get(':conductorId/expediente/:seccion/:registroId/archivos/:archivoId/url')
+  urlArchivoExpediente(
+    @Param('conductorId') conductorId: string,
+    @Param('seccion') seccion: string,
+    @Param('registroId') registroId: string,
+    @Param('archivoId') archivoId: string,
+  ) {
+    return this.archivosExpediente.urlDescarga(
+      conductorId,
+      this.archivosExpediente.resolverSeccion(seccion),
+      registroId,
+      archivoId,
+    );
+  }
+
+  @Delete(':conductorId/expediente/:seccion/:registroId/archivos/:archivoId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async eliminarArchivoExpediente(
+    @Param('conductorId') conductorId: string,
+    @Param('seccion') seccion: string,
+    @Param('registroId') registroId: string,
+    @Param('archivoId') archivoId: string,
+  ): Promise<void> {
+    await this.archivosExpediente.eliminar(
+      conductorId,
+      this.archivosExpediente.resolverSeccion(seccion),
+      registroId,
+      archivoId,
+    );
   }
 }

@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { seleccionRequerida, fechaRequerida, finNoAntesDeInicio } from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Paperclip, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { vencimientoInfo } from '@/components/conductores/documento-utils';
 import type { DocumentoConductor, DocumentoFormPayload } from '@/components/conductores/types';
+import { ArchivosDocumentoDialog } from '@/components/conductores/expediente/archivos-documento-dialog';
 import {
   ExpedienteFormDialog,
   CamposGrid,
@@ -163,6 +164,7 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
   const queryClient = useQueryClient();
   const [editando, setEditando] = useState<DocumentoConductor | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [archivosDoc, setArchivosDoc] = useState<DocumentoConductor | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['conductor-documentos', conductorId],
@@ -246,6 +248,16 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => setArchivosDoc(doc)}
+                        title="Archivos adjuntos"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        {doc._count?.archivos ?? 0}
+                      </Button>
+                      <Button
+                        variant="ghost"
                         size="icon"
                         onClick={() => {
                           setEditando(doc);
@@ -273,6 +285,16 @@ export function DocumentosTab({ conductorId }: { conductorId: string }) {
           </Table>
         )}
       </div>
+
+      {archivosDoc && (
+        <ArchivosDocumentoDialog
+          conductorId={conductorId}
+          documentoId={archivosDoc.id}
+          titulo={archivosDoc.numero ? `${archivosDoc.tipo} · N.º ${archivosDoc.numero}` : archivosDoc.tipo}
+          open={Boolean(archivosDoc)}
+          onOpenChange={(o) => { if (!o) setArchivosDoc(null); }}
+        />
+      )}
     </div>
   );
 }

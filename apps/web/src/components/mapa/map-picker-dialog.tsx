@@ -14,8 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  buscarDirecciones,
+  buscarDireccionEstructurada,
   reverseGeocode,
+  type DireccionEstructurada,
   type LugarGeocodificado,
 } from '@/lib/geocoding';
 
@@ -51,12 +52,11 @@ export function MapPickerDialog({
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [recenter, setRecenter] = useState<{ lat: number; lng: number } | null>(null);
   const [direccion, setDireccion] = useState('');
-  const [q, setQ] = useState('');
+  const [campos, setCampos] = useState<DireccionEstructurada>({ pais: 'México' });
   const [resultados, setResultados] = useState<LugarGeocodificado[]>([]);
   const [buscando, setBuscando] = useState(false);
+  const [buscado, setBuscado] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  // Evita que la dirección precargada dispare una búsqueda al abrir.
-  const skipSearchRef = useRef(false);
 
   // Reinicia el estado al abrir; aborta peticiones en vuelo al cerrar.
   useEffect(() => {
@@ -71,45 +71,58 @@ export function MapPickerDialog({
     setPos(inicialPos);
     setRecenter(inicialPos);
     setDireccion(inicial?.direccion ?? '');
-    setQ(inicial?.direccion ?? '');
+    setCampos({ pais: 'México' });
     setResultados([]);
-    skipSearchRef.current = true;
+    setBuscado(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Búsqueda con debounce (respeta la política de uso de Nominatim).
-  useEffect(() => {
-    if (!open) return;
-    if (skipSearchRef.current) {
-      skipSearchRef.current = false;
-      return;
-    }
-    const term = q.trim();
-    if (term.length < 3) {
-      setResultados([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      abortRef.current?.abort();
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
-      setBuscando(true);
-      try {
-        setResultados(await buscarDirecciones(term, ctrl.signal));
-      } catch {
-        /* abortado o error de red: se ignora */
-      } finally {
-        setBuscando(false);
+  const setCampo = (k: keyof DireccionEstructurada, v: string) =>
+    setCampos((c) => ({ ...c, [k]: v }));
+
+  // Búsqueda estructurada por botón / Enter (no en cada tecla → respeta la
+  // política de uso de Nominatim). Requiere al menos un campo además de país.
+  async function buscar() {
+    const camposBusqueda: (keyof DireccionEstructurada)[] = [
+      'calle',
+      'numero',
+      'colonia',
+      'cp',
+      'municipio',
+      'ciudad',
+      'estado',
+    ];
+    if (!camposBusqueda.some((k) => campos[k]?.trim())) return;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setBuscando(true);
+    try {
+      const res = await buscarDireccionEstructurada(campos, ctrl.signal);
+      setResultados(res);
+      setBuscado(true);
+      // Posiciona el mapa en el mejor resultado para que el usuario lo revise.
+      // NO confirma nada: eso ocurre solo al pulsar "Usar esta ubicación".
+      // La lista queda visible por si hay que elegir otra coincidencia.
+      if (res.length > 0) {
+        const r = res[0];
+        setPos({ lat: r.lat, lng: r.lng });
+        setRecenter({ lat: r.lat, lng: r.lng });
+        setDireccion(r.direccion);
       }
-    }, 1100);
-    return () => clearTimeout(t);
-  }, [q, open]);
+    } catch {
+      /* abortado o error de red: se ignora */
+    } finally {
+      setBuscando(false);
+    }
+  }
 
   function elegirResultado(r: LugarGeocodificado) {
     setPos({ lat: r.lat, lng: r.lng });
     setRecenter({ lat: r.lat, lng: r.lng }); // solo aquí se re-centra el mapa
     setDireccion(r.direccion);
     setResultados([]);
+    setBuscado(false);
   }
 
   // Al colocar/arrastrar el pin: mueve el marcador y rellena la dirección por
@@ -131,24 +144,104 @@ export function MapPickerDialog({
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
-            Busca la dirección o haz clic en el mapa; arrastra el pin para afinar.
+            Llena los campos y pulsa Buscar para posicionar el mapa; revisa el pin y
+            confirma con “Usar esta ubicación”. También puedes hacer clic en el mapa o
+            arrastrar el pin para afinar.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar dirección, ciudad, lugar…"
-              className="pl-8"
-              aria-label="Buscar dirección"
-            />
-            {(resultados.length > 0 || buscando) && (
-              <div className="absolute z-[1100] mt-1 max-h-48 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
+        <div className="max-h-[72vh] space-y-2 overflow-y-auto pr-1">
+          <div className="space-y-2">
+            <div
+              className="grid grid-cols-2 gap-2"
+              onKeyDown={(e) => {
+                // Enter dispara la búsqueda (sin enviar el formulario del viaje
+                // que envuelve a este diálogo).
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void buscar();
+                }
+              }}
+            >
+              <Input
+                className="col-span-2"
+                placeholder="Calle"
+                value={campos.calle ?? ''}
+                onChange={(e) => setCampo('calle', e.target.value)}
+                aria-label="Calle"
+              />
+              <Input
+                placeholder="Número"
+                value={campos.numero ?? ''}
+                onChange={(e) => setCampo('numero', e.target.value)}
+                aria-label="Número"
+              />
+              <Input
+                placeholder="C.P."
+                value={campos.cp ?? ''}
+                onChange={(e) => setCampo('cp', e.target.value)}
+                aria-label="Código postal"
+                inputMode="numeric"
+              />
+              <Input
+                className="col-span-2"
+                placeholder="Colonia"
+                value={campos.colonia ?? ''}
+                onChange={(e) => setCampo('colonia', e.target.value)}
+                aria-label="Colonia"
+              />
+              <Input
+                placeholder="Municipio"
+                value={campos.municipio ?? ''}
+                onChange={(e) => setCampo('municipio', e.target.value)}
+                aria-label="Municipio"
+              />
+              <Input
+                placeholder="Ciudad"
+                value={campos.ciudad ?? ''}
+                onChange={(e) => setCampo('ciudad', e.target.value)}
+                aria-label="Ciudad"
+              />
+              <Input
+                placeholder="Estado"
+                value={campos.estado ?? ''}
+                onChange={(e) => setCampo('estado', e.target.value)}
+                aria-label="Estado"
+              />
+              <Input
+                placeholder="País"
+                value={campos.pais ?? ''}
+                onChange={(e) => setCampo('pais', e.target.value)}
+                aria-label="País"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={buscando}
+              className="w-full"
+              onClick={() => void buscar()}
+            >
+              <Search className="h-4 w-4" />
+              {buscando ? 'Buscando…' : 'Buscar dirección'}
+            </Button>
+            {(buscando || buscado || resultados.length > 0) && (
+              <div className="max-h-40 w-full overflow-y-auto rounded-md border bg-popover shadow-sm">
                 {buscando && (
                   <p className="px-3 py-2 text-xs text-muted-foreground">Buscando…</p>
+                )}
+                {!buscando && resultados.length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    Sin resultados. Prueba con menos detalle (p. ej. solo calle, colonia y CP).
+                  </p>
+                )}
+                {!buscando && resultados.length > 0 && (
+                  <p className="border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+                    Mapa posicionado en la coincidencia más cercana. Si no es exacta,
+                    elige otra o <strong>arrastra el pin</strong> al punto correcto.
+                    Nada se guarda hasta “Usar esta ubicación”.
+                  </p>
                 )}
                 {resultados.map((r, i) => (
                   <button
@@ -165,7 +258,7 @@ export function MapPickerDialog({
             )}
           </div>
 
-          <div className="h-[320px] w-full overflow-hidden rounded-md border">
+          <div className="h-[300px] w-full overflow-hidden rounded-md border">
             <MapPickerLeaflet value={pos} recenter={recenter} onPick={alColocar} />
           </div>
 

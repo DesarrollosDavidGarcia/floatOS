@@ -21,10 +21,15 @@ export class BrevoMailProvider implements MailProvider {
     const key = process.env.BREVO_API_KEY;
     if (!key) throw new Error('BREVO_API_KEY no configurada');
 
-    const destinatarios = Array.isArray(m.to) ? m.to : [m.to];
+    const lista = (v?: string | string[]) =>
+      (Array.isArray(v) ? v : v ? [v] : []).map((email) => ({ email }));
+    const cc = lista(m.cc);
+    const bcc = lista(m.bcc);
     const body = {
       sender: this.remitente(from),
-      to: destinatarios.map((email) => ({ email })),
+      to: lista(m.to),
+      cc: cc.length ? cc : undefined,
+      bcc: bcc.length ? bcc : undefined,
       subject: m.subject,
       textContent: m.text,
       htmlContent: m.html || undefined,

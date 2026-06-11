@@ -5,7 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoCotizacion, Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EmailService } from '../../infrastructure/email/email.service';
 import {
@@ -20,6 +20,40 @@ import {
 } from '../../infrastructure/pdf/cotizacion-pdf';
 
 const dec = (v: Prisma.Decimal | null): number => (v == null ? 0 : Number(v));
+
+/** Escapa el texto del usuario antes de interpolarlo en el HTML del correo. */
+const escaparHtml = (s: string): string =>
+  s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/**
+ * Transiciones válidas del estado de una cotización. BORRADOR sale vía `enviar`
+ * (a ENVIADA) o se marca decidido manualmente; una vez decidida se puede cambiar
+ * la decisión o reabrir a ENVIADA. No hay vuelta a BORRADOR (no se "des-envía").
+ */
+const TRANSICIONES_COTIZACION: Record<EstadoCotizacion, EstadoCotizacion[]> = {
+  [EstadoCotizacion.BORRADOR]: [
+    EstadoCotizacion.ENVIADA,
+    EstadoCotizacion.ACEPTADA,
+    EstadoCotizacion.RECHAZADA,
+  ],
+  [EstadoCotizacion.ENVIADA]: [
+    EstadoCotizacion.ACEPTADA,
+    EstadoCotizacion.RECHAZADA,
+  ],
+  [EstadoCotizacion.ACEPTADA]: [
+    EstadoCotizacion.RECHAZADA,
+    EstadoCotizacion.ENVIADA,
+  ],
+  [EstadoCotizacion.RECHAZADA]: [
+    EstadoCotizacion.ACEPTADA,
+    EstadoCotizacion.ENVIADA,
+  ],
+};
 
 /**
  * Servicio de cotizaciones: ejecuta el motor de cálculo y persiste/consulta las
@@ -129,6 +163,66 @@ export class CotizacionesService {
     return cot;
   }
 
+  /**
+   * Cambia el estado de la cotización validando contra `TRANSICIONES_COTIZACION`.
+   * Al pasar a ENVIADA por primera vez sella `enviadaEn` (marcado manual sin correo).
+   */
+  async cambiarEstado(id: string, estado: EstadoCotizacion) {
+    const cot = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: { estado: true, enviadaEn: true },
+    });
+    if (!cot) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
+    if (cot.estado === estado) return this.obtener(id);
+    if (!TRANSICIONES_COTIZACION[cot.estado].includes(estado)) {
+      throw new ConflictException(
+        `Transición inválida: ${cot.estado} → ${estado}.`,
+      );
+    }
+    return this.prisma.cotizacion.update({
+      where: { id },
+      data: {
+        estado,
+        ...(estado === EstadoCotizacion.ENVIADA && !cot.enviadaEn
+          ? { enviadaEn: new Date() }
+          : {}),
+      },
+    });
+  }
+
+  /** Elimina una cotización SOLO si está en BORRADOR (si no, 409). */
+  async eliminar(id: string) {
+    const cot = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: { estado: true },
+    });
+    if (!cot) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
+    if (cot.estado !== EstadoCotizacion.BORRADOR) {
+      throw new ConflictException(
+        `Solo se pueden eliminar cotizaciones en borrador (estado actual: ${cot.estado}).`,
+      );
+    }
+    await this.prisma.cotizacion.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  /**
+   * Duplica una cotización (de cualquier estado) en un nuevo BORRADOR del mismo
+   * viaje, recalculando con los datos actuales del viaje (reusa `crear`).
+   */
+  async duplicar(id: string) {
+    const cot = await this.prisma.cotizacion.findUnique({
+      where: { id },
+      select: { viajeId: true, params: true, notas: true },
+    });
+    if (!cot) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
+    return this.crear(
+      cot.viajeId,
+      cot.params as unknown as ParamsCotizacion,
+      cot.notas ?? undefined,
+    );
+  }
+
   /** Genera el PDF de una cotización (datos del emisor por env, por instancia). */
   async generarPdf(id: string): Promise<{ buffer: Buffer; folio: number }> {
     const cot = await this.prisma.cotizacion.findUnique({
@@ -152,13 +246,28 @@ export class CotizacionesService {
       margen: number;
     };
 
+    // Emisor: se toma de la configuración de empresa (Mi Empresa); si está
+    // vacía, cae a las variables de entorno EMPRESA_* (legado).
+    const empresa = await this.prisma.empresa.findFirst();
+    const domicilio = empresa
+      ? [
+          [empresa.calle, empresa.numeroExt].filter(Boolean).join(' '),
+          empresa.colonia,
+          empresa.cp,
+          [empresa.municipio, empresa.estado].filter(Boolean).join(', '),
+        ]
+          .map((s) => s?.trim())
+          .filter(Boolean)
+          .join(', ')
+      : '';
+
     const datos: DatosCotizacionPdf = {
       emisor: {
-        nombre: process.env.EMPRESA_NOMBRE || 'Transportista',
-        rfc: process.env.EMPRESA_RFC || undefined,
-        direccion: process.env.EMPRESA_DIRECCION || undefined,
-        telefono: process.env.EMPRESA_TELEFONO || undefined,
-        email: process.env.EMPRESA_EMAIL || undefined,
+        nombre: empresa?.razonSocial || process.env.EMPRESA_NOMBRE || 'Transportista',
+        rfc: empresa?.rfc || process.env.EMPRESA_RFC || undefined,
+        direccion: domicilio || process.env.EMPRESA_DIRECCION || undefined,
+        telefono: empresa?.telefono || process.env.EMPRESA_TELEFONO || undefined,
+        email: empresa?.email || process.env.EMPRESA_EMAIL || undefined,
       },
       cliente: {
         razonSocial: cot.viaje.cliente?.razonSocial ?? 'Cliente',
@@ -194,20 +303,45 @@ export class CotizacionesService {
   /**
    * Envía la cotización por correo (PDF adjunto) vía EmailService (Brevo/SMTP).
    * Destinatarios: la lista `to`, o el correo de contacto del cliente si va vacía.
+   * `subject`/`mensaje` sobreescriben los textos por defecto; `cc`/`bcc` opcionales.
    * Marca ENVIADA si sale.
    */
-  async enviar(id: string, to?: string[]) {
+  async enviar(
+    id: string,
+    opts: {
+      to?: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject?: string;
+      mensaje?: string;
+    } = {},
+  ) {
     const info = await this.prisma.cotizacion.findUnique({
       where: { id },
       select: {
         folio: true,
-        viaje: { select: { cliente: { select: { contactoEmail: true } } } },
+        viaje: {
+          select: {
+            cliente: {
+              select: {
+                contactos: {
+                  orderBy: [{ esPrincipal: 'desc' }, { orden: 'asc' }],
+                  take: 1,
+                  select: { email: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
     if (!info) throw new NotFoundException(`Cotización con id ${id} no encontrada`);
 
-    const capturados = [...new Set((to ?? []).map((s) => s.trim()).filter(Boolean))];
-    const fallbackCliente = info.viaje.cliente?.contactoEmail;
+    const limpiar = (xs?: string[]) =>
+      [...new Set((xs ?? []).map((s) => s.trim().toLowerCase()).filter(Boolean))];
+
+    const capturados = limpiar(opts.to);
+    const fallbackCliente = info.viaje.cliente?.contactos?.[0]?.email;
     const destinatarios = capturados.length
       ? capturados
       : fallbackCliente
@@ -218,17 +352,31 @@ export class CotizacionesService {
         'No hay correo destino: captura al menos uno o registra el correo de contacto del cliente.',
       );
     }
+    // cc/bcc sin solaparse con los destinatarios (evita duplicar el envío).
+    const enTo = new Set(destinatarios);
+    const cc = limpiar(opts.cc).filter((e) => !enTo.has(e));
+    const enCc = new Set(cc);
+    const bcc = limpiar(opts.bcc).filter((e) => !enTo.has(e) && !enCc.has(e));
 
     const { buffer, folio } = await this.generarPdf(id);
-    const empresa = process.env.EMPRESA_NOMBRE || 'Transportista';
-    const subject = `Cotización #${folio} — ${empresa}`;
-    const text = `Hola,\n\nAdjuntamos la cotización #${folio} para su revisión.\n\nSaludos,\n${empresa}`;
-    const html =
-      `<p>Hola,</p><p>Adjuntamos la <strong>cotización #${folio}</strong> para su revisión.</p>` +
-      `<p>Saludos,<br/>${empresa}</p>`;
+    const empresaCfg = await this.prisma.empresa.findFirst();
+    const empresa =
+      empresaCfg?.razonSocial || process.env.EMPRESA_NOMBRE || 'Transportista';
+    const subject = opts.subject?.trim() || `Cotización #${folio} — ${empresa}`;
+    const cuerpo = opts.mensaje?.trim();
+    const text =
+      cuerpo ||
+      `Hola,\n\nAdjuntamos la cotización #${folio} para su revisión.\n\nSaludos,\n${empresa}`;
+    // Mensaje personalizado: respeta saltos de línea como párrafos/<br/> en HTML.
+    const html = cuerpo
+      ? `<p>${escaparHtml(cuerpo).replace(/\n/g, '<br/>')}</p>`
+      : `<p>Hola,</p><p>Adjuntamos la <strong>cotización #${folio}</strong> para su revisión.</p>` +
+        `<p>Saludos,<br/>${empresa}</p>`;
 
     const enviado = await this.email.enviar({
       to: destinatarios,
+      cc: cc.length ? cc : undefined,
+      bcc: bcc.length ? bcc : undefined,
       subject,
       text,
       html,

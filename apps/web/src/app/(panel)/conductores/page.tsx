@@ -41,7 +41,6 @@ import {
 } from '@/components/ui/table';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import type { Conductor } from '@/components/conductores/types';
-import { ConductorFormDialog } from '@/components/conductores/conductor-form-dialog';
 import { DocumentosDialog } from '@/components/conductores/documentos-dialog';
 import { ViajesDialog } from '@/components/conductores/viajes-dialog';
 
@@ -70,8 +69,6 @@ export default function ConductoresPage() {
   const [page, setPage] = useState(1);
   const q = useDebounce(busqueda);
 
-  const [crearOpen, setCrearOpen] = useState(false);
-  const [editando, setEditando] = useState<Conductor | null>(null);
   const [docsConductor, setDocsConductor] = useState<Conductor | null>(null);
   const [viajesConductor, setViajesConductor] = useState<Conductor | null>(null);
   const [eliminarConductor, setEliminarConductor] = useState<Conductor | null>(null);
@@ -125,8 +122,10 @@ export default function ConductoresPage() {
               }}
               placeholder="Buscar por nombre, usuario…"
             />
-            <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
-              <Plus /> Nuevo conductor
+            <Button asChild className="shrink-0">
+              <Link href="/conductores/crear">
+                <Plus /> Nuevo conductor
+              </Link>
             </Button>
           </div>
         }
@@ -215,11 +214,18 @@ export default function ConductoresPage() {
                     )}
                   </TableCell>
 
-                  {/* Estado */}
+                  {/* Estado + tipo de contratación */}
                   <TableCell>
-                    <Badge variant={c.activo ? 'success' : 'secondary'}>
-                      {c.activo ? 'Activo' : 'Inactivo'}
-                    </Badge>
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge variant={c.activo ? 'success' : 'secondary'}>
+                        {c.activo ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                      {c.tipoContratacion && c.tipoContratacion !== 'PLANTA' && (
+                        <Badge variant="outline">
+                          <CatalogoTexto grupo="TIPO_CONTRATACION" codigo={c.tipoContratacion} />
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
 
                   {/* Acciones */}
@@ -242,8 +248,10 @@ export default function ConductoresPage() {
                         <DropdownMenuItem onSelect={() => setViajesConductor(c)}>
                           <Route className="h-4 w-4" /> Historial de viajes
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setEditando(c)}>
-                          <Pencil className="h-4 w-4" /> Editar
+                        <DropdownMenuItem asChild>
+                          <Link href={`/conductores/${c.id}`}>
+                            <Pencil className="h-4 w-4" /> Editar datos
+                          </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -269,18 +277,6 @@ export default function ConductoresPage() {
         singular="conductor"
         plural="conductores"
         onPage={setPage}
-      />
-
-      {/* Crear */}
-      <ConductorFormDialog open={crearOpen} onOpenChange={setCrearOpen} />
-
-      {/* Editar */}
-      <ConductorFormDialog
-        open={Boolean(editando)}
-        onOpenChange={(o) => {
-          if (!o) setEditando(null);
-        }}
-        conductor={editando ?? undefined}
       />
 
       {/* Documentos */}

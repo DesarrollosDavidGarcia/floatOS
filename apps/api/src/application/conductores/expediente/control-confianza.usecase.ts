@@ -5,6 +5,7 @@ import {
 import { ControlConfianzaConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearControlConfianzaInput {
   tipo: string;
@@ -31,7 +32,10 @@ export interface ActualizarControlConfianzaInput {
 /** Casos de uso para los registros de control de confianza de un conductor. */
 @Injectable()
 export class ControlConfianzaUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
   private asegurarConductor(conductorId: string): Promise<void> {
     return asegurarConductorExiste(this.prisma, conductorId);
@@ -113,6 +117,7 @@ export class ControlConfianzaUseCase {
 
   async eliminar(conductorId: string, registroId: string): Promise<void> {
     await this.obtener(conductorId, registroId);
+    await this.archivos.eliminarDeRegistro('CONTROL_CONFIANZA', registroId);
     await this.prisma.controlConfianzaConductor.delete({ where: { id: registroId } });
   }
 }

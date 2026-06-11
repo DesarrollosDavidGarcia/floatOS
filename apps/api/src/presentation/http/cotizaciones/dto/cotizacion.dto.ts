@@ -4,14 +4,17 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Max,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { EstadoCotizacion } from '@prisma/client';
 
 /**
  * Tarifas/parámetros capturados para la cotización (modelo mixto configurable).
@@ -57,4 +60,36 @@ export class EnviarCotizacionDto {
   @ArrayMaxSize(20, { message: 'Máximo 20 destinatarios' })
   @IsEmail({}, { each: true, message: 'Correo destino inválido' })
   to?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20, { message: 'Máximo 20 en copia' })
+  @IsEmail({}, { each: true, message: 'Correo en copia inválido' })
+  cc?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20, { message: 'Máximo 20 en copia oculta' })
+  @IsEmail({}, { each: true, message: 'Correo en copia oculta inválido' })
+  bcc?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300, { message: 'El asunto no puede exceder 300 caracteres' })
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5_000, { message: 'El mensaje no puede exceder 5000 caracteres' })
+  mensaje?: string;
+}
+
+/** Cambia el estado de una cotización (Aceptada/Rechazada/reabrir a Enviada). */
+export class CambiarEstadoCotizacionDto {
+  @IsIn([
+    EstadoCotizacion.ENVIADA,
+    EstadoCotizacion.ACEPTADA,
+    EstadoCotizacion.RECHAZADA,
+  ])
+  estado!: EstadoCotizacion;
 }

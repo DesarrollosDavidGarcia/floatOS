@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { IncidenciaConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearIncidenciaInput {
   tipo: string;
@@ -33,7 +34,10 @@ export interface ActualizarIncidenciaInput {
 
 @Injectable()
 export class IncidenciasUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
   private asegurarConductor(conductorId: string): Promise<void> {
     return asegurarConductorExiste(this.prisma, conductorId);
@@ -122,6 +126,7 @@ export class IncidenciasUseCase {
 
   async eliminar(conductorId: string, incidenciaId: string): Promise<void> {
     await this.obtener(conductorId, incidenciaId);
+    await this.archivos.eliminarDeRegistro('INCIDENCIA', incidenciaId);
     await this.prisma.incidenciaConductor.delete({
       where: { id: incidenciaId },
     });

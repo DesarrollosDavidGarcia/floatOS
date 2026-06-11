@@ -21,6 +21,10 @@ import {
   Dinero,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import {
+  ArchivosExpedienteButton,
+  useConteosArchivosExpediente,
+} from '@/components/conductores/expediente/archivos-expediente-button';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -173,6 +177,8 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
       return data;
     },
   });
+
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'incidencias');
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -397,6 +403,13 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <ArchivosExpedienteButton
+                        conductorId={conductorId}
+                        seccion="incidencias"
+                        registroId={inc.id}
+                        titulo={inc.titulo}
+                        count={conteos?.[inc.id]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"

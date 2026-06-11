@@ -5,6 +5,7 @@ import {
 import { CapacitacionConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearCapacitacionInput {
   nombre: string;
@@ -34,7 +35,10 @@ export interface ActualizarCapacitacionInput {
 
 @Injectable()
 export class CapacitacionesUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
   private asegurarConductor(conductorId: string): Promise<void> {
     return asegurarConductorExiste(this.prisma, conductorId);
@@ -118,6 +122,7 @@ export class CapacitacionesUseCase {
 
   async eliminar(conductorId: string, capacitacionId: string): Promise<void> {
     await this.obtener(conductorId, capacitacionId);
+    await this.archivos.eliminarDeRegistro('CAPACITACION', capacitacionId);
     await this.prisma.capacitacionConductor.delete({ where: { id: capacitacionId } });
   }
 }

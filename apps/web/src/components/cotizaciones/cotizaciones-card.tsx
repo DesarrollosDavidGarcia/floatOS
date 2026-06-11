@@ -24,6 +24,7 @@ import type { Viaje } from '@/components/viajes/types';
 import type { Cotizacion } from './types';
 import { CotizarDialog } from './cotizar-dialog';
 import { EnviarCotizacionDialog } from './enviar-cotizacion-dialog';
+import { CotizacionAcciones } from './cotizacion-acciones';
 
 async function descargarPdf(id: string, folio: number) {
   try {
@@ -90,7 +91,13 @@ export function CotizacionesCard({ viaje }: { viaje: Viaje }) {
                   cotizacionId={c.id}
                   folio={c.folio}
                   viajeId={viaje.id}
-                  clienteEmail={viaje.cliente?.contactoEmail ?? null}
+                  clienteEmail={viaje.cliente?.contactos?.[0]?.email ?? null}
+                />
+                <CotizacionAcciones
+                  cotizacionId={c.id}
+                  folio={c.folio}
+                  estado={c.estado}
+                  viajeId={viaje.id}
                 />
               </div>
             </div>

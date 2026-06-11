@@ -64,9 +64,13 @@ export default function MapaItinerario({
     .filter((e) => e.lat != null && e.lng != null);
   const puntos = conCoords.map((e) => [e.lat as number, e.lng as number] as [number, number]);
 
-  // Ruta por carretera si viene; si no, las escalas en línea recta.
-  const trazo: [number, number][] =
-    geometria && geometria.length >= 2 ? geometria : puntos;
+  // Ruta por carretera si viene; si no, las escalas en línea recta (aproximación).
+  const usaCarretera = Boolean(geometria && geometria.length >= 2);
+  const trazo: [number, number][] = usaCarretera ? (geometria as [number, number][]) : puntos;
+  // La ruta real va sólida en azul; la aproximación geodésica, punteada en ámbar.
+  const estiloTrazo = usaCarretera
+    ? { color: '#2563eb', weight: 3, opacity: 0.7 }
+    : { color: '#d97706', weight: 3, opacity: 0.85, dashArray: '6 8' };
 
   if (puntos.length === 0) {
     return (
@@ -89,7 +93,7 @@ export default function MapaItinerario({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Encuadrar puntos={puntos} />
-      <Polyline positions={trazo} pathOptions={{ color: '#2563eb', weight: 3, opacity: 0.7 }} />
+      <Polyline positions={trazo} pathOptions={estiloTrazo} />
       {conCoords.map((e, i) => (
         <Marker
           key={e.id}

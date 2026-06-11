@@ -36,7 +36,6 @@ export interface CrearDocumentoConductorInput {
   numero?: string;
   fechaEmision?: string;
   fechaVencimiento: string;
-  archivoKey?: string;
 }
 
 export interface ActualizarDocumentoConductorInput {
@@ -44,7 +43,6 @@ export interface ActualizarDocumentoConductorInput {
   numero?: string;
   fechaEmision?: string;
   fechaVencimiento?: string;
-  archivoKey?: string;
 }
 
 /** Casos de uso para los documentos de un conductor. */
@@ -76,17 +74,18 @@ export class DocumentosConductorUseCase {
           ? new Date(input.fechaEmision)
           : null,
         fechaVencimiento: new Date(input.fechaVencimiento),
-        archivoKey: input.archivoKey ?? null,
       },
     });
   }
 
-  async listar(conductorId: string): Promise<DocumentoConductor[]> {
+  async listar(conductorId: string) {
     await this.asegurarConductor(conductorId);
 
+    // Incluye el conteo de archivos adjuntos por documento (para la UI).
     return this.prisma.documentoConductor.findMany({
       where: { conductorId },
       orderBy: { fechaVencimiento: 'asc' },
+      include: { _count: { select: { archivos: true } } },
     });
   }
 
@@ -119,7 +118,6 @@ export class DocumentosConductorUseCase {
     if (input.fechaVencimiento !== undefined) {
       data.fechaVencimiento = new Date(input.fechaVencimiento);
     }
-    if (input.archivoKey !== undefined) data.archivoKey = input.archivoKey;
 
     return this.prisma.documentoConductor.update({
       where: { id: docId },

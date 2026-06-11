@@ -39,6 +39,10 @@ import {
   unirSub,
 } from '@/components/conductores/expediente/tabla-ui';
 import {
+  ArchivosExpedienteButton,
+  useConteosArchivosExpediente,
+} from '@/components/conductores/expediente/archivos-expediente-button';
+import {
   textoRequerido,
   numeroOpcional,
   finNoAntesDeInicio,
@@ -325,6 +329,8 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
     },
   });
 
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'capacitaciones');
+
   const eliminar = useMutation({
     mutationFn: async (id: string) => {
       await api.delete(`/conductores/${conductorId}/capacitaciones/${id}`);
@@ -408,6 +414,13 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <ArchivosExpedienteButton
+                        conductorId={conductorId}
+                        seccion="capacitaciones"
+                        registroId={cap.id}
+                        titulo={cap.nombre}
+                        count={conteos?.[cap.id]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"

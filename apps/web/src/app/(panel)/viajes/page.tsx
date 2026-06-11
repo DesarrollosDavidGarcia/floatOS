@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { ArrowRight, Eye, MoreHorizontal, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, keepPreviousData } from '@tanstack/react-query';
+import { ArrowRight, Copy, Eye, MoreHorizontal, Plus } from 'lucide-react';
 import { EstadoViaje } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
+import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import type { Paginado } from '@flotaos/shared-types';
@@ -47,10 +49,21 @@ const PAGE_SIZE = 20;
 const TODOS = '__todos__';
 
 export default function ViajesPage() {
+  const router = useRouter();
   const [q, setQ] = useState('');
   const [estado, setEstado] = useState<string>(TODOS);
   const [page, setPage] = useState(1);
   const qDebounced = useDebounce(q);
+
+  const duplicar = useMutation({
+    mutationFn: async (viajeId: string) =>
+      (await api.post<Viaje>(`/viajes/${viajeId}/duplicar`)).data,
+    onSuccess: (nuevo) => {
+      toast.success(`Viaje duplicado (#${nuevo.folio})`);
+      router.push(`/viajes/${nuevo.id}`);
+    },
+    onError: (err) => toast.error(apiError(err)),
+  });
 
   const { data, isLoading, isError, error, isPlaceholderData } = useQuery<Paginado<Viaje>>({
     queryKey: ['viajes', { q: qDebounced, estado, page }],
@@ -238,6 +251,12 @@ export default function ViajesPage() {
                           <Link href={`/viajes/${v.id}`}>
                             <Eye className="h-4 w-4" /> Ver detalle
                           </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => duplicar.mutate(v.id)}
+                          disabled={duplicar.isPending}
+                        >
+                          <Copy className="h-4 w-4" /> Duplicar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

@@ -15,6 +15,26 @@ export const ESTADO_COTIZACION_BADGE: Record<EstadoCotizacion, BadgeVariant> = {
   RECHAZADA: 'destructive',
 };
 
+/**
+ * Transiciones de estado disponibles desde la UI (espejo del backend en
+ * `cotizaciones.service.ts`). No incluye BORRADOR como destino (no se des-envía)
+ * ni ENVIADA desde BORRADOR (eso ocurre al enviar el correo).
+ */
+export const TRANSICIONES_COTIZACION: Record<EstadoCotizacion, EstadoCotizacion[]> = {
+  BORRADOR: ['ACEPTADA', 'RECHAZADA'],
+  ENVIADA: ['ACEPTADA', 'RECHAZADA'],
+  ACEPTADA: ['RECHAZADA', 'ENVIADA'],
+  RECHAZADA: ['ACEPTADA', 'ENVIADA'],
+};
+
+/** Etiqueta del ítem de menú para mover una cotización a `destino`. */
+export const ACCION_ESTADO_LABEL: Record<EstadoCotizacion, string> = {
+  BORRADOR: 'Volver a borrador',
+  ENVIADA: 'Reabrir (marcar enviada)',
+  ACEPTADA: 'Marcar como aceptada',
+  RECHAZADA: 'Marcar como rechazada',
+};
+
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
 /** Formatea un monto como moneda MXN. */

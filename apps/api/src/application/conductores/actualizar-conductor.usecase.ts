@@ -33,6 +33,15 @@ export interface ActualizarConductorInput {
   emergenciaNombre?: string;
   emergenciaTelefono?: string;
   emergenciaRelacion?: string;
+  // Contratación (planta / freelance / terciarizado)
+  tipoContratacion?: string;
+  empresaProveedor?: string;
+  empresaProveedorRfc?: string;
+  proveedorContactoNombre?: string;
+  proveedorContactoTelefono?: string;
+  vigenciaDesde?: string;
+  vigenciaHasta?: string;
+  notasContratacion?: string;
 }
 
 /** Caso de uso: actualizar datos del conductor (re-hashea password si llega). */
@@ -100,6 +109,39 @@ export class ActualizarConductorUseCase {
     if (input.emergenciaNombre !== undefined) data.emergenciaNombre = input.emergenciaNombre;
     if (input.emergenciaTelefono !== undefined) data.emergenciaTelefono = input.emergenciaTelefono;
     if (input.emergenciaRelacion !== undefined) data.emergenciaRelacion = input.emergenciaRelacion;
+    // Contratación
+    if (input.tipoContratacion !== undefined) data.tipoContratacion = input.tipoContratacion;
+    if (input.empresaProveedor !== undefined) data.empresaProveedor = input.empresaProveedor;
+    if (input.empresaProveedorRfc !== undefined) data.empresaProveedorRfc = input.empresaProveedorRfc;
+    if (input.proveedorContactoNombre !== undefined)
+      data.proveedorContactoNombre = input.proveedorContactoNombre;
+    if (input.proveedorContactoTelefono !== undefined)
+      data.proveedorContactoTelefono = input.proveedorContactoTelefono;
+    if (input.vigenciaDesde !== undefined) {
+      data.vigenciaDesde = input.vigenciaDesde ? new Date(input.vigenciaDesde) : null;
+    }
+    if (input.vigenciaHasta !== undefined) {
+      data.vigenciaHasta = input.vigenciaHasta ? new Date(input.vigenciaHasta) : null;
+    }
+    if (input.notasContratacion !== undefined) data.notasContratacion = input.notasContratacion;
+    // Consistencia por tipo: al cambiar el tipo de contratación, limpia los datos
+    // que no le corresponden (evita empresa/vigencia colgados que dispararían alertas).
+    if (input.tipoContratacion !== undefined) {
+      const terciarizado = input.tipoContratacion === 'TERCIARIZADO';
+      const externo =
+        input.tipoContratacion === 'FREELANCE' || input.tipoContratacion === 'TERCIARIZADO';
+      if (!terciarizado) {
+        data.empresaProveedor = null;
+        data.empresaProveedorRfc = null;
+        data.proveedorContactoNombre = null;
+        data.proveedorContactoTelefono = null;
+      }
+      if (!externo) {
+        data.vigenciaDesde = null;
+        data.vigenciaHasta = null;
+        data.notasContratacion = null;
+      }
+    }
 
     const actualizado = await this.prisma.conductor.update({
       where: { id },

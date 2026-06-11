@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -11,6 +12,7 @@ import {
 import { CotizacionesService } from '../../../application/cotizaciones/cotizaciones.service';
 import {
   CalcularCotizacionDto,
+  CambiarEstadoCotizacionDto,
   CrearCotizacionDto,
   EnviarCotizacionDto,
 } from './dto/cotizacion.dto';
@@ -40,6 +42,27 @@ export class CotizacionesController {
     return this.cotizaciones.editar(id, dto.params, dto.notas);
   }
 
+  /** Cambia el estado de una cotización (Aceptada/Rechazada/reabrir a Enviada). */
+  @Patch('cotizaciones/:id/estado')
+  cambiarEstado(
+    @Param('id') id: string,
+    @Body() dto: CambiarEstadoCotizacionDto,
+  ) {
+    return this.cotizaciones.cambiarEstado(id, dto.estado);
+  }
+
+  /** Duplica una cotización en un nuevo borrador del mismo viaje. */
+  @Post('cotizaciones/:id/duplicar')
+  duplicar(@Param('id') id: string) {
+    return this.cotizaciones.duplicar(id);
+  }
+
+  /** Elimina una cotización (solo si está en borrador). */
+  @Delete('cotizaciones/:id')
+  eliminar(@Param('id') id: string) {
+    return this.cotizaciones.eliminar(id);
+  }
+
   /** Lista las cotizaciones de un viaje. */
   @Get('viajes/:viajeId/cotizaciones')
   listar(@Param('viajeId') viajeId: string) {
@@ -55,7 +78,7 @@ export class CotizacionesController {
   /** Envía la cotización por correo con el PDF adjunto (Brevo/SMTP). */
   @Post('cotizaciones/:id/enviar')
   enviar(@Param('id') id: string, @Body() dto: EnviarCotizacionDto) {
-    return this.cotizaciones.enviar(id, dto.to);
+    return this.cotizaciones.enviar(id, dto);
   }
 
   /** Descarga el PDF de la cotización. */

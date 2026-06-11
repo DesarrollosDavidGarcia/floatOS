@@ -11,18 +11,20 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { Cliente } from '@prisma/client';
+import { Cliente, SucursalCliente } from '@prisma/client';
 import { Paginado } from '@flotaos/shared-types';
 import { CrearClienteUseCase } from '../../../application/clientes/crear-cliente.usecase';
 import { ListarClientesUseCase } from '../../../application/clientes/listar-clientes.usecase';
 import { ObtenerClienteUseCase } from '../../../application/clientes/obtener-cliente.usecase';
 import { ActualizarClienteUseCase } from '../../../application/clientes/actualizar-cliente.usecase';
 import { EliminarClienteUseCase } from '../../../application/clientes/eliminar-cliente.usecase';
+import { SucursalesClienteUseCase } from '../../../application/clientes/sucursales-cliente.usecase';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { CrearClienteDto } from './dto/crear-cliente.dto';
 import { ActualizarClienteDto } from './dto/actualizar-cliente.dto';
 import { ListarClientesDto } from './dto/listar-clientes.dto';
+import { CrearSucursalDto, ActualizarSucursalDto } from './dto/sucursal-cliente.dto';
 
 @Controller('clientes')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -33,6 +35,7 @@ export class ClientesController {
     private readonly obtenerCliente: ObtenerClienteUseCase,
     private readonly actualizarCliente: ActualizarClienteUseCase,
     private readonly eliminarCliente: EliminarClienteUseCase,
+    private readonly sucursales: SucursalesClienteUseCase,
   ) {}
 
   @Post()
@@ -62,5 +65,40 @@ export class ClientesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminar(@Param('id') id: string): Promise<void> {
     await this.eliminarCliente.execute(id);
+  }
+
+  // ─────────────────── Sucursales de un cliente ───────────────────
+
+  @Get(':clienteId/sucursales')
+  listarSucursales(
+    @Param('clienteId') clienteId: string,
+  ): Promise<SucursalCliente[]> {
+    return this.sucursales.listar(clienteId);
+  }
+
+  @Post(':clienteId/sucursales')
+  crearSucursal(
+    @Param('clienteId') clienteId: string,
+    @Body() dto: CrearSucursalDto,
+  ): Promise<SucursalCliente> {
+    return this.sucursales.crear(clienteId, dto);
+  }
+
+  @Patch(':clienteId/sucursales/:sucursalId')
+  actualizarSucursal(
+    @Param('clienteId') clienteId: string,
+    @Param('sucursalId') sucursalId: string,
+    @Body() dto: ActualizarSucursalDto,
+  ): Promise<SucursalCliente> {
+    return this.sucursales.actualizar(clienteId, sucursalId, dto);
+  }
+
+  @Delete(':clienteId/sucursales/:sucursalId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async eliminarSucursal(
+    @Param('clienteId') clienteId: string,
+    @Param('sucursalId') sucursalId: string,
+  ): Promise<void> {
+    await this.sucursales.eliminar(clienteId, sucursalId);
   }
 }

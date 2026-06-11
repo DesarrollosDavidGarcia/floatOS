@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -27,7 +28,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ClienteFormDialog } from '@/components/clientes/cliente-form-dialog';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CeldaPrincipal, unirSub } from '@/components/conductores/expediente/tabla-ui';
 import type { Cliente, Paginado } from './tipos';
@@ -40,8 +40,6 @@ export default function ClientesPage() {
   const [page, setPage] = useState(1);
   const debouncedQ = useDebounce(busqueda, 350);
 
-  const [crearOpen, setCrearOpen] = useState(false);
-  const [editando, setEditando] = useState<Cliente | null>(null);
   const [eliminarCliente, setEliminarCliente] = useState<Cliente | null>(null);
 
   const query = useQuery({
@@ -99,8 +97,10 @@ export default function ClientesPage() {
               }}
               placeholder="Buscar por razón social, RFC…"
             />
-            <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
-              <Plus /> Nuevo cliente
+            <Button asChild className="shrink-0">
+              <Link href="/clientes/crear">
+                <Plus /> Nuevo cliente
+              </Link>
             </Button>
           </div>
         }
@@ -114,7 +114,7 @@ export default function ClientesPage() {
                 Cliente
               </TableHead>
               <TableHead className="text-xs uppercase text-muted-foreground">
-                Teléfono
+                Contacto principal
               </TableHead>
               <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Dirección
@@ -136,48 +136,66 @@ export default function ClientesPage() {
                   : 'Aún no hay clientes registrados.'
               }
             >
-              {filas.map((cliente) => (
-                <TableRow key={cliente.id}>
-                  {/* Cliente: razón social + RFC · contacto */}
-                  <TableCell>
-                    <CeldaPrincipal
-                      titulo={cliente.razonSocial}
-                      subtitulo={unirSub(cliente.rfc, cliente.contactoNombre, cliente.contactoEmail)}
-                    />
-                  </TableCell>
+              {filas.map((cliente) => {
+                const contacto = cliente.contactos?.[0];
+                return (
+                  <TableRow key={cliente.id}>
+                    {/* Cliente: razón social + RFC */}
+                    <TableCell>
+                      <CeldaPrincipal
+                        titulo={
+                          <Link href={`/clientes/${cliente.id}/editar`} className="hover:underline">
+                            {cliente.razonSocial}
+                          </Link>
+                        }
+                        subtitulo={cliente.rfc || undefined}
+                      />
+                    </TableCell>
 
-                  {/* Teléfono */}
-                  <TableCell>{cliente.contactoTelefono || '—'}</TableCell>
+                    {/* Contacto principal: nombre + correo · teléfono */}
+                    <TableCell>
+                      {contacto ? (
+                        <CeldaPrincipal
+                          titulo={contacto.nombre}
+                          subtitulo={unirSub(contacto.email, contacto.telefono)}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
 
-                  {/* Dirección */}
-                  <TableCell className="hidden md:table-cell max-w-[200px] truncate">
-                    {cliente.direccion || '—'}
-                  </TableCell>
+                    {/* Dirección */}
+                    <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+                      {cliente.direccion || '—'}
+                    </TableCell>
 
-                  {/* Acciones */}
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Acciones">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onSelect={() => setEditando(cliente)}>
-                          <Pencil className="h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => setEliminarCliente(cliente)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    {/* Acciones */}
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label="Acciones">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/clientes/${cliente.id}/editar`}>
+                              <Pencil className="h-4 w-4" /> Editar
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => setEliminarCliente(cliente)}
+                          >
+                            <Trash2 className="h-4 w-4" /> Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </EstadoTabla>
           </TableBody>
         </Table>
@@ -190,18 +208,6 @@ export default function ClientesPage() {
         singular="cliente"
         plural="clientes"
         onPage={setPage}
-      />
-
-      {/* Crear */}
-      <ClienteFormDialog open={crearOpen} onOpenChange={setCrearOpen} />
-
-      {/* Editar */}
-      <ClienteFormDialog
-        cliente={editando}
-        open={editando !== null}
-        onOpenChange={(o) => {
-          if (!o) setEditando(null);
-        }}
       />
 
       {/* Confirmar eliminación */}

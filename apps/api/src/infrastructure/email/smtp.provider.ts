@@ -43,9 +43,13 @@ export class SmtpMailProvider implements MailProvider {
   async enviar(m: MensajeCorreo, from: string): Promise<void> {
     this.init();
     if (!this.transporter) throw new Error('SMTP no configurado');
+    const unir = (v?: string | string[]) =>
+      Array.isArray(v) ? v.join(', ') : v || undefined;
     await this.transporter.sendMail({
       from,
-      to: Array.isArray(m.to) ? m.to.join(', ') : m.to,
+      to: unir(m.to),
+      cc: unir(m.cc),
+      bcc: unir(m.bcc),
       subject: m.subject,
       text: m.text,
       html: m.html,

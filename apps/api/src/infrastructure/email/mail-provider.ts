@@ -9,6 +9,10 @@ export interface AdjuntoCorreo {
 export interface MensajeCorreo {
   /** Uno o varios destinatarios. */
   to: string | string[];
+  /** Copia (visible para todos). */
+  cc?: string | string[];
+  /** Copia oculta (no visible para los demás destinatarios). */
+  bcc?: string | string[];
   subject: string;
   text: string;
   html?: string;
