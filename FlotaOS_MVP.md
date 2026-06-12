@@ -445,7 +445,7 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - [x] Auth JWT para admin y conductor
 - [x] CRUD de flota y conductores con alertas de vencimiento — *API + panel web ✅*
 - [x] Creación y gestión de viajes con estados — *API + panel web (lista, detalle, máquina de estados) ✅*
-- [ ] App Flutter: viajes, cambio de estado, tracking + Socket.io
+- [x] App Flutter: viajes, cambio de estado, tracking + Socket.io — *✅ 2026-06-11: base + auditoría (19 fixes) + prueba E2E en emulador (login conductor, viaje TomTom, estados, GPS→panel). Pendiente menor: validar GPS background en dispositivo físico*
 - [x] Link de seguimiento público para cliente final — *API `GET /tracking/:token` ✅; página pública sin login pendiente*
 - [x] Dashboard del monitorista (Next.js) — *dashboard, mapa en vivo y CRUDs ✅*
 - [x] Docker Compose funcional para dev y producción — *dev verificado; prod definido (Dockerfiles api + web)*
@@ -987,6 +987,68 @@ Sesión sobre **expediente (evidencias)**, **ruteo/ubicación** y el arranque de
 - **Fase 2 — Parte B (timbrado Carta Porte):** generar XML CFDI 4.0 + complemento Carta Porte, timbrar vía **SW Sapien** (ya hay emisor, permiso SCT, CSD y credenciales cifradas), descargar XML/PDF, cancelar.
 - **Recomendaciones de auditoría pendientes:** validar RFC/CP del emisor contra catálogos SAT; consolidar `ArchivoSubido` duplicado; reemplazo logo/CSD transaccional con MinIO.
 - **Pendientes de Fase 1:** página pública de seguimiento (`/seguimiento/<token>`, API ya existe); app Flutter del conductor.
+
+### 2026-06-11 — App Flutter del conductor (Fase 1): base completa ✅
+
+Rama `feat/tomtom-ruteo`. Se creó **`apps/mobile`** (Flutter 3.44, `mx.flotaos.flotaos_conductor`, Android + iOS) con el alcance de Fase 1: login, viajes, avance de estados y tracking GPS + Socket.io. Solo librerías gratuitas y top de pub.dev.
+
+**Stack:** `flutter_riverpod` (estado) · `dio` (HTTP con refresh JWT automático vía `QueuedInterceptorsWrapper`, single-flight) · `go_router` (redirect por sesión) · `flutter_secure_storage` (Keystore/Keychain) · `socket_io_client` · `flutter_map` + OSM · `geolocator` · `google_fonts` (Manrope, Material 3) · `url_launcher`. **Decisión:** se descartó `flutter_background_service` — el foreground service nativo de `geolocator` (`ForegroundNotificationConfig`) cubre el background en Android y `allowBackgroundLocationUpdates` + `UIBackgroundModes: location` en iOS, con mucho menos código.
+
+**Implementado:**
+- **Auth:** login conductor (`POST /auth/conductor/login`), restauración de sesión al abrir, logout, aviso de sesión expirada; tokens en almacenamiento seguro.
+- **Viajes:** lista con segmentos Activos/Historial (pull-to-refresh, tarjetas con ruta origen→destino y escalas intermedias), detalle con mapa OSM (pins + línea punteada), itinerario multi-escala (cargas por parada, ventanas, notas), carga, historial de estados y **botón único de avance** (espejo de `TRANSICIONES_VIAJE`, confirmación en bottom sheet con nota opcional; cancelar queda en el panel). Botón "Navegar" por parada → Google/Apple Maps.
+- **Tracking:** arranca/para solo según el estado (`EN_CAMINO_ORIGEN`…`EN_TRANSITO`), `POST /viajes/:id/ubicacion` por punto, **cola en memoria + envío en lote** (`/ubicaciones`, bloques de 500) al recuperar señal, **reanudación automática** si se reabre la app a mitad de viaje; banner "GPS activo" en la lista. Socket.io `/tracking`: suscripción a la sala del viaje, alertas como snackbar, re-suscripción al reconectar.
+- **Plataforma:** permisos Android (location, foreground service, notifications) y iOS (`NSLocation*`, background mode) configurados; HTTP sin TLS **solo en debug**; parser tolerante a `Decimal`-string de Prisma; UI completa en español (`es_MX`).
+
+**Verificado:** `flutter analyze` 0 issues; **6/6 tests** (máquina de estados espejo + parsing del modelo con relaciones/escalas/Decimal); **`flutter build apk --debug` OK**.
+
+**Para continuar:** probar en emulador/dispositivo real contra el API local (login → aceptar → tracking en el mapa del panel); POD y gastos requieren primero sus endpoints en el API (Fase 2); modo offline persistente con `drift` (Fase 2); página pública de seguimiento (sigue pendiente).
+
+### 2026-06-11 — Auditoría de la app Flutter (multiagente) + fixes ✅
+
+Auditoría con 4 revisores en paralelo (correctitud/contrato API, seguridad, lifecycle/perf Flutter-Riverpod, UX de conductor) sobre `apps/mobile`: **31 hallazgos, 19 corregidos** el mismo día. Los críticos se verificaron contra el código fuente de las dependencias (dio 5.9.2, socket_io_client 3.1.5, flutter_secure_storage 10.3.1).
+
+**🔴 Críticos corregidos:**
+- **Deadlock del refresh JWT:** el 401 del propio refresh entraba a la cola de errores del `QueuedInterceptorsWrapper` que estaba bloqueada esperándolo → la app se congelaba en vez de volver al login. Fix: refresh y reintento por un `Dio` plano sin interceptores.
+- **Stream GPS moría en silencio** (GPS apagado a mitad de viaje cierra el stream de geolocator definitivamente y el banner seguía en "GPS activo"). Fix: reintento con backoff 15 s + estado honesto.
+- **Avanzar estado sin señal perdía la nota** y obligaba a rehacer el flujo. Fix: SnackBar 10 s con "Reintentar" que conserva la nota.
+
+**🟠 Importantes corregidos:** cola GPS ahora lleva `viajeId` por punto (antes podía enviar puntos del viaje A al B); aceptar un viaje ya no apaga el GPS de otro en tránsito; el socket renueva el token en cada reconexión (antes moría a los 15 min); logout/sesión expirada cierran socket + GPS (centralizado en `AuthNotifier`); **minimización de PII** (CURP/RFC/NSS del login ya no se persisten — solo 11 campos de UI); paginación completa del listado (antes truncaba a 50 en silencio); `select` en el watch del tracking (cada punto GPS re-renderizaba la pantalla entera); guard de reentrada en `iniciar()` (doble stream GPS); guards `mounted`/`ref.mounted` en todos los gaps async; la **cancelación del monitorista llega en vivo** (lista y detalle se refrescan por socket y el GPS se apaga solo vía `_sincronizarTracking`).
+
+**🟡 Pulido aplicado:** mapa sin `drag` (secuestraba el scroll); contraste WCAG en chips de estado (`colorTexto` oscuro); direcciones a 2 líneas en la card; "Navegar" con fallback a búsqueda por dirección si la parada no tiene coordenadas; refresh al volver del background y al recibir alertas; copy sin jerga; errores internos nunca llegan crudos a la UI (`mensajeDeError`); sheet de confirmación con scroll y controller propio; terminología unificada ("paradas").
+
+**Verificado OK sin acción:** touch targets ≥48dp, secure storage (AES-GCM + Keystore/Keychain), cero fugas de tokens en logs/URLs/query, sin TLS relajado, permisos mínimos, jerarquía del botón principal.
+
+**Verificado tras los fixes:** `flutter analyze` 0 issues, 6/6 tests, `flutter build apk --debug` OK.
+
+**Deuda registrada:** cola offline persistente (`drift`) y encolar cambios de estado offline → Fase 2; quitar `NSAllowsLocalNetworking` para builds de App Store (comentado en el plist).
+
+### 2026-06-11 — Prueba E2E de la app en emulador ✅
+
+Con API + panel + Docker arriba (Node 20 fijado en PATH), se probó la app completa en un emulador Android (`sdk gphone16k x86_64`):
+
+- **Datos de prueba por API:** conductor `pedro` (con credenciales de app), unidad Kenworth T680 `ABC-123-D`, cliente "Comercializadora del Bajío" y **viaje folio #4 CDMX→Querétaro** asignado (24 tarimas, 8,500 kg) — el ruteo **TomTom calculó 206.8 km / ~3.5 h por carretera** al crearlo.
+- **Verificado en vivo:** login del conductor, viaje en "Activos", detalle con mapa/itinerario, avance de estados y tracking GPS hacia el panel. Confirmado de paso que `pesoKg` llega como Decimal-string y la app lo parsea (fix de la auditoría).
+- **Nota:** `Invoke-RestMethod` (PowerShell 5.1) da un 413 falso con el body anidado del viaje; con `curl` + archivo JSON funciona — peculiaridad del cliente, no del API.
+- Warning de build conocido e inofensivo: `package_info_plus` aplica KGP (transitivo); se resolverá cuando la dependencia se actualice.
+
+### 2026-06-11 — Resumen de la sesión 📌
+
+Sesión dedicada a la **app Flutter del conductor** (Fase 1): de cero a probada en emulador. Todo en la rama `feat/tomtom-ruteo` (sin commitear aún).
+
+- **App base completa** (`apps/mobile`): login + sesión segura, lista/detalle de viajes con mapa OSM, avance de estados (espejo de `TRANSICIONES_VIAJE`), tracking GPS background (foreground service Android / background mode iOS), cola offline en lote y Socket.io. Stack 100% open-source top de pub.dev (Riverpod, dio, go_router, flutter_map, geolocator).
+- **Auditoría multiagente + 19 fixes**: deadlock del refresh JWT, GPS resiliente (rearmado, cola por viaje, cancelación en vivo), minimización de PII, paginación, rebuilds, contraste y UX de conductor.
+- **Prueba E2E en emulador**: flujo completo conductor↔panel funcionando.
+
+**Verificado globalmente:** `flutter analyze` 0 issues; 6/6 tests; APK debug compila; flujo E2E en emulador OK.
+
+**Para continuar (próxima sesión):**
+- **Commitear y mergear `feat/tomtom-ruteo` → `main`** (incluye la app y todas las sesiones anteriores).
+- **Probar GPS background en dispositivo físico** (Android real; iOS cuando haya Mac/cuenta de desarrollador).
+- **Fase 2 — endpoints de POD y gastos** en el API (los modelos ya existen) y sus pantallas en la app (foto, firma, tickets).
+- **Fase 2 — Parte B timbrado Carta Porte** (SW Sapien; la configuración ya está desde la Parte A).
+- **Pendiente de Fase 1:** página pública de seguimiento (`/seguimiento/<token>`, API ya existe).
+- **Recordatorios previos:** rotar API key de Brevo; recomendaciones de auditoría web (RFC/CP vs catálogos SAT, `ArchivoSubido` duplicado, logo/CSD transaccional).
 
 ---
 
