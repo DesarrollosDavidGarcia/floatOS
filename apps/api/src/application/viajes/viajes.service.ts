@@ -1,16 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { CrearViajeUseCase } from './crear-viaje.usecase';
+import { DuplicarViajeUseCase } from './duplicar-viaje.usecase';
 import { ListarViajesUseCase } from './listar-viajes.usecase';
 import { ObtenerViajeUseCase } from './obtener-viaje.usecase';
 import { EditarViajeUseCase } from './editar-viaje.usecase';
 import { AsignarViajeUseCase } from './asignar-viaje.usecase';
 import { CambiarEstadoViajeUseCase } from './cambiar-estado-viaje.usecase';
+import { ActualizarPlanRutaUseCase } from './actualizar-plan-ruta.usecase';
+import { MotorViajeService } from './motor-viaje.service';
 import {
   AsignarViajeInput,
   CambiarEstadoInput,
   CrearViajeInput,
   EditarViajeInput,
+  EvaluarViajeInput,
   ListarViajesInput,
+  PlanRutaInput,
 } from './viajes.types';
 
 /**
@@ -21,15 +26,28 @@ import {
 export class ViajesService {
   constructor(
     private readonly crearViaje: CrearViajeUseCase,
+    private readonly duplicarViaje: DuplicarViajeUseCase,
     private readonly listarViajes: ListarViajesUseCase,
     private readonly obtenerViaje: ObtenerViajeUseCase,
     private readonly editarViaje: EditarViajeUseCase,
     private readonly asignarViaje: AsignarViajeUseCase,
     private readonly cambiarEstadoViaje: CambiarEstadoViajeUseCase,
+    private readonly actualizarPlanRuta: ActualizarPlanRutaUseCase,
+    private readonly motor: MotorViajeService,
   ) {}
 
   crear(input: CrearViajeInput, registradoPor: string) {
     return this.crearViaje.execute(input, registradoPor);
+  }
+
+  /** Duplica un viaje (itinerario + cliente + fecha + plan; sin asignación). */
+  duplicar(id: string, registradoPor: string) {
+    return this.duplicarViaje.execute(id, registradoPor);
+  }
+
+  /** Motor de cálculo: evalúa un itinerario contra la flota. */
+  evaluar(input: EvaluarViajeInput) {
+    return this.motor.evaluar(input);
   }
 
   listar(filtros: ListarViajesInput) {
@@ -45,8 +63,8 @@ export class ViajesService {
     return this.obtenerViaje.execute(id, conductorId);
   }
 
-  historial(id: string) {
-    return this.obtenerViaje.historial(id);
+  historial(id: string, conductorId?: string) {
+    return this.obtenerViaje.historial(id, conductorId);
   }
 
   editar(id: string, input: EditarViajeInput) {
@@ -55,6 +73,11 @@ export class ViajesService {
 
   asignar(id: string, input: AsignarViajeInput) {
     return this.asignarViaje.execute(id, input);
+  }
+
+  /** Guarda el plan multi-día del viaje (planeación de la llegada estimada). */
+  actualizarPlan(id: string, input: PlanRutaInput) {
+    return this.actualizarPlanRuta.execute(id, input);
   }
 
   cambiarEstado(

@@ -4,6 +4,8 @@ import {
 } from '@nestjs/common';
 import { CertificacionConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearCertificacionInput {
   tipo: string;
@@ -27,15 +29,13 @@ export interface ActualizarCertificacionInput {
 
 @Injectable()
 export class CertificacionesUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-    });
-    if (!conductor) {
-      throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(
@@ -47,7 +47,7 @@ export class CertificacionesUseCase {
     return this.prisma.certificacionConductor.create({
       data: {
         conductorId,
-        tipo: input.tipo as any,
+        tipo: input.tipo,
         nombre: input.nombre,
         emisor: input.emisor ?? null,
         folio: input.folio ?? null,
@@ -90,7 +90,7 @@ export class CertificacionesUseCase {
     await this.obtener(conductorId, certId);
 
     const data: Prisma.CertificacionConductorUpdateInput = {};
-    if (input.tipo !== undefined) data.tipo = input.tipo as any;
+    if (input.tipo !== undefined) data.tipo = input.tipo;
     if (input.nombre !== undefined) data.nombre = input.nombre;
     if (input.emisor !== undefined) data.emisor = input.emisor;
     if (input.folio !== undefined) data.folio = input.folio;
@@ -110,6 +110,7 @@ export class CertificacionesUseCase {
 
   async eliminar(conductorId: string, certId: string): Promise<void> {
     await this.obtener(conductorId, certId);
+    await this.archivos.eliminarDeRegistro('CERTIFICACION', certId);
     await this.prisma.certificacionConductor.delete({ where: { id: certId } });
   }
 }

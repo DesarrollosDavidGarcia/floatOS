@@ -10,8 +10,6 @@ import {
   fechaRequerida,
 } from '@/lib/validacion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
@@ -22,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
+import { fechaCorta } from '@/lib/fecha';
 import {
   ExpedienteFormDialog,
   CamposGrid,
@@ -170,7 +169,7 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
       {/* Botón Agregar siempre visible arriba a la derecha */}
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar evento
+          <Plus /> Agregar evento
         </Button>
       </div>
 
@@ -244,7 +243,7 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
                   <div className="space-y-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <time className="text-xs text-muted-foreground whitespace-nowrap">
-                        {format(new Date(evento.fecha), 'dd MMM yyyy', { locale: es })}
+                        {fechaCorta(evento.fecha)}
                       </time>
                       <Badge variant="secondary">
                         <CatalogoTexto grupo="TIPO_EVENTO_LABORAL" codigo={evento.tipo} />

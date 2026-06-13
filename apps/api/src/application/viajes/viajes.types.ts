@@ -4,7 +4,17 @@ import { EstadoViaje } from '@flotaos/shared-types';
 /** Selección resumida de relaciones para listados y detalle. */
 export const RELACIONES_RESUMEN = {
   cliente: {
-    select: { id: true, razonSocial: true, rfc: true },
+    select: {
+      id: true,
+      razonSocial: true,
+      rfc: true,
+      // Contacto principal (o el primero): destinatario por defecto al cotizar.
+      contactos: {
+        orderBy: [{ esPrincipal: 'desc' }, { orden: 'asc' }],
+        take: 1,
+        select: { nombre: true, email: true, telefono: true },
+      },
+    },
   },
   unidad: {
     select: { id: true, placas: true, tipo: true, marca: true, modelo: true },
@@ -14,10 +24,19 @@ export const RELACIONES_RESUMEN = {
   },
 } satisfies Prisma.ViajeInclude;
 
+/** Include para el DETALLE: relaciones resumidas + itinerario (escalas + cargas). */
+export const RELACIONES_DETALLE = {
+  ...RELACIONES_RESUMEN,
+  escalas: {
+    orderBy: { orden: 'asc' },
+    include: { cargas: true },
+  },
+} satisfies Prisma.ViajeInclude;
+
 /**
  * Selección para el LISTADO de viajes: incluye todos los campos escalares
  * EXCEPTO `trackingToken` (link público que no debe exponerse en listados),
- * más las relaciones resumidas.
+ * más las relaciones resumidas. No incluye escalas (el listado usa el resumen).
  */
 export const SELECCION_LISTADO = {
   id: true,
@@ -35,6 +54,9 @@ export const SELECCION_LISTADO = {
   descripcionCarga: true,
   pesoKg: true,
   dimensiones: true,
+  distanciaEstimadaKm: true,
+  pesoMaxKg: true,
+  volumenMaxM3: true,
   estado: true,
   fechaProgramada: true,
   fechaInicio: true,
@@ -50,49 +72,71 @@ export const SELECCION_LISTADO = {
 // Los DTOs de presentation satisfacen estructuralmente estas interfaces; la
 // capa application NO depende de presentation.
 
+/** Un movimiento de carga (recoger/entregar) dentro de una escala. */
+export interface CargaInput {
+  sentido: string; // CARGA | DESCARGA
+  tipoCarga: string;
+  descripcion?: string;
+  pesoKg: number;
+  volumenM3?: number;
+  largoM?: number;
+  anchoM?: number;
+  altoM?: number;
+  cantidad?: number;
+  loteRef?: string;
+}
+
+/** Una escala del itinerario. */
+export interface EscalaInput {
+  accion: string;
+  direccion: string;
+  lat?: number;
+  lng?: number;
+  notas?: string;
+  ventanaDesde?: string;
+  ventanaHasta?: string;
+  cargas?: CargaInput[];
+}
+
 /** Datos para crear un viaje. */
 export interface CrearViajeInput {
   clienteId: string;
-  origenDireccion: string;
-  origenLat?: number;
-  origenLng?: number;
-  destinoDireccion: string;
-  destinoLat?: number;
-  destinoLng?: number;
-  tipoCarga: string;
-  descripcionCarga?: string;
-  pesoKg?: number;
-  dimensiones?: string;
+  escalas: EscalaInput[];
   fechaProgramada?: string;
   unidadId?: string;
   conductorId?: string;
 }
 
-/** Datos para editar campos generales de un viaje. */
+/** Datos para editar un viaje. Si `escalas` viene, reemplaza el itinerario. */
 export interface EditarViajeInput {
-  origenDireccion?: string;
-  origenLat?: number;
-  origenLng?: number;
-  destinoDireccion?: string;
-  destinoLat?: number;
-  destinoLng?: number;
-  tipoCarga?: string;
-  descripcionCarga?: string;
-  pesoKg?: number;
-  dimensiones?: string;
+  escalas?: EscalaInput[];
   fechaProgramada?: string;
 }
 
-/** Datos para asignar/reasignar unidad y/o conductor. */
+/** Datos para evaluar un itinerario contra la flota (motor de cálculo). */
+export interface EvaluarViajeInput {
+  escalas: EscalaInput[];
+  unidadIds?: string[];
+}
+
+/** Datos para asignar/reasignar unidad y/o conductor. `null` = desasignar. */
 export interface AsignarViajeInput {
-  unidadId?: string;
-  conductorId?: string;
+  unidadId?: string | null;
+  conductorId?: string | null;
 }
 
 /** Datos para cambiar el estado de un viaje. */
 export interface CambiarEstadoInput {
   estado: EstadoViaje;
   nota?: string;
+}
+
+/** Plan multi-día que el monitorista asigna al viaje (alimenta la llegada estimada). */
+export interface PlanRutaInput {
+  horasConduccionDia: number;
+  horasDescanso: number;
+  minutosPorEscala: number;
+  horaInicio: number;
 }
 
 /** Filtros y paginación para el listado de viajes. */
@@ -106,4 +150,10 @@ export interface ListarViajesInput {
   q?: string;
   page?: number;
   pageSize?: number;
+  /**
+   * True cuando quien lista es un conductor (no un admin filtrando por
+   * conductor): aplica la regla de visibilidad de cotizaciones
+   * (ver visibilidad-conductor.helper).
+   */
+  paraConductor?: boolean;
 }

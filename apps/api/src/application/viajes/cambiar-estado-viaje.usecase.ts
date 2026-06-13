@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,6 +11,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { mensajeTransicionInvalida } from '../../domain/viaje/transiciones-viaje';
 import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 import { CambiarEstadoInput, RELACIONES_RESUMEN } from './viajes.types';
+import { cotizacionSinAceptar } from './visibilidad-conductor.helper';
 
 /**
  * Caso de uso: cambiar el estado de un viaje validando la transición contra
@@ -62,6 +64,18 @@ export class CambiarEstadoViajeUseCase {
       throw new BadRequestException(error);
     }
 
+    // Un conductor no puede aceptar un viaje cuya cotización el cliente aún
+    // no acepta (o rechazó) — espejo de la regla de visibilidad del listado.
+    if (
+      conductorId &&
+      estadoNuevo === EstadoViaje.ACEPTADO &&
+      (await cotizacionSinAceptar(this.prisma, id))
+    ) {
+      throw new ConflictException(
+        'La cotización del viaje aún no está aceptada por el cliente',
+      );
+    }
+
     const ahora = new Date();
     const data: Prisma.ViajeUpdateInput = {
       estado: estadoNuevo,
@@ -83,11 +97,27 @@ export class CambiarEstadoViajeUseCase {
       data.fechaEntrega = ahora;
     }
 
-    const actualizado = await this.prisma.viaje.update({
-      where: { id },
-      data,
-      include: RELACIONES_RESUMEN,
-    });
+    // Update condicional al estado leído: si otra petición concurrente ya cambió
+    // el estado, el WHERE no matchea, Prisma lanza P2025 y lo traducimos a 409.
+    // Garantiza que solo una transición concurrente gane (sin doble historial).
+    let actualizado;
+    try {
+      actualizado = await this.prisma.viaje.update({
+        where: { id, estado: estadoAnterior },
+        data,
+        include: RELACIONES_RESUMEN,
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2025'
+      ) {
+        throw new ConflictException(
+          'El estado del viaje cambió mientras se procesaba la petición; reintente.',
+        );
+      }
+      throw e;
+    }
 
     // Reemite el cambio de estado a la sala de tiempo real del viaje.
     this.tracking.emitirCambioEstado(id, {
@@ -97,6 +127,12 @@ export class CambiarEstadoViajeUseCase {
       nota: input.nota,
       registradoPor,
     });
+
+    // No exponer el trackingToken (secreto del link público) al conductor.
+    if (conductorId) {
+      const { trackingToken: _omit, ...sinToken } = actualizado;
+      return sinToken;
+    }
 
     return actualizado;
   }

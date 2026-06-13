@@ -24,6 +24,13 @@ export class ListarClientesUseCase {
     return paginar<Cliente>(this.prisma.cliente, {
       where,
       orderBy: { razonSocial: 'asc' },
+      // Contacto principal (o el primero) para mostrarlo en la tabla.
+      include: {
+        contactos: {
+          orderBy: [{ esPrincipal: 'desc' }, { orden: 'asc' }],
+          take: 1,
+        },
+      },
       page: input.page,
       pageSize: input.pageSize,
     });

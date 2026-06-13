@@ -85,4 +85,38 @@ export class CrearConductorDto {
   @IsOptional()
   @IsString()
   emergenciaRelacion?: string;
+
+  // ── Contratación (planta / freelance / terciarizado) ──────────────────────────
+
+  @IsOptional()
+  @IsString()
+  tipoContratacion?: string;
+
+  @IsOptional()
+  @IsString()
+  empresaProveedor?: string;
+
+  @IsOptional()
+  @IsString()
+  empresaProveedorRfc?: string;
+
+  @IsOptional()
+  @IsString()
+  proveedorContactoNombre?: string;
+
+  @IsOptional()
+  @IsString()
+  proveedorContactoTelefono?: string;
+
+  @IsOptional()
+  @IsDateString()
+  vigenciaDesde?: string;
+
+  @IsOptional()
+  @IsDateString()
+  vigenciaHasta?: string;
+
+  @IsOptional()
+  @IsString()
+  notasContratacion?: string;
 }

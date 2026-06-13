@@ -39,6 +39,10 @@ import {
   Vigencia,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import {
+  ArchivosExpedienteButton,
+  useConteosArchivosExpediente,
+} from '@/components/conductores/expediente/archivos-expediente-button';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -167,6 +171,8 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
     enabled: Boolean(conductorId),
   });
 
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'control-confianza');
+
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload: Record<string, unknown> = {
@@ -220,7 +226,7 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
       <div className="flex items-center justify-end gap-3">
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={abrirNuevo}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar registro
+          <Plus /> Agregar registro
         </Button>
       </div>
 
@@ -347,6 +353,13 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <ArchivosExpedienteButton
+                        conductorId={conductorId}
+                        seccion="control-confianza"
+                        registroId={registro.id}
+                        titulo={registro.institucion ?? 'Control de confianza'}
+                        count={conteos?.[registro.id]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"

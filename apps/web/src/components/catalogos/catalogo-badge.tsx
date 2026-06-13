@@ -1,15 +1,7 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant } from '@/components/ui/badge';
 import { useCatalogo } from '@/lib/catalogos';
-
-type BadgeVariant =
-  | 'default'
-  | 'secondary'
-  | 'destructive'
-  | 'outline'
-  | 'success'
-  | 'warning';
 
 /** Muestra el nombre de un código de catálogo como texto plano (para celdas). */
 export function CatalogoTexto({

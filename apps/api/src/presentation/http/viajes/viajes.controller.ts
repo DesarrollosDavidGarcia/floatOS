@@ -10,10 +10,12 @@ import {
 } from '@nestjs/common';
 import { ViajesService } from '../../../application/viajes/viajes.service';
 import { CrearViajeDto } from './dto/crear-viaje.dto';
+import { EvaluarViajeDto } from './dto/evaluar-viaje.dto';
 import { ListarViajesDto } from './dto/listar-viajes.dto';
 import { EditarViajeDto } from './dto/editar-viaje.dto';
 import { AsignarViajeDto } from './dto/asignar-viaje.dto';
 import { CambiarEstadoViajeDto } from './dto/cambiar-estado-viaje.dto';
+import { PlanRutaDto } from './dto/plan-ruta.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import {
@@ -32,14 +34,34 @@ export class ViajesController {
     return this.viajes.crear(dto, user.sub);
   }
 
+  /** Duplica un viaje existente (itinerario + cliente + fecha + plan). */
+  @Post(':id/duplicar')
+  @UseGuards(AdminGuard)
+  duplicar(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    return this.viajes.duplicar(id, user.sub);
+  }
+
+  /** Motor de cálculo: evalúa un itinerario contra la flota (no persiste). */
+  @Post('evaluar')
+  @UseGuards(AdminGuard)
+  evaluar(@Body() dto: EvaluarViajeDto) {
+    return this.viajes.evaluar(dto);
+  }
+
   @Get()
   listar(
     @Query() filtros: ListarViajesDto,
     @CurrentUser() user: AuthPrincipal,
   ) {
-    // El conductor solo ve sus propios viajes.
+    // El conductor solo ve sus propios viajes, y nunca los que tienen una
+    // cotización sin aceptar por el cliente (paraConductor, no aplica cuando
+    // un admin filtra por conductor).
     if (user.type === 'conductor') {
-      return this.viajes.listar({ ...filtros, conductorId: user.sub });
+      return this.viajes.listar({
+        ...filtros,
+        conductorId: user.sub,
+        paraConductor: true,
+      });
     }
     return this.viajes.listar(filtros);
   }
@@ -53,8 +75,10 @@ export class ViajesController {
   }
 
   @Get(':id/historial')
-  historial(@Param('id') id: string) {
-    return this.viajes.historial(id);
+  historial(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    // El conductor solo puede ver el historial de SUS viajes.
+    const conductorId = user.type === 'conductor' ? user.sub : undefined;
+    return this.viajes.historial(id, conductorId);
   }
 
   @Patch(':id')
@@ -67,6 +91,13 @@ export class ViajesController {
   @UseGuards(AdminGuard)
   asignar(@Param('id') id: string, @Body() dto: AsignarViajeDto) {
     return this.viajes.asignar(id, dto);
+  }
+
+  /** Guarda el plan multi-día del viaje (horas/día, descanso, escala, inicio). */
+  @Patch(':id/plan-ruta')
+  @UseGuards(AdminGuard)
+  actualizarPlan(@Param('id') id: string, @Body() dto: PlanRutaDto) {
+    return this.viajes.actualizarPlan(id, dto);
   }
 
   @Patch(':id/estado')

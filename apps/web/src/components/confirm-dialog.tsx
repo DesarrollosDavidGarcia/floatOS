@@ -13,18 +13,30 @@ import { Button } from '@/components/ui/button';
 
 export function ConfirmDialog({
   trigger,
+  open: openProp,
+  onOpenChange,
   title = '¿Confirmar?',
   description,
   confirmLabel = 'Confirmar',
   onConfirm,
 }: {
-  trigger: ReactNode;
+  /** Modo no controlado: el diálogo se abre al hacer click en este elemento. */
+  trigger?: ReactNode;
+  /** Modo controlado: el padre gobierna la apertura (p. ej. desde un menú). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title?: string;
   description?: string;
   confirmLabel?: string;
   onConfirm: () => Promise<void> | void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInner, setOpenInner] = useState(false);
+  const controlado = openProp !== undefined;
+  const open = controlado ? openProp : openInner;
+  const setOpen = (v: boolean) => {
+    if (!controlado) setOpenInner(v);
+    onOpenChange?.(v);
+  };
   const [loading, setLoading] = useState(false);
 
   async function handle() {
@@ -39,7 +51,7 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <span onClick={() => setOpen(true)}>{trigger}</span>
+      {trigger ? <span onClick={() => setOpen(true)}>{trigger}</span> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

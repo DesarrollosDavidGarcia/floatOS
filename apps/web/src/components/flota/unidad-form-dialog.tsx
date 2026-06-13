@@ -1,12 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,6 +14,7 @@ import {
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
 import { textoRequerido, seleccionRequerida, numeroOpcional } from '@/lib/validacion';
+import { useEntityFormDialog } from '@/lib/use-entity-form-dialog';
 import type { Unidad } from './types';
 
 const schema = z.object({
@@ -48,67 +43,51 @@ function toDefaults(unidad?: Unidad | null): FormValues {
   };
 }
 
+function toPayload(values: FormValues) {
+  return {
+    placas:       values.placas,
+    tipo:         values.tipo,
+    marca:        values.marca || undefined,
+    modelo:       values.modelo || undefined,
+    anio:         values.anio ? Number(values.anio) : undefined,
+    capacidadKg:  values.capacidadKg ? Number(values.capacidadKg) : undefined,
+    aseguradora:  values.aseguradora || undefined,
+    numeroPoliza: values.numeroPoliza || undefined,
+  };
+}
+
 export function UnidadFormDialog({
   unidad,
-  open,
+  open: openProp,
   onOpenChange,
 }: {
   unidad?: Unidad | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const editando = Boolean(unidad);
-  const queryClient = useQueryClient();
+  const { open, setOpen, form, editando, submit, isPending } = useEntityFormDialog<
+    FormValues,
+    Unidad
+  >({
+    schema,
+    entity: unidad,
+    open: openProp,
+    onOpenChange,
+    toDefaults,
+    toPayload,
+    endpoint: '/unidades',
+    invalidateKeys: [['unidades']],
+    mensajes: { creado: 'Unidad creada', actualizado: 'Unidad actualizada' },
+  });
   const {
     register,
-    handleSubmit,
-    reset,
     watch,
     setValue,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: toDefaults(unidad),
-    mode: 'onTouched',
-  });
-
-  // Reinicia el formulario cuando cambia la unidad o se abre el diálogo.
-  const [lastKey, setLastKey] = useState<string | null>(null);
-  const key = `${open}-${unidad?.id ?? 'nueva'}`;
-  if (open && key !== lastKey) {
-    setLastKey(key);
-    reset(toDefaults(unidad));
-  }
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload = {
-        placas:       values.placas,
-        tipo:         values.tipo,
-        marca:        values.marca || undefined,
-        modelo:       values.modelo || undefined,
-        anio:         values.anio ? Number(values.anio) : undefined,
-        capacidadKg:  values.capacidadKg ? Number(values.capacidadKg) : undefined,
-        aseguradora:  values.aseguradora || undefined,
-        numeroPoliza: values.numeroPoliza || undefined,
-      };
-      if (editando && unidad) {
-        const { data } = await api.patch<Unidad>(`/unidades/${unidad.id}`, payload);
-        return data;
-      }
-      const { data } = await api.post<Unidad>('/unidades', payload);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unidades'] });
-      toast.success(editando ? 'Unidad actualizada' : 'Unidad creada');
-      onOpenChange(false);
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
+  } = form;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{editando ? 'Editar unidad' : 'Nueva unidad'}</DialogTitle>
@@ -118,10 +97,7 @@ export function UnidadFormDialog({
               : 'Registra una nueva unidad de la flotilla.'}
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={handleSubmit((values) => mutation.mutate(values))}
-          className="space-y-4"
-        >
+        <form onSubmit={submit} className="space-y-4">
           <CamposGrid cols={2}>
             <Campo
               label="Placas"
@@ -129,7 +105,7 @@ export function UnidadFormDialog({
               required
               error={errors.placas?.message}
             >
-              <Input id="placas" {...register('placas')} />
+              <Input id="placas" autoFocus {...register('placas')} />
             </Campo>
 
             <Campo
@@ -142,23 +118,28 @@ export function UnidadFormDialog({
                 value={watch('tipo')}
                 onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
                 placeholder="Selecciona el tipo"
+                ariaLabel="Tipo de unidad"
               />
             </Campo>
 
-            <Campo
-              label="Marca"
-              htmlFor="marca"
-              error={errors.marca?.message}
-            >
-              <Input id="marca" {...register('marca')} />
+            <Campo label="Marca" error={errors.marca?.message}>
+              <CatalogoSelect
+                grupo="MARCA_UNIDAD"
+                value={watch('marca') ?? ''}
+                onChange={(c) => setValue('marca', c, { shouldValidate: true })}
+                placeholder="Selecciona…"
+                ariaLabel="Marca"
+              />
             </Campo>
 
-            <Campo
-              label="Modelo"
-              htmlFor="modelo"
-              error={errors.modelo?.message}
-            >
-              <Input id="modelo" {...register('modelo')} />
+            <Campo label="Modelo" error={errors.modelo?.message}>
+              <CatalogoSelect
+                grupo="MODELO_UNIDAD"
+                value={watch('modelo') ?? ''}
+                onChange={(c) => setValue('modelo', c, { shouldValidate: true })}
+                placeholder="Selecciona…"
+                ariaLabel="Modelo"
+              />
             </Campo>
 
             <Campo
@@ -186,6 +167,7 @@ export function UnidadFormDialog({
                 value={watch('aseguradora') ?? ''}
                 onChange={(c) => setValue('aseguradora', c, { shouldValidate: true })}
                 placeholder="Selecciona…"
+                ariaLabel="Aseguradora"
               />
             </Campo>
 
@@ -202,13 +184,13 @@ export function UnidadFormDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={mutation.isPending}
+              onClick={() => setOpen(false)}
+              disabled={isPending}
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear unidad'}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Guardando…' : editando ? 'Guardar cambios' : 'Crear unidad'}
             </Button>
           </DialogFooter>
         </form>

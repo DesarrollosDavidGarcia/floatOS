@@ -15,7 +15,8 @@
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "dotenv -e ../../.env -- prisma studio",
-    "seed": "dotenv -e ../../.env -- ts-node prisma/seed.ts"
+    "seed": "dotenv -e ../../.env -- node prisma/seed-admin.mjs",
+    "seed:catalogos": "dotenv -e ../../.env -- node prisma/seed-catalogos.mjs"
   },
   "dependencies": {
     "@flotaos/shared-types": "*",
@@ -39,6 +40,7 @@
     "nodemailer": "^6.9.16",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfkit": "^0.19.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1"
@@ -53,6 +55,7 @@
     "@types/node": "^20.17.10",
     "@types/nodemailer": "^6.4.17",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdfkit": "^0.17.6",
     "dotenv-cli": "^7.4.4",
     "jest": "^29.7.0",
     "prisma": "^6.2.1",

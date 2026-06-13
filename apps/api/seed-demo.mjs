@@ -46,10 +46,17 @@ async function main() {
   // Viajes en distintos estados
   const mkViaje = (cliente, unidad, conductor, extra) => a('POST', '/viajes', {
     clienteId: cliente, unidadId: unidad, conductorId: conductor,
-    tipoCarga: extra.tipoCarga, pesoKg: extra.pesoKg,
-    origenDireccion: extra.origen, origenLat: extra.oLat, origenLng: extra.oLng,
-    destinoDireccion: extra.destino, destinoLat: extra.dLat, destinoLng: extra.dLng,
     fechaProgramada: inDays(0),
+    escalas: [
+      {
+        accion: 'RECOGER', direccion: extra.origen, lat: extra.oLat, lng: extra.oLng,
+        cargas: [{ sentido: 'CARGA', tipoCarga: 'GENERAL', descripcion: extra.tipoCarga, pesoKg: extra.pesoKg }],
+      },
+      {
+        accion: 'ENTREGAR', direccion: extra.destino, lat: extra.dLat, lng: extra.dLng,
+        cargas: [{ sentido: 'DESCARGA', tipoCarga: 'GENERAL', descripcion: extra.tipoCarga, pesoKg: extra.pesoKg }],
+      },
+    ],
   });
   const setEstado = (id, estado, nota) => a('PATCH', `/viajes/${id}/estado`, { estado, nota });
 

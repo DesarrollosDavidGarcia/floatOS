@@ -29,6 +29,22 @@ export interface ConductorPublico {
   emergenciaNombre: string | null;
   emergenciaTelefono: string | null;
   emergenciaRelacion: string | null;
+  // Contratación (planta / freelance / terciarizado)
+  tipoContratacion: string | null; // catálogo TIPO_CONTRATACION
+  empresaProveedor: string | null;
+  empresaProveedorRfc: string | null;
+  proveedorContactoNombre: string | null;
+  proveedorContactoTelefono: string | null;
+  vigenciaDesde: Date | null;
+  vigenciaHasta: Date | null;
+  notasContratacion: string | null;
+}
+
+/** Resumen del viaje abierto que ocupa a un conductor (chip de disponibilidad). */
+export interface ViajeActivoConductor {
+  id: string;
+  folio: number;
+  estado: string;
 }
 
 /** Quita passwordHash y refreshTokenHash de un Conductor de Prisma. */

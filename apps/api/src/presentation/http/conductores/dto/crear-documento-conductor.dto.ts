@@ -14,8 +14,4 @@ export class CrearDocumentoConductorDto {
 
   @IsDateString({}, { message: 'La fecha de vencimiento no es válida' })
   fechaVencimiento!: string;
-
-  @IsOptional()
-  @IsString()
-  archivoKey?: string;
 }

@@ -27,6 +27,15 @@ export interface CrearConductorInput {
   emergenciaNombre?: string;
   emergenciaTelefono?: string;
   emergenciaRelacion?: string;
+  // Contratación (planta / freelance / terciarizado)
+  tipoContratacion?: string;
+  empresaProveedor?: string;
+  empresaProveedorRfc?: string;
+  proveedorContactoNombre?: string;
+  proveedorContactoTelefono?: string;
+  vigenciaDesde?: string;
+  vigenciaHasta?: string;
+  notasContratacion?: string;
 }
 
 /** Caso de uso: el admin crea un conductor con credenciales para la app. */
@@ -56,6 +65,12 @@ export class CrearConductorUseCase {
 
     const passwordHash = await this.passwordService.hash(input.password);
 
+    // Consistencia por tipo: empresa proveedora solo terciarizado; vigencia/notas
+    // solo externos (freelance/terciarizado); planta no lleva nada de esto.
+    const tipo = input.tipoContratacion ?? 'PLANTA';
+    const terciarizado = tipo === 'TERCIARIZADO';
+    const externo = tipo === 'FREELANCE' || tipo === 'TERCIARIZADO';
+
     const conductor = await this.prisma.conductor.create({
       data: {
         nombre: input.nombre,
@@ -78,6 +93,15 @@ export class CrearConductorUseCase {
         emergenciaNombre: input.emergenciaNombre ?? null,
         emergenciaTelefono: input.emergenciaTelefono ?? null,
         emergenciaRelacion: input.emergenciaRelacion ?? null,
+        // Contratación
+        tipoContratacion: tipo,
+        empresaProveedor: terciarizado ? (input.empresaProveedor ?? null) : null,
+        empresaProveedorRfc: terciarizado ? (input.empresaProveedorRfc ?? null) : null,
+        proveedorContactoNombre: terciarizado ? (input.proveedorContactoNombre ?? null) : null,
+        proveedorContactoTelefono: terciarizado ? (input.proveedorContactoTelefono ?? null) : null,
+        vigenciaDesde: externo && input.vigenciaDesde ? new Date(input.vigenciaDesde) : null,
+        vigenciaHasta: externo && input.vigenciaHasta ? new Date(input.vigenciaHasta) : null,
+        notasContratacion: externo ? (input.notasContratacion ?? null) : null,
       },
     });
 

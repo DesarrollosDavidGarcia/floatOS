@@ -1,12 +1,18 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -53,6 +59,28 @@ export function Campo({
   full?: boolean;
   children: ReactNode;
 }) {
+  const errorId = error && htmlFor ? `${htmlFor}-error` : undefined;
+
+  // Inyecta atributos ARIA en el control para que la validación se anuncie:
+  // aria-invalid cuando hay error, aria-describedby apuntando al texto de error,
+  // y aria-required cuando el campo es obligatorio.
+  const control =
+    isValidElement(children) && (error || required)
+      ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+          'aria-invalid': error ? true : undefined,
+          'aria-describedby':
+            [
+              (children as ReactElement<Record<string, unknown>>).props[
+                'aria-describedby'
+              ],
+              errorId,
+            ]
+              .filter(Boolean)
+              .join(' ') || undefined,
+          'aria-required': required ? true : undefined,
+        })
+      : children;
+
   return (
     <div className={cn('space-y-1', full && 'sm:col-span-full')}>
       <Label
@@ -63,7 +91,11 @@ export function Campo({
         )}
       >
         {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
+        {required && (
+          <span className="ml-0.5 text-destructive" aria-hidden="true">
+            *
+          </span>
+        )}
       </Label>
       <div
         className={cn(
@@ -71,10 +103,14 @@ export function Campo({
             '[&_input]:border-destructive [&_input]:focus-visible:ring-destructive [&_textarea]:border-destructive [&_[role=combobox]]:border-destructive',
         )}
       >
-        {children}
+        {control}
       </div>
       {error && (
-        <p className="flex items-start gap-1 text-xs text-destructive">
+        <p
+          id={errorId}
+          role="alert"
+          className="flex items-start gap-1 text-xs text-destructive"
+        >
           <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
           <span>{error}</span>
         </p>
@@ -95,6 +131,7 @@ export function ExpedienteFormDialog({
   saving,
   submitLabel = 'Guardar',
   size = 'md',
+  description = 'Completa los campos y guarda los cambios.',
   children,
 }: {
   open: boolean;
@@ -104,6 +141,7 @@ export function ExpedienteFormDialog({
   saving?: boolean;
   submitLabel?: string;
   size?: 'md' | 'lg';
+  description?: string;
   children: ReactNode;
 }) {
   return (
@@ -111,6 +149,7 @@ export function ExpedienteFormDialog({
       <DialogContent className={size === 'lg' ? 'max-w-2xl' : 'max-w-lg'}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           {children}

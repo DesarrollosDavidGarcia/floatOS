@@ -1,10 +1,13 @@
 import type { EstadoViaje } from '@flotaos/shared-types';
+import type { PlanRutaParams } from './plan-ruta';
 
 /** Resumen de cliente que viene embebido en el viaje. */
 export interface ClienteResumen {
   id: string;
-  nombre: string;
+  razonSocial: string;
   rfc?: string | null;
+  /** Contacto principal (o el primero); destinatario por defecto al cotizar. */
+  contactos?: { nombre: string; email?: string | null; telefono?: string | null }[];
 }
 
 /** Resumen de unidad embebido en el viaje. */
@@ -22,6 +25,33 @@ export interface ConductorResumen {
   telefono?: string | null;
 }
 
+/** Movimiento de carga (recoger/entregar) dentro de una escala. */
+export interface CargaEscala {
+  id: string;
+  sentido: string; // CARGA | DESCARGA
+  tipoCarga: string;
+  descripcion?: string | null;
+  pesoKg: number | string;
+  volumenM3?: number | string | null;
+  largoM?: number | string | null;
+  anchoM?: number | string | null;
+  altoM?: number | string | null;
+  cantidad: number;
+  loteRef?: string | null;
+}
+
+/** Escala (parada) del itinerario de un viaje. */
+export interface EscalaViaje {
+  id: string;
+  orden: number;
+  accion: string; // catálogo ACCION_ESCALA
+  direccion: string;
+  lat?: number | null;
+  lng?: number | null;
+  notas?: string | null;
+  cargas: CargaEscala[];
+}
+
 /** Entrada del historial de cambios de estado de un viaje. */
 export interface HistorialViaje {
   id: string;
@@ -34,7 +64,7 @@ export interface HistorialViaje {
 /** Viaje tal como lo devuelve la API (listado y detalle). */
 export interface Viaje {
   id: string;
-  folio: string;
+  folio: number;
   estado: EstadoViaje;
   cliente: ClienteResumen | null;
   clienteId: string;
@@ -52,6 +82,16 @@ export interface Viaje {
   descripcionCarga?: string | null;
   pesoKg?: number | null;
   dimensiones?: string | null;
+  distanciaEstimadaKm?: number | string | null;
+  /** ETA estimada por carretera en minutos (free-flow); null si geodésica. */
+  tiempoEstimadoMin?: number | null;
+  pesoMaxKg?: number | string | null;
+  volumenMaxM3?: number | string | null;
+  /** Polilínea de la ruta por carretera ([[lat, lng], ...]); null si geodésica. */
+  rutaGeometria?: [number, number][] | null;
+  /** Plan multi-día asignado por el monitorista (horas/día, descanso, escala, inicio). */
+  planRuta?: PlanRutaParams | null;
+  escalas?: EscalaViaje[];
   fechaProgramada?: string | null;
   trackingToken?: string | null;
   historial?: HistorialViaje[];
@@ -59,19 +99,34 @@ export interface Viaje {
   updatedAt?: string;
 }
 
-/** Payload para crear un viaje. */
+/** Una carga dentro de una escala en el payload de creación/edición. */
+export interface CargaEscalaPayload {
+  sentido: string;
+  tipoCarga: string;
+  descripcion?: string;
+  pesoKg: number;
+  volumenM3?: number;
+  largoM?: number;
+  anchoM?: number;
+  altoM?: number;
+  cantidad?: number;
+  loteRef?: string;
+}
+
+/** Una escala en el payload de creación/edición. */
+export interface EscalaViajePayload {
+  accion: string;
+  direccion: string;
+  lat?: number;
+  lng?: number;
+  notas?: string;
+  cargas?: CargaEscalaPayload[];
+}
+
+/** Payload para crear un viaje (itinerario de escalas). */
 export interface CrearViajePayload {
   clienteId: string;
-  origenDireccion: string;
-  origenLat?: number;
-  origenLng?: number;
-  destinoDireccion: string;
-  destinoLat?: number;
-  destinoLng?: number;
-  tipoCarga: string;
-  descripcionCarga?: string;
-  pesoKg?: number;
-  dimensiones?: string;
+  escalas: EscalaViajePayload[];
   fechaProgramada?: string;
   unidadId?: string;
   conductorId?: string;

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserCog } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { invalidarViajes } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useConductoresCatalogo, useUnidadesCatalogo } from './catalogos';
+import { ConductorSelectItems } from './conductor-select-items';
 
 const NINGUNO = '__ninguno__';
 
@@ -62,8 +64,9 @@ export function AsignarDialog({
     },
     onSuccess: () => {
       toast.success('Asignación actualizada');
-      qc.invalidateQueries({ queryKey: ['viaje', viajeId] });
-      qc.invalidateQueries({ queryKey: ['viajes'] });
+      invalidarViajes(qc, viajeId);
+      // La disponibilidad de los conductores cambió (chips del selector).
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'conductores'] });
       setOpen(false);
     },
     onError: (err) => toast.error(apiError(err)),
@@ -75,7 +78,7 @@ export function AsignarDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
-          <UserCog className="mr-2 h-4 w-4" />
+          <UserCog />
           {tieneAsignacion ? 'Reasignar' : 'Asignar'}
         </Button>
       </DialogTrigger>
@@ -110,11 +113,10 @@ export function AsignarDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NINGUNO}>Sin asignar</SelectItem>
-                {(conductores.data ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
+                <ConductorSelectItems
+                  conductores={conductores.data ?? []}
+                  viajeIdActual={viajeId}
+                />
               </SelectContent>
             </Select>
           </div>

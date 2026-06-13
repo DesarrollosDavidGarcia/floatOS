@@ -5,6 +5,7 @@ import { ListarClientesUseCase } from '../../../application/clientes/listar-clie
 import { ObtenerClienteUseCase } from '../../../application/clientes/obtener-cliente.usecase';
 import { ActualizarClienteUseCase } from '../../../application/clientes/actualizar-cliente.usecase';
 import { EliminarClienteUseCase } from '../../../application/clientes/eliminar-cliente.usecase';
+import { SucursalesClienteUseCase } from '../../../application/clientes/sucursales-cliente.usecase';
 
 @Module({
   controllers: [ClientesController],
@@ -14,6 +15,7 @@ import { EliminarClienteUseCase } from '../../../application/clientes/eliminar-c
     ObtenerClienteUseCase,
     ActualizarClienteUseCase,
     EliminarClienteUseCase,
+    SucursalesClienteUseCase,
   ],
   exports: [
     CrearClienteUseCase,

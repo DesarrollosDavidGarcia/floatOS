@@ -1,6 +1,5 @@
 import { EstadoViaje } from '@flotaos/shared-types';
-
-type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
+import type { BadgeVariant } from '@/components/ui/badge';
 
 export const ESTADO_VIAJE_LABEL: Record<EstadoViaje, string> = {
   [EstadoViaje.ASIGNADO]: 'Asignado',

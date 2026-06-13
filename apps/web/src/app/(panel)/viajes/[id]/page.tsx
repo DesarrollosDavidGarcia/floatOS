@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, ArrowRight, Building2, Truck, User } from 'lucide-react';
-import { api } from '@/lib/api';
+import { ArrowLeft, Building2, Copy, MapPin, Pencil, Truck, User } from 'lucide-react';
+import { api, apiError } from '@/lib/api';
+import { toast } from '@/components/ui/sonner';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,9 +21,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { CambiarEstadoDialog } from '@/components/viajes/cambiar-estado-dialog';
 import { AsignarDialog } from '@/components/viajes/asignar-dialog';
-import { EditarViajeDialog } from '@/components/viajes/editar-viaje-dialog';
 import { HistorialTimeline } from '@/components/viajes/historial-timeline';
 import { TrackingLink } from '@/components/viajes/tracking-link';
+import { VeredictoUnidadCard } from '@/components/viajes/veredicto-unidad-card';
+import { CotizacionesCard } from '@/components/cotizaciones/cotizaciones-card';
+import { PlanRutaDialog } from '@/components/viajes/plan-ruta-dialog';
+import { formatearDuracion, planificarRuta } from '@/components/viajes/plan-ruta';
+import { MapaViajeCard } from '@/components/viajes/mapa-viaje-card';
 import type { Viaje } from '@/components/viajes/types';
 
 function Dato({ label, value }: { label: string; value?: string | null }) {
@@ -45,6 +50,8 @@ export default function ViajeDetallePage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
+  const router = useRouter();
+
   const { data: viaje, isLoading, isError } = useQuery<Viaje>({
     queryKey: ['viaje', id],
     queryFn: async () => {
@@ -52,6 +59,15 @@ export default function ViajeDetallePage() {
       return data;
     },
     enabled: Boolean(id),
+  });
+
+  const duplicar = useMutation({
+    mutationFn: async () => (await api.post<Viaje>(`/viajes/${id}/duplicar`)).data,
+    onSuccess: (nuevo) => {
+      toast.success(`Viaje duplicado (#${nuevo.folio})`);
+      router.push(`/viajes/${nuevo.id}`);
+    },
+    onError: (err) => toast.error(apiError(err)),
   });
 
   if (isLoading) {
@@ -71,7 +87,7 @@ export default function ViajeDetallePage() {
       <div className="space-y-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/viajes">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft />
             Volver a viajes
           </Link>
         </Button>
@@ -84,19 +100,32 @@ export default function ViajeDetallePage() {
     );
   }
 
+  const salidaPlan = viaje.fechaProgramada ? new Date(viaje.fechaProgramada) : null;
+  const plan =
+    salidaPlan &&
+    viaje.tiempoEstimadoMin != null &&
+    !Number.isNaN(salidaPlan.getTime())
+      ? planificarRuta(
+          salidaPlan,
+          viaje.tiempoEstimadoMin,
+          viaje.escalas?.length ?? 0,
+          viaje.planRuta,
+        )
+      : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
         <Button variant="ghost" size="sm" className="w-fit" asChild>
           <Link href="/viajes">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft />
             Volver a viajes
           </Link>
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{viaje.folio}</h1>
+              <h1 className="text-xl font-bold sm:text-2xl">Viaje #{viaje.folio}</h1>
               <Badge variant={ESTADO_VIAJE_BADGE[viaje.estado]}>
                 {ESTADO_VIAJE_LABEL[viaje.estado]}
               </Badge>
@@ -112,7 +141,20 @@ export default function ViajeDetallePage() {
               unidadIdActual={viaje.unidad?.id ?? viaje.unidadId}
               conductorIdActual={viaje.conductor?.id ?? viaje.conductorId}
             />
-            <EditarViajeDialog viaje={viaje} />
+            <Button asChild variant="outline">
+              <Link href={`/viajes/${viaje.id}/editar`}>
+                <Pencil />
+                Editar
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => duplicar.mutate()}
+              disabled={duplicar.isPending}
+            >
+              <Copy />
+              {duplicar.isPending ? 'Duplicando…' : 'Duplicar'}
+            </Button>
           </div>
         </div>
       </div>
@@ -121,28 +163,58 @@ export default function ViajeDetallePage() {
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Ruta y carga</CardTitle>
+              <CardTitle className="text-lg">Itinerario</CardTitle>
+              <CardDescription>
+                {(viaje.escalas?.length ?? 0)} escala(s) · Fecha programada:{' '}
+                {fechaLarga(viaje.fechaProgramada)}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                <span>{viaje.origenDireccion}</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span>{viaje.destinoDireccion}</span>
+              {/* Snapshot del motor de cálculo */}
+              <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+                <Dato label="Distancia" value={viaje.distanciaEstimadaKm != null ? `${viaje.distanciaEstimadaKm} km` : null} />
+                <Dato label="Conducción" value={viaje.tiempoEstimadoMin != null ? formatearDuracion(viaje.tiempoEstimadoMin) : null} />
+                <Dato label="Peso máx." value={viaje.pesoMaxKg != null ? `${viaje.pesoMaxKg} kg` : null} />
+                <Dato label="Volumen máx." value={viaje.volumenMaxM3 != null ? `${viaje.volumenMaxM3} m³` : null} />
               </div>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <Dato label="Tipo de carga" value={viaje.tipoCarga} />
-                <Dato
-                  label="Peso"
-                  value={viaje.pesoKg != null ? `${viaje.pesoKg} kg` : null}
-                />
-                <Dato label="Dimensiones" value={viaje.dimensiones} />
-                <Dato label="Fecha programada" value={fechaLarga(viaje.fechaProgramada)} />
-                <div className="sm:col-span-2">
-                  <Dato label="Descripción" value={viaje.descripcionCarga} />
-                </div>
-              </dl>
+
+              {/* Lista de escalas */}
+              <ol className="space-y-3">
+                {(viaje.escalas ?? []).map((e, i) => (
+                  <li key={e.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      {i < (viaje.escalas?.length ?? 0) - 1 && (
+                        <span className="my-1 w-px flex-1 bg-border" />
+                      )}
+                    </div>
+                    <div className="flex-1 pb-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{e.accion}</Badge>
+                        <span className="text-sm font-medium">{e.direccion}</span>
+                      </div>
+                      {e.cargas.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                          {e.cargas.map((c) => (
+                            <li key={c.id}>
+                              {c.sentido === 'DESCARGA' ? '↓ Entrega' : '↑ Recoge'}{' '}
+                              {Number(c.pesoKg)} kg · {c.tipoCarga}
+                              {c.descripcion ? ` · ${c.descripcion}` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {e.notas ? (
+                        <p className="mt-0.5 text-xs italic text-muted-foreground">{e.notas}</p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </CardContent>
           </Card>
+
+          <MapaViajeCard viaje={viaje} />
 
           <Card>
             <CardHeader>
@@ -165,7 +237,7 @@ export default function ViajeDetallePage() {
                 <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</p>
-                  <p className="font-medium">{viaje.cliente?.nombre ?? '—'}</p>
+                  <p className="font-medium">{viaje.cliente?.razonSocial ?? '—'}</p>
                   {viaje.cliente?.rfc ? (
                     <p className="text-xs text-muted-foreground">{viaje.cliente.rfc}</p>
                   ) : null}
@@ -198,6 +270,49 @@ export default function ViajeDetallePage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-lg">Plan de viaje</CardTitle>
+                <CardDescription>Llegada estimada multi-día</CardDescription>
+              </div>
+              <PlanRutaDialog viaje={viaje} />
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {plan ? (
+                <>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Llegada estimada
+                    </p>
+                    <p className="font-medium">{fechaLarga(plan.llegada.toISOString())}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Dato label="Días de conducción" value={`${plan.diasConduccion}`} />
+                    <Dato label="Duración total" value={formatearDuracion(plan.totalMin)} />
+                    <Dato label="Al volante" value={formatearDuracion(plan.conduccionMin)} />
+                    <Dato label="Descansos" value={formatearDuracion(plan.descansoMin)} />
+                    <Dato label="Escalas" value={formatearDuracion(plan.servicioMin)} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {(viaje.planRuta?.horasConduccionDia ?? 9)} h/día · descanso{' '}
+                    {(viaje.planRuta?.horasDescanso ?? 11)} h · {(viaje.planRuta?.minutosPorEscala ?? 60)} min/escala
+                    {' '}· inicia {String(viaje.planRuta?.horaInicio ?? 8).padStart(2, '0')}:00
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  Asigna una <strong>fecha programada</strong> y calcula la ruta por
+                  carretera (TomTom) para estimar la llegada multi-día.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <CotizacionesCard viaje={viaje} />
+
+          <VeredictoUnidadCard viaje={viaje} />
 
           {viaje.trackingToken ? (
             <Card>

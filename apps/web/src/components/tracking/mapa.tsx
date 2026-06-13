@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import {
   CircleMarker,
   MapContainer,
@@ -82,7 +82,7 @@ export default function Mapa({ viajes, posiciones, enfoque }: MapaProps) {
         const pos = posiciones[viaje.id];
 
         return (
-          <div key={viaje.id}>
+          <Fragment key={viaje.id}>
             {/* Origen */}
             {viaje.origenLat != null && viaje.origenLng != null ? (
               <Marker
@@ -138,7 +138,7 @@ export default function Mapa({ viajes, posiciones, enfoque }: MapaProps) {
                 </Popup>
               </CircleMarker>
             ) : null}
-          </div>
+          </Fragment>
         );
       })}
     </MapContainer>

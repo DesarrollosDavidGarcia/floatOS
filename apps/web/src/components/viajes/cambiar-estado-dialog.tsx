@@ -6,6 +6,7 @@ import { ArrowRightLeft } from 'lucide-react';
 import { EstadoViaje, TRANSICIONES_VIAJE } from '@flotaos/shared-types';
 import { ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import { api, apiError } from '@/lib/api';
+import { invalidarViajes } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -50,8 +51,7 @@ export function CambiarEstadoDialog({
     },
     onSuccess: () => {
       toast.success('Estado actualizado');
-      qc.invalidateQueries({ queryKey: ['viaje', viajeId] });
-      qc.invalidateQueries({ queryKey: ['viajes'] });
+      invalidarViajes(qc, viajeId);
       setOpen(false);
       setDestino('');
       setNota('');
@@ -71,7 +71,7 @@ export function CambiarEstadoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button disabled={opciones.length === 0}>
-          <ArrowRightLeft className="mr-2 h-4 w-4" />
+          <ArrowRightLeft />
           Cambiar estado
         </Button>
       </DialogTrigger>

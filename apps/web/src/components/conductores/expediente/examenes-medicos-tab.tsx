@@ -40,6 +40,10 @@ import {
   Vigencia,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import {
+  ArchivosExpedienteButton,
+  useConteosArchivosExpediente,
+} from '@/components/conductores/expediente/archivos-expediente-button';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -254,6 +258,8 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
     enabled: Boolean(conductorId),
   });
 
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'examenes-medicos');
+
   const eliminar = useMutation({
     mutationFn: async (examenId: string) => {
       await api.delete(`/conductores/${conductorId}/examenes-medicos/${examenId}`);
@@ -277,7 +283,7 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
       <SeccionHeader>
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar examen
+          <Plus /> Agregar examen
         </Button>
       </SeccionHeader>
 
@@ -334,6 +340,13 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <ArchivosExpedienteButton
+                        conductorId={conductorId}
+                        seccion="examenes-medicos"
+                        registroId={examen.id}
+                        titulo={examen.institucion ?? 'Examen médico'}
+                        count={conteos?.[examen.id]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"

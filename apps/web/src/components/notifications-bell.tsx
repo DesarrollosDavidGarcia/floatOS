@@ -47,7 +47,9 @@ export function NotificationsBell() {
           variant="ghost"
           size="icon"
           className="relative"
-          title="Notificaciones"
+          aria-label={
+            total > 0 ? `Notificaciones, ${total} por vencer` : 'Notificaciones'
+          }
         >
           <Bell className="h-5 w-5" />
           {total > 0 && (

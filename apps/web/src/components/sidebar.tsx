@@ -11,6 +11,7 @@ import {
   Building2,
   BellRing,
   ListChecks,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,7 @@ const GRUPOS: NavGroup[] = [
     items: [
       { href: '/alertas', label: 'Alertas', icon: BellRing },
       { href: '/catalogos', label: 'Catálogos', icon: ListChecks },
+      { href: '/configuracion', label: 'Configuración', icon: Settings },
     ],
   },
 ];

@@ -32,6 +32,16 @@ import {
 
 const COLORES = ['default', 'secondary', 'destructive', 'outline', 'success', 'warning'];
 
+/** Etiquetas legibles (es) para los colores de badge del catálogo. */
+const COLOR_LABEL: Record<string, string> = {
+  default: 'Azul',
+  secondary: 'Gris',
+  destructive: 'Rojo',
+  outline: 'Contorno',
+  success: 'Verde',
+  warning: 'Ámbar',
+};
+
 interface FormState {
   codigo: string;
   nombre: string;
@@ -119,7 +129,7 @@ export default function CatalogosPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalogo', grupo] });
-      toast.success(editando ? 'Item actualizado' : 'Item agregado');
+      toast.success(editando ? 'Opción actualizada' : 'Opción agregada');
       resetForm();
     },
     onError: (err) => toast.error(apiError(err)),
@@ -131,7 +141,7 @@ export default function CatalogosPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['catalogo', grupo] });
-      toast.success('Item eliminado');
+      toast.success('Opción eliminada');
     },
     onError: (err) => toast.error(apiError(err)),
   });
@@ -175,7 +185,7 @@ export default function CatalogosPage() {
             <h2 className="text-lg font-semibold">{grupoMeta?.nombre ?? '—'}</h2>
             {!mostrarForm && (
               <Button size="sm" onClick={abrirNuevo} disabled={!grupo}>
-                <Plus className="mr-1 h-4 w-4" /> Agregar opción
+                <Plus /> Agregar opción
               </Button>
             )}
           </div>
@@ -223,7 +233,7 @@ export default function CatalogosPage() {
                       <SelectContent>
                         {COLORES.map((c) => (
                           <SelectItem key={c} value={c}>
-                            {c}
+                            {COLOR_LABEL[c] ?? c}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -240,8 +250,8 @@ export default function CatalogosPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="si">Activo</SelectItem>
-                      <SelectItem value="no">Inactivo</SelectItem>
+                      <SelectItem value="si">Activa</SelectItem>
+                      <SelectItem value="no">Inactiva</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -297,7 +307,9 @@ export default function CatalogosPage() {
                       {grupoMeta?.coloreable && (
                         <TableCell>
                           {item.color ? (
-                            <Badge variant={item.color as never}>{item.color}</Badge>
+                            <Badge variant={item.color as never}>
+                              {COLOR_LABEL[item.color] ?? item.color}
+                            </Badge>
                           ) : (
                             '—'
                           )}
@@ -305,7 +317,7 @@ export default function CatalogosPage() {
                       )}
                       <TableCell>
                         <Badge variant={item.activo ? 'success' : 'secondary'}>
-                          {item.activo ? 'Activo' : 'Inactivo'}
+                          {item.activo ? 'Activa' : 'Inactiva'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -313,14 +325,14 @@ export default function CatalogosPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Editar"
+                            aria-label="Editar opción"
                             onClick={() => abrirEditar(item)}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <ConfirmDialog
                             trigger={
-                              <Button variant="ghost" size="icon" title="Eliminar">
+                              <Button variant="ghost" size="icon" aria-label="Eliminar opción">
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             }

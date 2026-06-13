@@ -4,6 +4,8 @@ import {
 } from '@nestjs/common';
 import { ExamenMedicoConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearExamenMedicoInput {
   tipo: string;
@@ -30,15 +32,13 @@ export interface ActualizarExamenMedicoInput {
 /** Casos de uso para los exámenes médicos de un conductor. */
 @Injectable()
 export class ExamenesMedicosUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-    });
-    if (!conductor) {
-      throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(
@@ -115,6 +115,7 @@ export class ExamenesMedicosUseCase {
 
   async eliminar(conductorId: string, examenId: string): Promise<void> {
     await this.obtener(conductorId, examenId);
+    await this.archivos.eliminarDeRegistro('EXAMEN_MEDICO', examenId);
     await this.prisma.examenMedicoConductor.delete({ where: { id: examenId } });
   }
 }

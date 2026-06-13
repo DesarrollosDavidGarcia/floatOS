@@ -3,10 +3,17 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from './api';
-import { tokenStore, type StoredUser } from './token-store';
+
+/** Usuario autenticado del panel (vista pública que devuelve GET /auth/me). */
+export interface AuthUser {
+  id: string;
+  nombre: string;
+  email?: string;
+  type: string;
+}
 
 interface AuthContextValue {
-  user: StoredUser | null;
+  user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -15,25 +22,30 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    setUser(tokenStore.getUser());
-    setLoading(false);
+    // La sesión vive en cookies httpOnly; preguntamos al backend quién somos.
+    // El interceptor de api intentará refrescar si el access token expiró.
+    api
+      .get<AuthUser>('/auth/me')
+      .then((res) => setUser(res.data))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
   }, []);
 
   async function login(email: string, password: string) {
-    const { data } = await api.post('/auth/login', { email, password });
-    const stored: StoredUser = { ...data.user, type: 'admin' };
-    tokenStore.set(data.accessToken, data.refreshToken, stored);
-    setUser(stored);
+    const { data } = await api.post<{ user: AuthUser }>('/auth/login', {
+      email,
+      password,
+    });
+    setUser(data.user);
   }
 
-  function logout() {
-    api.post('/auth/logout').catch(() => undefined);
-    tokenStore.clear();
+  async function logout() {
+    await api.post('/auth/logout').catch(() => undefined);
     setUser(null);
     router.push('/login');
   }

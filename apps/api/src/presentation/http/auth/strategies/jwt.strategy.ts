@@ -1,7 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthPrincipal } from '../decorators/current-user.decorator';
+import { COOKIE_ACCESS, leerCookie } from '../cookies';
 
 interface JwtPayload {
   sub?: string;
@@ -20,7 +22,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new Error('La variable de entorno JWT_SECRET no está configurada');
     }
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // Panel web: cookie httpOnly. App móvil: header Authorization Bearer.
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (req: Request) => leerCookie(req, COOKIE_ACCESS),
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       secretOrKey: secret,
     });

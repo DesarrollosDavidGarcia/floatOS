@@ -215,9 +215,14 @@ export const CATALOGO_GRUPOS: CatalogoGrupoMeta[] = [
   { grupo: 'TIPO_AUSENCIA', nombre: 'Tipos de ausencia' },
   { grupo: 'TIPO_GASTO', nombre: 'Tipos de gasto' },
   { grupo: 'TIPO_UNIDAD', nombre: 'Tipos de unidad (flota)' },
+  { grupo: 'MARCA_UNIDAD', nombre: 'Marcas (flota)' },
+  { grupo: 'MODELO_UNIDAD', nombre: 'Modelos (flota)' },
   { grupo: 'ASEGURADORA', nombre: 'Aseguradoras' },
   { grupo: 'PUESTO', nombre: 'Puestos' },
   { grupo: 'TIPO_SANGRE', nombre: 'Tipos de sangre' },
+  { grupo: 'TIPO_CARGA', nombre: 'Tipos de carga' },
+  { grupo: 'ACCION_ESCALA', nombre: 'Acciones de escala' },
+  { grupo: 'SENTIDO_CARGA', nombre: 'Sentido de carga' },
 ];
 
 export const CATALOGO_GRUPO_KEYS = CATALOGO_GRUPOS.map((g) => g.grupo);
@@ -247,4 +252,55 @@ export interface AuthTokens {
 export interface LoginPayload {
   email: string;
   password: string;
+}
+
+// ── Motor de cálculo de viajes (uso adecuado de la unidad) ──
+// Contrato compartido por la API (dominio) y el panel web.
+
+export type MotivoInadecuacion =
+  | 'SOBREPESO'
+  | 'SOBRE_VOLUMEN'
+  | 'TIPO_INCOMPATIBLE'
+  | 'AUTONOMIA_INSUFICIENTE'
+  | 'DATOS_INCOMPLETOS';
+
+/** Método con que se estimó la distancia de la ruta. */
+export type MetodoDistancia = 'GEODESICA' | 'RUTA';
+
+export interface MotivoVeredicto {
+  codigo: MotivoInadecuacion;
+  mensaje: string;
+  /** Valor requerido por la carga (kg, m³, km) cuando aplica. */
+  requerido?: number;
+  /** Valor disponible en la unidad (kg, m³, km) cuando aplica. */
+  disponible?: number;
+}
+
+export interface VeredictoUnidad {
+  unidadId: string;
+  placas?: string;
+  /** Apta si no hay motivos bloqueantes (DATOS_INCOMPLETOS no bloquea). */
+  apta: boolean;
+  motivos: MotivoVeredicto[];
+  usoPesoPct?: number;
+  usoVolumenPct?: number;
+  usoAutonomiaPct?: number;
+}
+
+export interface ResumenEvaluacion {
+  pesoMaxKg: number;
+  volumenMaxM3: number;
+  distanciaTotalKm: number;
+  metodoDistancia: MetodoDistancia;
+  /** Avisos no bloqueantes (p. ej. escala sin coordenadas → tramo omitido). */
+  advertencias: string[];
+  tiposCargaPresentes: string[];
+}
+
+export interface ResultadoEvaluacion {
+  resumen: ResumenEvaluacion;
+  /** Veredictos ordenados: aptas primero, mejor ajuste primero. */
+  veredictos: VeredictoUnidad[];
+  /** unidadId de la mejor unidad apta, si la hay. */
+  recomendada?: string;
 }

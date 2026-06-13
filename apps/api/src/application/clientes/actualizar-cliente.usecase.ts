@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Cliente, Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { ActualizarClienteInput } from './clientes.types';
+import { ActualizarClienteInput, contactosACreate } from './clientes.types';
 
-/** Caso de uso: actualizar parcialmente un cliente. */
+/** Caso de uso: actualizar parcialmente un cliente (y reemplazar contactos). */
 @Injectable()
 export class ActualizarClienteUseCase {
   constructor(private readonly prisma: PrismaService) {}
@@ -20,14 +20,24 @@ export class ActualizarClienteUseCase {
     const data: Prisma.ClienteUpdateInput = {};
     if (input.razonSocial !== undefined) data.razonSocial = input.razonSocial;
     if (input.rfc !== undefined) data.rfc = input.rfc;
-    if (input.contactoNombre !== undefined)
-      data.contactoNombre = input.contactoNombre;
-    if (input.contactoTelefono !== undefined)
-      data.contactoTelefono = input.contactoTelefono;
-    if (input.contactoEmail !== undefined)
-      data.contactoEmail = input.contactoEmail;
+    if (input.regimenFiscal !== undefined) data.regimenFiscal = input.regimenFiscal;
+    if (input.usoCfdi !== undefined) data.usoCfdi = input.usoCfdi;
+    if (input.cpFiscal !== undefined) data.cpFiscal = input.cpFiscal;
+    if (input.emailFacturacion !== undefined)
+      data.emailFacturacion = input.emailFacturacion;
     if (input.direccion !== undefined) data.direccion = input.direccion;
+    // Si llega `contactos`, reemplaza la lista completa (borra y recrea).
+    if (input.contactos !== undefined) {
+      data.contactos = {
+        deleteMany: {},
+        create: contactosACreate(input.contactos),
+      };
+    }
 
-    return this.prisma.cliente.update({ where: { id }, data });
+    return this.prisma.cliente.update({
+      where: { id },
+      data,
+      include: { contactos: { orderBy: { orden: 'asc' } } },
+    });
   }
 }

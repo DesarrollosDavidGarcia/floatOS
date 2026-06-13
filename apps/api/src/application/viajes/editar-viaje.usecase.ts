@@ -1,48 +1,95 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { EditarViajeInput, RELACIONES_RESUMEN } from './viajes.types';
+import { simularCarga } from '../../domain/viaje/motor-calculo';
+import { MotorViajeService } from './motor-viaje.service';
+import {
+  derivarResumen,
+  itemsDeEscalas,
+  nestedEscalasCreate,
+  snapshotRuta,
+} from './viaje-escalas.helper';
+import { EditarViajeInput, RELACIONES_DETALLE } from './viajes.types';
 
 /**
- * Caso de uso: editar datos generales del viaje (no el estado ni la asignación
- * de unidad/conductor).
+ * Caso de uso: editar un viaje (no el estado ni la asignación). Si vienen
+ * `escalas`, reemplazan el itinerario completo (borrar + recrear) y se recalcula
+ * el resumen y el snapshot del motor.
  */
 @Injectable()
 export class EditarViajeUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly motor: MotorViajeService,
+  ) {}
+
+  // El itinerario solo puede reescribirse antes de iniciar el viaje.
+  private static readonly ESTADOS_EDITABLES: readonly string[] = [
+    'ASIGNADO',
+    'ACEPTADO',
+  ];
 
   async execute(id: string, input: EditarViajeInput) {
+    const existe = await this.prisma.viaje.findUnique({
+      where: { id },
+      select: { id: true, estado: true, fechaProgramada: true },
+    });
+    if (!existe) {
+      throw new NotFoundException(`Viaje con id ${id} no encontrado`);
+    }
+
+    const fechaProgramada =
+      input.fechaProgramada !== undefined
+        ? new Date(input.fechaProgramada)
+        : undefined;
+
+    if (input.escalas &&
+      !EditarViajeUseCase.ESTADOS_EDITABLES.includes(existe.estado)) {
+      throw new ConflictException(
+        `No se puede modificar el itinerario de un viaje en estado ${existe.estado}`,
+      );
+    }
+
+    if (!input.escalas) {
+      return this.prisma.viaje.update({
+        where: { id },
+        data: { fechaProgramada },
+        include: RELACIONES_DETALLE,
+      });
+    }
+
+    if (input.escalas.length < 2) {
+      throw new BadRequestException(
+        'El itinerario requiere al menos origen y destino',
+      );
+    }
+
+    const sim = simularCarga(itemsDeEscalas(input.escalas));
+    // departAt = fecha programada efectiva (la nueva o la ya guardada) → tráfico predicho.
+    const departAt = (fechaProgramada ?? existe.fechaProgramada)?.toISOString();
+    const ruta = await this.motor.distanciaKm(input.escalas, { departAt });
+    const resumen = derivarResumen(input.escalas, sim);
+
     const data: Prisma.ViajeUpdateInput = {
-      origenDireccion: input.origenDireccion,
-      origenLat: input.origenLat,
-      origenLng: input.origenLng,
-      destinoDireccion: input.destinoDireccion,
-      destinoLat: input.destinoLat,
-      destinoLng: input.destinoLng,
-      tipoCarga: input.tipoCarga,
-      descripcionCarga: input.descripcionCarga,
-      pesoKg: input.pesoKg,
-      dimensiones: input.dimensiones,
-      fechaProgramada:
-        input.fechaProgramada !== undefined
-          ? new Date(input.fechaProgramada)
-          : undefined,
+      ...resumen,
+      ...snapshotRuta(ruta),
+      fechaProgramada,
+      escalas: { create: nestedEscalasCreate(input.escalas) },
     };
 
-    try {
-      return await this.prisma.viaje.update({
+    // Reemplazo atómico del itinerario: borrar escalas (cascada → cargas) y recrear.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.escalaViaje.deleteMany({ where: { viajeId: id } });
+      return tx.viaje.update({
         where: { id },
         data,
-        include: RELACIONES_RESUMEN,
+        include: RELACIONES_DETALLE,
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        throw new NotFoundException(`Viaje con id ${id} no encontrado`);
-      }
-      throw error;
-    }
+    });
   }
 }

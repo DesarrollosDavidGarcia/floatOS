@@ -113,7 +113,9 @@ export default function AlertasPage() {
           {!isLoading && !isError && (
             <p className="text-sm text-muted-foreground">
               {itemsFiltrados.length}{' '}
-              {itemsFiltrados.length === 1 ? 'por vencer' : 'por vencer'}
+              {itemsFiltrados.length === 1
+                ? 'documento por vencer'
+                : 'documentos por vencer'}
             </p>
           )}
         </div>

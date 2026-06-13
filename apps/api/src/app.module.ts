@@ -4,6 +4,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SharedModule } from './infrastructure/shared/shared.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
+import { CryptoModule } from './infrastructure/crypto/crypto.module';
 import { HealthController } from './presentation/http/health.controller';
 
 // Módulos de funcionalidad (Fase 1)
@@ -14,6 +16,8 @@ import { ConductoresModule } from './presentation/http/conductores/conductores.m
 import { ExpedienteModule } from './presentation/http/conductores/expediente/expediente.module';
 import { CatalogosModule } from './presentation/http/catalogos/catalogos.module';
 import { ViajesModule } from './presentation/http/viajes/viajes.module';
+import { CotizacionesModule } from './presentation/http/cotizaciones/cotizaciones.module';
+import { EmpresaModule } from './presentation/http/empresa/empresa.module';
 import { TrackingModule } from './presentation/ws/tracking/tracking.module';
 import { AlertasModule } from './presentation/http/alertas/alertas.module';
 
@@ -26,6 +30,8 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
     PrismaModule,
     SharedModule,
+    StorageModule,
+    CryptoModule,
     AuthModule,
     ClientesModule,
     FlotaModule,
@@ -33,6 +39,8 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     ExpedienteModule,
     CatalogosModule,
     ViajesModule,
+    CotizacionesModule,
+    EmpresaModule,
     TrackingModule,
     AlertasModule,
   ],

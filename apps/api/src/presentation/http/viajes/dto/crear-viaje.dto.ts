@@ -1,60 +1,31 @@
+import { Type } from 'class-transformer';
 import {
-  IsLatitude,
-  IsLongitude,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsPositive,
-  IsString,
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateNested,
 } from 'class-validator';
+import { EscalaViajeDto } from './escala-viaje.dto';
 
-/** Datos para crear un viaje. Estado inicial siempre ASIGNADO. */
+/**
+ * Crear un viaje con su itinerario de escalas. El origen es la primera escala y
+ * el destino la última (mínimo 2). Estado inicial siempre ASIGNADO.
+ */
 export class CrearViajeDto {
   @IsString()
   @IsNotEmpty({ message: 'El clienteId es obligatorio' })
   clienteId!: string;
 
-  @IsString()
-  @IsNotEmpty({ message: 'La dirección de origen es obligatoria' })
-  origenDireccion!: string;
-
-  @IsOptional()
-  @IsLatitude({ message: 'origenLat no es una latitud válida' })
-  origenLat?: number;
-
-  @IsOptional()
-  @IsLongitude({ message: 'origenLng no es una longitud válida' })
-  origenLng?: number;
-
-  @IsString()
-  @IsNotEmpty({ message: 'La dirección de destino es obligatoria' })
-  destinoDireccion!: string;
-
-  @IsOptional()
-  @IsLatitude({ message: 'destinoLat no es una latitud válida' })
-  destinoLat?: number;
-
-  @IsOptional()
-  @IsLongitude({ message: 'destinoLng no es una longitud válida' })
-  destinoLng?: number;
-
-  @IsString()
-  @IsNotEmpty({ message: 'El tipo de carga es obligatorio' })
-  tipoCarga!: string;
-
-  @IsOptional()
-  @IsString()
-  descripcionCarga?: string;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'pesoKg debe ser numérico' })
-  @IsPositive({ message: 'pesoKg debe ser mayor a cero' })
-  pesoKg?: number;
-
-  @IsOptional()
-  @IsString()
-  dimensiones?: string;
+  @IsArray()
+  @ArrayMinSize(2, { message: 'El itinerario requiere al menos origen y destino' })
+  @ArrayMaxSize(50, { message: 'Máximo 50 escalas por viaje' })
+  @ValidateNested({ each: true })
+  @Type(() => EscalaViajeDto)
+  escalas!: EscalaViajeDto[];
 
   @IsOptional()
   @IsDateString({}, { message: 'fechaProgramada debe ser una fecha ISO válida' })

@@ -1,0 +1,26 @@
+# Overlay SOLO para construir las imágenes (tu máquina o CI). NO se copia al VPS
+# de ningún cliente. Agrega el contexto de build a los servicios que en
+# producción se consumen como imagen publicada (api, web).
+#
+# Uso (lo envuelve scripts/build-publicar.sh):
+#   FLOTAOS_VERSION=1.1.0 docker compose -f docker-compose.yml -f docker-compose.build.yml build api web
+#   FLOTAOS_VERSION=1.1.0 docker compose -f docker-compose.yml push api web
+#
+# Las imágenes quedan etiquetadas con el `image:` definido en docker-compose.yml
+# (registry + versión), listas para `docker compose pull` en cada instancia.
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # URLs relativas → la imagen no depende del dominio del cliente.
+        # /api lo enruta Nginx al API; el WebSocket usa el mismo origen.
+        - NEXT_PUBLIC_API_URL=/api
+        - NEXT_PUBLIC_WS_URL=

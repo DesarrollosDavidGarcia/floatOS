@@ -11,6 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { WS_EVENTS } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { COOKIE_ACCESS, valorDeCookie } from '../../http/auth/cookies';
 
 /** Construye el nombre de la sala de un viaje. */
 function salaViaje(viajeId: string): string {
@@ -36,12 +37,14 @@ interface SuscribirPayload {
 
 /**
  * cors.origin: se toma de CORS_ORIGIN (coma-separado) si está definido; en caso
- * contrario se usa '*'. IMPORTANTE: restringir CORS_ORIGIN en producción.
+ * contrario se refleja el origen (`true`) para permitir credenciales en dev.
+ * Se usa junto a `credentials: true` para que el navegador envíe la cookie
+ * httpOnly de acceso en el handshake. IMPORTANTE: fijar CORS_ORIGIN en producción.
  */
-function resolverCorsOrigin(): string | string[] {
+function resolverCorsOrigin(): string[] | boolean {
   const env = process.env.CORS_ORIGIN;
   if (!env) {
-    return '*';
+    return true;
   }
   return env
     .split(',')
@@ -56,7 +59,7 @@ function resolverCorsOrigin(): string | string[] {
  * ubicaciones, cambios de estado y alertas reemitidas por la API.
  */
 @WebSocketGateway({
-  cors: { origin: resolverCorsOrigin() },
+  cors: { origin: resolverCorsOrigin(), credentials: true },
   namespace: 'tracking',
 })
 export class TrackingGateway implements OnGatewayConnection {
@@ -104,7 +107,10 @@ export class TrackingGateway implements OnGatewayConnection {
     }
   }
 
-  /** Extrae el JWT del handshake: auth.token o header Authorization (Bearer). */
+  /**
+   * Extrae el JWT del handshake: auth.token o Authorization Bearer (app móvil),
+   * o la cookie httpOnly de acceso (panel web con withCredentials).
+   */
   private extraerToken(client: Socket): string | null {
     const authToken = client.handshake.auth?.token;
     if (typeof authToken === 'string' && authToken.length > 0) {
@@ -114,7 +120,7 @@ export class TrackingGateway implements OnGatewayConnection {
     if (typeof header === 'string' && header.startsWith('Bearer ')) {
       return header.slice('Bearer '.length);
     }
-    return null;
+    return valorDeCookie(client.handshake.headers.cookie, COOKIE_ACCESS);
   }
 
   /**

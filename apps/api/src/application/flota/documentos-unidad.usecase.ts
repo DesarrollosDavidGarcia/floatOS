@@ -116,7 +116,7 @@ export class DocumentosUnidadUseCase {
     return this.prisma.documentoUnidad.findMany({
       where: { fechaVencimiento: { gte: inicio, lte: fin } },
       orderBy: { fechaVencimiento: 'asc' },
-      include: { unidad: true },
+      include: { unidad: { select: { id: true, placas: true } } },
     });
   }
 }

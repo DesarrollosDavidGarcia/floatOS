@@ -33,6 +33,10 @@ import {
   Vigencia,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import {
+  ArchivosExpedienteButton,
+  useConteosArchivosExpediente,
+} from '@/components/conductores/expediente/archivos-expediente-button';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -92,6 +96,8 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
       return data;
     },
   });
+
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'certificaciones');
 
   const eliminar = useMutation({
     mutationFn: async (certId: string) => {
@@ -190,7 +196,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
         <Button size="sm" onClick={() => setMostrarForm(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Agregar certificación
+          <Plus /> Agregar certificación
         </Button>
       </div>
 
@@ -281,6 +287,13 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <ArchivosExpedienteButton
+                        conductorId={conductorId}
+                        seccion="certificaciones"
+                        registroId={cert.id}
+                        titulo={cert.nombre}
+                        count={conteos?.[cert.id]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"

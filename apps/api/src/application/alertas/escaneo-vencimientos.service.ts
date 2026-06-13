@@ -35,7 +35,7 @@ export class EscaneoVencimientosService {
     const hoy = inicioDelDiaUTC(ahora);
     const limite = finDelDiaUTC(sumarDias(ahora, dias));
 
-    const [docsUnidad, docsConductor] = await Promise.all([
+    const [docsUnidad, docsConductor, contratosConductor] = await Promise.all([
       this.prisma.documentoUnidad.findMany({
         where: { fechaVencimiento: { gte: hoy, lte: limite } },
         include: { unidad: { select: { placas: true } } },
@@ -46,35 +46,18 @@ export class EscaneoVencimientosService {
         include: { conductor: { select: { nombre: true, apellidos: true } } },
         orderBy: { fechaVencimiento: 'asc' },
       }),
+      this.prisma.conductor.findMany({
+        where: { vigenciaHasta: { gte: hoy, lte: limite } },
+        select: { nombre: true, apellidos: true, vigenciaHasta: true },
+        orderBy: { vigenciaHasta: 'asc' },
+      }),
     ]);
 
-    const alertas: AlertaVencimiento[] = [];
-
-    for (const doc of docsUnidad) {
-      alertas.push({
-        tipo: 'unidad',
-        entidad: doc.unidad.placas,
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
-
-    for (const doc of docsConductor) {
-      alertas.push({
-        tipo: 'conductor',
-        entidad: this.nombreConductor(doc.conductor),
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
-
-    alertas.sort(
-      (a, b) => a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime(),
-    );
-
-    return alertas;
+    return this.ordenarPorVencimiento([
+      ...docsUnidad.map((doc) => this.aAlertaUnidad(doc, ahora)),
+      ...docsConductor.map((doc) => this.aAlertaConductor(doc, ahora)),
+      ...contratosConductor.map((c) => this.aAlertaVigencia(c, ahora)),
+    ]);
   }
 
   /**
@@ -101,7 +84,13 @@ export class EscaneoVencimientosService {
       return [];
     }
 
-    const [docsUnidad, docsConductor] = await Promise.all([
+    // Mismos rangos pero sobre la columna de vigencia del contrato.
+    const rangosVigencia = umbrales.map((dias) => {
+      const { gte, lt } = rangoDiaUTC(dias, ahora);
+      return { vigenciaHasta: { gte, lt } };
+    });
+
+    const [docsUnidad, docsConductor, contratosConductor] = await Promise.all([
       this.prisma.documentoUnidad.findMany({
         where: { OR: rangos },
         include: { unidad: { select: { placas: true } } },
@@ -110,35 +99,72 @@ export class EscaneoVencimientosService {
         where: { OR: rangos },
         include: { conductor: { select: { nombre: true, apellidos: true } } },
       }),
+      this.prisma.conductor.findMany({
+        where: { OR: rangosVigencia },
+        select: { nombre: true, apellidos: true, vigenciaHasta: true },
+      }),
     ]);
 
-    const resultados: AlertaVencimiento[] = [];
+    return this.ordenarPorVencimiento([
+      ...docsUnidad.map((doc) => this.aAlertaUnidad(doc, ahora)),
+      ...docsConductor.map((doc) => this.aAlertaConductor(doc, ahora)),
+      ...contratosConductor.map((c) => this.aAlertaVigencia(c, ahora)),
+    ]);
+  }
 
-    for (const doc of docsUnidad) {
-      resultados.push({
-        tipo: 'unidad',
-        entidad: doc.unidad.placas,
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
+  /** Mapea un documento de unidad a una alerta de vencimiento. */
+  private aAlertaUnidad(
+    doc: { tipo: string; fechaVencimiento: Date; unidad: { placas: string } },
+    ahora: Date,
+  ): AlertaVencimiento {
+    return {
+      tipo: 'unidad',
+      entidad: doc.unidad.placas,
+      tipoDocumento: doc.tipo,
+      fechaVencimiento: doc.fechaVencimiento,
+      diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
+    };
+  }
 
-    for (const doc of docsConductor) {
-      resultados.push({
-        tipo: 'conductor',
-        entidad: this.nombreConductor(doc.conductor),
-        tipoDocumento: doc.tipo,
-        fechaVencimiento: doc.fechaVencimiento,
-        diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
-      });
-    }
+  /** Mapea un documento de conductor a una alerta de vencimiento. */
+  private aAlertaConductor(
+    doc: {
+      tipo: string;
+      fechaVencimiento: Date;
+      conductor: { nombre: string | null; apellidos: string | null };
+    },
+    ahora: Date,
+  ): AlertaVencimiento {
+    return {
+      tipo: 'conductor',
+      entidad: this.nombreConductor(doc.conductor),
+      tipoDocumento: doc.tipo,
+      fechaVencimiento: doc.fechaVencimiento,
+      diasRestantes: diasEntre(ahora, doc.fechaVencimiento),
+    };
+  }
 
-    resultados.sort(
+  /** Mapea la vigencia del contrato temporal/externo de un conductor a alerta. */
+  private aAlertaVigencia(
+    c: { nombre: string | null; apellidos: string | null; vigenciaHasta: Date | null },
+    ahora: Date,
+  ): AlertaVencimiento {
+    return {
+      tipo: 'conductor',
+      entidad: this.nombreConductor(c),
+      tipoDocumento: 'Vigencia de contrato',
+      fechaVencimiento: c.vigenciaHasta as Date,
+      diasRestantes: diasEntre(ahora, c.vigenciaHasta as Date),
+    };
+  }
+
+  /** Ordena las alertas por fecha de vencimiento ascendente (in place). */
+  private ordenarPorVencimiento(
+    alertas: AlertaVencimiento[],
+  ): AlertaVencimiento[] {
+    return alertas.sort(
       (a, b) => a.fechaVencimiento.getTime() - b.fechaVencimiento.getTime(),
     );
-
-    return resultados;
   }
 
   /** Construye el nombre legible del conductor (nombre + apellidos). */

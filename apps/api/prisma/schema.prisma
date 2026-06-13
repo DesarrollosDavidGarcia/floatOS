@@ -1,7 +1,9 @@
 // FlotaOS — Modelo de datos (Prisma)
 // Despliegue instancia-por-cliente: SIN tenantId, la BD ya está aislada por diseño.
-// PostGIS está habilitado en la BD (ver postgres/init.sql); para el MVP las
-// coordenadas se guardan como Float y las geocercas se calculan en aplicación.
+// PostGIS está habilitado en la BD (ver postgres/init.sql). Las coordenadas se
+// guardan como Float (gestionadas por Prisma) y, donde se necesitan consultas
+// geográficas (distancia/geocercas), una columna `geography` GENERADA por SQL
+// (declarada como Unsupported(...) @ignore) alimenta índices GIST y ST_Distance/ST_DWithin.
 
 generator client {
   provider = "prisma-client-js"
@@ -221,6 +223,52 @@ model Usuario {
   @@map("usuarios")
 }
 
+/// Configuración de la empresa transportista (emisor). Singleton: una sola fila
+/// por instancia. Reúne datos generales/fiscales, domicilio fiscal, datos para
+/// Carta Porte (permiso SCT, seguro) y credenciales de PAC/CSD para timbrado
+/// (Fase 2). Los secretos (token/clave del PAC y contraseña del CSD) NUNCA se
+/// exponen en las respuestas de la API (la capa de aplicación los enmascara).
+model Empresa {
+  id            String  @id @default(cuid())
+  // Datos generales / fiscales del emisor
+  razonSocial   String?
+  rfc           String?
+  regimenFiscal String? // catálogo REGIMEN_FISCAL (c_RegimenFiscal)
+  telefono      String?
+  email         String?
+  logoKey       String? // logo en MinIO (para PDF / documentos)
+  // Domicilio fiscal
+  calle     String?
+  numeroExt String?
+  numeroInt String?
+  colonia   String?
+  cp        String?
+  municipio String?
+  estado    String?
+  pais      String? @default("México")
+  // Carta Porte — datos del emisor / autotransporte
+  permisoSctTipo       String? // catálogo TIPO_PERMISO_SCT (c_TipoPermiso)
+  permisoSctNumero     String?
+  aseguradoraRespCivil String?
+  polizaRespCivil      String?
+  // PAC / timbrado (SW Sapien por defecto)
+  pacProveedor String? @default("SW")
+  pacAmbiente  String? @default("PRUEBAS") // PRUEBAS | PRODUCCION
+  pacUsuario   String?
+  pacToken     String? // secreto — no se expone
+  pacPassword  String? // secreto — no se expone
+  // Certificado de Sello Digital (CSD)
+  csdNumero   String?
+  csdCerKey   String? // .cer en MinIO
+  csdKeyKey   String? // .key en MinIO
+  csdPassword String? // secreto — no se expone
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("empresa")
+}
+
 /// Conductor: credenciales separadas para la app Flutter.
 /// Incluye los datos de RH del expediente formal (las secciones detalladas
 /// viven en modelos relacionados: médico, certificaciones, incidencias, etc.).
@@ -252,6 +300,18 @@ model Conductor {
   emergenciaTelefono  String?
   emergenciaRelacion  String?
 
+  // ── Contratación (planta / freelance / terciarizado) ──
+  tipoContratacion          String?   @default("PLANTA") // catálogo TIPO_CONTRATACION
+  // Datos de la empresa que presta al conductor (solo terciarizado/externo)
+  empresaProveedor          String?
+  empresaProveedorRfc       String?
+  proveedorContactoNombre   String?
+  proveedorContactoTelefono String?
+  // Vigencia del contrato temporal/externo (engancha alertas de vencimiento)
+  vigenciaDesde             DateTime?
+  vigenciaHasta             DateTime?
+  notasContratacion         String?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -268,6 +328,7 @@ model Conductor {
   controlesConfianza ControlConfianzaConductor[]
   evaluaciones      EvaluacionDesempenoConductor[]
   ausencias         AusenciaConductor[]
+  archivosExpediente ArchivoExpediente[]
 
   @@map("conductores")
 }
@@ -277,11 +338,15 @@ model Conductor {
 model Unidad {
   id            String   @id @default(cuid())
   placas        String   @unique
-  tipo          String   // tractocamión, camión, camioneta, etc.
+  tipo          String   // tractocamión, camión, camioneta, etc. (catálogo TIPO_UNIDAD)
   marca         String?
   modelo        String?
   anio          Int?
   capacidadKg   Decimal? @db.Decimal(10, 2)
+  // Entradas del motor de cálculo (uso adecuado de la unidad):
+  capacidadM3      Decimal? @db.Decimal(10, 3) // capacidad volumétrica
+  rendimientoKmL   Decimal? @db.Decimal(6, 2)  // km por litro
+  capacidadTanqueL Decimal? @db.Decimal(8, 2)  // litros de tanque (autonomía = rendimiento * tanque)
   aseguradora   String?
   numeroPoliza  String?
   activo        Boolean  @default(true)
@@ -289,9 +354,35 @@ model Unidad {
   updatedAt     DateTime @updatedAt
 
   documentos DocumentoUnidad[]
+  archivos   ArchivoUnidad[]
   viajes     Viaje[]
 
   @@map("unidades")
+}
+
+/// Categoría de un archivo adjunto a una unidad.
+enum CategoriaArchivoUnidad {
+  POLIZA_SEGURO
+  GENERAL
+}
+
+/// Archivo adjunto a una unidad (póliza de seguro o documentos propios del
+/// vehículo). Varios por unidad; el binario vive en MinIO bajo `key`.
+model ArchivoUnidad {
+  id          String                 @id @default(cuid())
+  unidadId    String
+  categoria   CategoriaArchivoUnidad @default(GENERAL)
+  nombre      String // nombre original del archivo
+  key         String // object key en MinIO
+  contentType String
+  tamanoBytes Int
+  createdAt   DateTime               @default(now())
+
+  unidad Unidad @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+
+  @@index([unidadId])
+  @@index([unidadId, categoria])
+  @@map("archivos_unidad")
 }
 
 model DocumentoUnidad {
@@ -319,15 +410,31 @@ model DocumentoConductor {
   numero          String?
   fechaEmision    DateTime?
   fechaVencimiento DateTime
-  archivoKey      String?
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  conductor Conductor                     @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+  archivos  ArchivoDocumentoConductor[]
 
   @@index([conductorId])
   @@index([fechaVencimiento])
   @@map("documentos_conductor")
+}
+
+/// Archivo adjunto a un documento del conductor (PDF o imagen). N por documento.
+model ArchivoDocumentoConductor {
+  id          String   @id @default(cuid())
+  documentoId String
+  nombre      String // nombre original del archivo
+  key         String // object key en MinIO
+  contentType String
+  tamanoBytes Int
+  createdAt   DateTime @default(now())
+
+  documento DocumentoConductor @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@index([documentoId])
+  @@map("archivos_documento_conductor")
 }
 
 // ───────────────── Expediente del conductor ──────────────────────
@@ -527,6 +634,40 @@ model AusenciaConductor {
   @@map("ausencias_conductor")
 }
 
+/// Sección del expediente a la que pertenece un archivo de evidencia.
+enum SeccionExpediente {
+  EXAMEN_MEDICO
+  CERTIFICACION
+  CAPACITACION
+  CONTROL_CONFIANZA
+  INCIDENCIA
+  EVALUACION
+}
+
+/// Archivo de evidencia (PDF o imagen) adjunto a un registro de una sección del
+/// expediente del conductor (médico, certificación, capacitación, control de
+/// confianza, incidencia o evaluación). N por registro; el binario vive en MinIO
+/// bajo `key`. `registroId` apunta al id del registro de su `seccion`; el FK a
+/// Conductor garantiza el cascade al borrar el conductor (el borrado de un
+/// registro individual limpia sus archivos en la capa de aplicación).
+model ArchivoExpediente {
+  id          String            @id @default(cuid())
+  conductorId String
+  seccion     SeccionExpediente
+  registroId  String
+  nombre      String // nombre original del archivo
+  key         String // object key en MinIO
+  contentType String
+  tamanoBytes Int
+  createdAt   DateTime          @default(now())
+
+  conductor Conductor @relation(fields: [conductorId], references: [id], onDelete: Cascade)
+
+  @@index([conductorId])
+  @@index([seccion, registroId])
+  @@map("archivos_expediente")
+}
+
 // ──────────────────────── Clientes finales ───────────────────────
 
 /// Cliente del transportista (a quien se le presta el servicio de viaje).
@@ -534,16 +675,70 @@ model Cliente {
   id               String   @id @default(cuid())
   razonSocial      String
   rfc              String?
-  contactoNombre   String?
-  contactoTelefono String?
-  contactoEmail    String?
+  // Datos fiscales (CFDI 4.0) — códigos de catálogo SAT (grupos REGIMEN_FISCAL / USO_CFDI).
+  regimenFiscal    String?
+  usoCfdi          String?
+  cpFiscal         String?
+  emailFacturacion String?
   direccion        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  viajes Viaje[]
+  contactos  ContactoCliente[]
+  sucursales SucursalCliente[]
+  viajes     Viaje[]
 
   @@map("clientes")
+}
+
+/// Sucursal (domicilio adicional) de un cliente: punto de recolección/entrega.
+/// Un cliente puede tener varias. Sirve como origen/destino de viajes y como
+/// domicilio del receptor en Carta Porte.
+model SucursalCliente {
+  id        String  @id @default(cuid())
+  clienteId String
+  nombre    String
+  rfc       String? // normalmente el del cliente
+  // Domicilio
+  calle     String?
+  numeroExt String?
+  numeroInt String?
+  colonia   String?
+  cp        String?
+  municipio String?
+  estado    String?
+  pais      String? @default("México")
+  lat       Float?
+  lng       Float?
+  esPrincipal Boolean @default(false)
+  orden       Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("sucursales_cliente")
+}
+
+/// Contacto del cliente (lista). Uno puede marcarse como principal: es el
+/// destinatario por defecto al cotizar/enviar correo. Si ninguno lo está, se
+/// usa el de menor `orden`.
+model ContactoCliente {
+  id          String   @id @default(cuid())
+  clienteId   String
+  nombre      String
+  email       String?
+  telefono    String? // celular
+  esPrincipal Boolean  @default(false)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("contactos_cliente")
 }
 
 // ───────────────────────────── Viajes ────────────────────────────
@@ -556,7 +751,8 @@ model Viaje {
   unidadId      String?
   conductorId   String?
 
-  // Origen / destino
+  // Origen / destino — DERIVADOS de las escalas (primera = origen, última = destino).
+  // Se mantienen denormalizados para el tracking público, la búsqueda del listado y el mapa.
   origenDireccion  String
   origenLat        Float?
   origenLng        Float?
@@ -564,11 +760,24 @@ model Viaje {
   destinoLat       Float?
   destinoLng       Float?
 
-  // Carga
+  // Carga — DERIVADA de las cargas de las escalas (resumen para listado/fiscal).
   tipoCarga        String
   descripcionCarga String?
   pesoKg           Decimal? @db.Decimal(10, 2)
   dimensiones      String?
+
+  // Snapshot del motor de cálculo (se recalcula al crear/editar).
+  distanciaEstimadaKm Decimal? @db.Decimal(10, 2)
+  // ETA estimada por carretera (free-flow, sin tráfico en vivo); null si geodésica.
+  tiempoEstimadoMin   Float?
+  pesoMaxKg           Decimal? @db.Decimal(10, 2)
+  volumenMaxM3        Decimal? @db.Decimal(10, 3)
+  // Polilínea de la ruta por carretera ([[lat, lng], ...]) para pintar el mapa;
+  // null si se calculó por geodésica (el mapa cae a líneas rectas entre escalas).
+  rutaGeometria       Json?
+  // Plan multi-día que asigna el monitorista (horas de conducción/día, descanso,
+  // tiempo por escala, hora de inicio). Alimenta el cálculo de llegada estimada.
+  planRuta            Json?
 
   estado        EstadoViaje @default(ASIGNADO)
   trackingToken String      @unique // link público; token aleatorio seguro (ver token.util.ts)
@@ -586,18 +795,24 @@ model Viaje {
   unidad    Unidad?    @relation(fields: [unidadId], references: [id])
   conductor Conductor? @relation(fields: [conductorId], references: [id])
 
+  escalas     EscalaViaje[]
   historial   HistorialEstadoViaje[]
   ubicaciones UbicacionConductor[]
   gastos      GastoViaje[]
   evidencias  EvidenciaViaje[]
   incidencias IncidenciaConductor[]
-  cartaPorte  CartaPorte?
-  factura     Factura?
+  cartaPorte   CartaPorte?
+  factura      Factura?
+  cotizaciones Cotizacion[]
 
   @@index([clienteId])
   @@index([unidadId])
   @@index([conductorId])
-  @@index([estado])
+  // El listado filtra por estado y ordena por createdAt desc (índice compuesto);
+  // fechaProgramada se usa en el filtro de rango; createdAt en el orden por defecto.
+  @@index([estado, createdAt])
+  @@index([fechaProgramada])
+  @@index([createdAt])
   @@map("viajes")
 }
 
@@ -669,6 +884,70 @@ model EvidenciaViaje {
   @@map("evidencias_viaje")
 }
 
+/// Escala (parada) del itinerario de un viaje. Origen = orden 0, destino = última.
+model EscalaViaje {
+  id           String    @id @default(cuid())
+  viajeId      String
+  orden        Int // posición 0-based en el itinerario
+  accion       String // catálogo ACCION_ESCALA: RECOGER / ENTREGAR / RECOGER_ENTREGAR / PASO
+  direccion    String
+  lat          Float?
+  lng          Float?
+  // Columna geography GENERADA por SQL (ST_MakePoint) para consultas PostGIS;
+  // la app escribe lat/lng, no esta columna. Se declara para que Prisma la conozca
+  // (no genere drift/DROP); el ADD COLUMN se reemplaza por GENERATED en la migración.
+  ubicacion    Unsupported("geography(Point, 4326)")?
+  notas        String?
+  ventanaDesde DateTime?
+  ventanaHasta DateTime?
+  // Marca de tiempo de la primera alerta de geocerca emitida (dedup entre lotes).
+  llegadaNotificadaEn DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  viaje  Viaje         @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  cargas CargaEscala[]
+
+  @@unique([viajeId, orden])
+  @@index([viajeId])
+  @@map("escalas_viaje")
+}
+
+/// Carga que se recoge o entrega en una escala. "Reemplazar" = DESCARGA + CARGA en
+/// la misma escala; loteRef empareja una DESCARGA con la CARGA previa del mismo lote.
+model CargaEscala {
+  id          String   @id @default(cuid())
+  escalaId    String
+  sentido     String // catálogo SENTIDO_CARGA: CARGA / DESCARGA
+  tipoCarga   String // catálogo TIPO_CARGA
+  descripcion String?
+  pesoKg      Decimal  @db.Decimal(10, 2)
+  volumenM3   Decimal? @db.Decimal(10, 3)
+  largoM      Decimal? @db.Decimal(8, 3)
+  anchoM      Decimal? @db.Decimal(8, 3)
+  altoM       Decimal? @db.Decimal(8, 3)
+  cantidad    Int      @default(1)
+  loteRef     String?
+  createdAt   DateTime @default(now())
+
+  escala EscalaViaje @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+
+  @@index([escalaId])
+  @@map("cargas_escala")
+}
+
+/// Regla de compatibilidad tipo de carga ↔ tipo de unidad (la consume el motor).
+model CompatibilidadCargaUnidad {
+  id         String  @id @default(cuid())
+  tipoCarga  String // catálogo TIPO_CARGA
+  tipoUnidad String // catálogo TIPO_UNIDAD
+  permitido  Boolean @default(true)
+  nota       String?
+
+  @@unique([tipoCarga, tipoUnidad])
+  @@map("compatibilidad_carga_unidad")
+}
+
 // ──────────────────── Fiscal: Carta Porte / Factura (Fase 2) ───────
 
 model CartaPorte {
@@ -707,4 +986,65 @@ model Factura {
   cartaPorte CartaPorte? @relation(fields: [cartaPorteId], references: [id])
 
   @@map("facturas")
+}
+
+// ──────────────────────── Cotizaciones ────────────────────────────
+
+enum EstadoCotizacion {
+  BORRADOR
+  ENVIADA
+  ACEPTADA
+  RECHAZADA
+}
+
+/// Cotización de un viaje. Congela los parámetros capturados (params), los datos
+/// del viaje usados y el desglose calculado por el motor (domain/cotizacion).
+model Cotizacion {
+  id          String           @id @default(cuid())
+  folio       Int              @unique @default(autoincrement())
+  viajeId     String
+  estado      EstadoCotizacion @default(BORRADOR)
+  moneda      String           @default("MXN")
+  // Parámetros (tarifas) y datos del viaje usados, congelados.
+  params      Json
+  distanciaKm Decimal?         @db.Decimal(10, 2)
+  pesoKg      Decimal?         @db.Decimal(10, 2)
+  numEscalas  Int              @default(0)
+  // Resultado del motor (líneas + subtotales) y totales para consulta rápida.
+  desglose    Json
+  subtotal    Decimal          @db.Decimal(12, 2)
+  iva         Decimal          @db.Decimal(12, 2)
+  retencion   Decimal          @db.Decimal(12, 2)
+  total       Decimal          @db.Decimal(12, 2)
+  notas       String?
+  // Marca de tiempo del envío por correo (Fase 3, Brevo).
+  enviadaEn   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@map("cotizaciones")
+}
+
+// ──────────────────── Caché de ruteo (TomTom) ─────────────────────
+
+/// Caché persistente de rutas calculadas por el proveedor externo (TomTom) para
+/// no repetir llamadas. `clave` es un hash determinista de las coordenadas
+/// ordenadas + perfil (ver routing/route-provider.ts). Las rutas son estables en
+/// el tiempo (traffic=false), así que se reutilizan entre viajes a largo plazo.
+model RutaCache {
+  id          String   @id @default(cuid())
+  clave       String   @unique
+  distanciaKm Float
+  tiempoMin   Float?
+  // Polilínea de la ruta por carretera ([[lat, lng], ...]); null si no se obtuvo.
+  geometria   Json?
+  proveedor   String // TOMTOM
+  createdAt   DateTime @default(now())
+
+  // Índice para la poda por antigüedad (purgarAntiguas en RouteService).
+  @@index([createdAt])
+  @@map("ruta_cache")
 }

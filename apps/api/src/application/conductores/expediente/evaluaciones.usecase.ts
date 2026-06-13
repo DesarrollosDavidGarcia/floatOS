@@ -4,6 +4,8 @@ import {
 } from '@nestjs/common';
 import { EvaluacionDesempenoConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
+import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
 
 export interface CrearEvaluacionInput {
   periodoInicio: string;
@@ -34,15 +36,13 @@ export interface ActualizarEvaluacionInput {
 /** Casos de uso para las evaluaciones de desempeño de un conductor. */
 @Injectable()
 export class EvaluacionesUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archivos: ArchivosExpedienteUseCase,
+  ) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-    });
-    if (!conductor) {
-      throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(
@@ -121,6 +121,7 @@ export class EvaluacionesUseCase {
 
   async eliminar(conductorId: string, evaluacionId: string): Promise<void> {
     await this.obtener(conductorId, evaluacionId);
+    await this.archivos.eliminarDeRegistro('EVALUACION', evaluacionId);
     await this.prisma.evaluacionDesempenoConductor.delete({ where: { id: evaluacionId } });
   }
 }

@@ -1,5 +1,8 @@
 import { TipoDocumentoConductor, TipoDocumentoUnidad } from '@flotaos/shared-types';
 
+// Urgencia según días restantes: regla escalonada única (lib/vencimiento).
+export { variantePorDias as urgenciaBadge } from '@/lib/vencimiento';
+
 /** Etiquetas legibles para los tipos de documento (unidad y conductor). */
 const DOC_LABEL: Record<string, string> = {
   [TipoDocumentoUnidad.VERIFICACION]: 'Verificación',
@@ -12,11 +15,4 @@ const DOC_LABEL: Record<string, string> = {
 
 export function documentoLabel(tipoDocumento: string): string {
   return DOC_LABEL[tipoDocumento] ?? tipoDocumento;
-}
-
-/** Variante de badge según la urgencia (días restantes). */
-export function urgenciaBadge(diasRestantes: number): 'destructive' | 'warning' | 'secondary' {
-  if (diasRestantes <= 7) return 'destructive';
-  if (diasRestantes <= 15) return 'warning';
-  return 'secondary';
 }

@@ -2,23 +2,16 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, MoreHorizontal, Pencil, Plus, Search, Trash2, Truck } from 'lucide-react';
+import { FileText, MoreHorizontal, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { SearchInput } from '@/components/search-input';
+import { PaginacionFooter } from '@/components/paginacion-footer';
+import { EstadoTabla } from '@/components/estado-tabla';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -38,6 +32,7 @@ import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { CeldaPrincipal } from '@/components/conductores/expediente/tabla-ui';
 import { UnidadFormDialog } from '@/components/flota/unidad-form-dialog';
 import { DocumentosDialog } from '@/components/flota/documentos-dialog';
+import { ArchivosDialog } from '@/components/flota/archivos-dialog';
 import type { Paginado, Unidad } from '@/components/flota/types';
 
 const PAGE_SIZE = 10;
@@ -52,6 +47,8 @@ export default function FlotaPage() {
   const [unidadEditar, setUnidadEditar] = useState<Unidad | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [unidadDocs, setUnidadDocs] = useState<Unidad | null>(null);
+  const [archivosOpen, setArchivosOpen] = useState(false);
+  const [unidadArchivos, setUnidadArchivos] = useState<Unidad | null>(null);
   const [eliminarUnidad, setEliminarUnidad] = useState<Unidad | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -91,6 +88,11 @@ export default function FlotaPage() {
     setDocsOpen(true);
   }
 
+  function abrirArchivos(unidad: Unidad) {
+    setUnidadArchivos(unidad);
+    setArchivosOpen(true);
+  }
+
   const unidades = data?.data ?? [];
   const totalPaginas = data?.totalPaginas ?? 1;
 
@@ -101,20 +103,16 @@ export default function FlotaPage() {
         description="Unidades de la flotilla y sus documentos."
         action={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por placas, tipo, marca…"
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPage(1);
+              }}
+              placeholder="Buscar por placas, tipo, marca…"
+            />
             <Button className="shrink-0" onClick={abrirNueva}>
-              <Plus className="mr-1 h-4 w-4" /> Nueva unidad
+              <Plus /> Nueva unidad
             </Button>
           </div>
         }
@@ -145,29 +143,21 @@ export default function FlotaPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={6}>
-                    <Skeleton className="h-10 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-destructive">
-                  {apiError(error)}
-                </TableCell>
-              </TableRow>
-            ) : unidades.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+            <EstadoTabla
+              colSpan={6}
+              loading={isLoading}
+              error={isError ? apiError(error) || 'No se pudieron cargar las unidades.' : null}
+              vacio={unidades.length === 0}
+              vacioMensaje={
+                <>
                   <Truck className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  No se encontraron unidades.
-                </TableCell>
-              </TableRow>
-            ) : (
-              unidades.map((u) => (
+                  {qDebounced
+                    ? 'No se encontraron unidades para tu búsqueda.'
+                    : 'Aún no hay unidades registradas.'}
+                </>
+              }
+            >
+              {unidades.map((u) => (
                 <TableRow key={u.id}>
                   {/* Unidad: placas + tipo · marca/modelo */}
                   <TableCell>
@@ -179,7 +169,13 @@ export default function FlotaPage() {
                           {(u.marca || u.modelo) && (
                             <>
                               {' · '}
-                              {[u.marca, u.modelo].filter(Boolean).join(' ')}
+                              {u.marca ? (
+                                <CatalogoTexto grupo="MARCA_UNIDAD" codigo={u.marca} />
+                              ) : null}
+                              {u.marca && u.modelo ? ' ' : null}
+                              {u.modelo ? (
+                                <CatalogoTexto grupo="MODELO_UNIDAD" codigo={u.modelo} />
+                              ) : null}
                             </>
                           )}
                         </>
@@ -217,13 +213,16 @@ export default function FlotaPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Acciones">
+                        <Button variant="ghost" size="icon" aria-label="Acciones">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem onSelect={() => abrirDocumentos(u)}>
                           <FileText className="h-4 w-4" /> Documentos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => abrirArchivos(u)}>
+                          <Paperclip className="h-4 w-4" /> Archivos
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => abrirEdicion(u)}>
                           <Pencil className="h-4 w-4" /> Editar
@@ -239,79 +238,47 @@ export default function FlotaPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
+            </EstadoTabla>
           </TableBody>
         </Table>
       </div>
 
-      {/* Conteo y paginación — siempre visible cuando hay datos */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {data
-            ? `${data.total} ${data.total === 1 ? 'unidad' : 'unidades'} · Página ${data.page} de ${totalPaginas}`
-            : ' '}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Anterior
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPaginas}
-            onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-          >
-            Siguiente
-          </Button>
-        </div>
-      </div>
+      <PaginacionFooter
+        page={page}
+        totalPaginas={totalPaginas}
+        total={data?.total ?? 0}
+        singular="unidad"
+        plural="unidades"
+        onPage={setPage}
+      />
 
       {/* Diálogos */}
       <UnidadFormDialog unidad={unidadEditar} open={formOpen} onOpenChange={setFormOpen} />
       <DocumentosDialog unidad={unidadDocs} open={docsOpen} onOpenChange={setDocsOpen} />
+      <ArchivosDialog
+        unidad={unidadArchivos}
+        open={archivosOpen}
+        onOpenChange={setArchivosOpen}
+      />
 
       {/* Confirmar eliminación */}
-      <Dialog
+      <ConfirmDialog
         open={Boolean(eliminarUnidad)}
         onOpenChange={(o) => {
           if (!o) setEliminarUnidad(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar unidad</DialogTitle>
-            <DialogDescription>
-              {eliminarUnidad
-                ? `¿Eliminar la unidad ${eliminarUnidad.placas}? Si tiene viajes asociados no podrá eliminarse. Esta acción no se puede deshacer.`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEliminarUnidad(null)}
-              disabled={deleteMutation.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                eliminarUnidad && deleteMutation.mutate(eliminarUnidad.id)
-              }
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? 'Eliminando…' : 'Eliminar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Eliminar unidad"
+        description={
+          eliminarUnidad
+            ? `¿Eliminar la unidad ${eliminarUnidad.placas}? Si tiene viajes asociados no podrá eliminarse. Esta acción no se puede deshacer.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        onConfirm={async () => {
+          if (eliminarUnidad) await deleteMutation.mutateAsync(eliminarUnidad.id);
+        }}
+      />
     </div>
   );
 }

@@ -14,9 +14,7 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
+    image: ${IMAGE_REGISTRY:-ghcr.io/desarrollosdavidgarcia}/flotaos-api:${FLOTAOS_VERSION:-latest}
     environment:
       - NODE_ENV=${NODE_ENV}
       - DATABASE_URL=${DATABASE_URL}
@@ -50,14 +48,13 @@ services:
     restart: unless-stopped
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    # La imagen del panel es agnóstica del cliente: las URLs de API y WebSocket
+    # se hornean como rutas relativas (/api y mismo origen) en build (ver
+    # docker-compose.build.yml), y Nginx enruta todo bajo el mismo dominio.
+    # Por eso una sola imagen sirve a cualquier cliente sin recompilar.
+    image: ${IMAGE_REGISTRY:-ghcr.io/desarrollosdavidgarcia}/flotaos-web:${FLOTAOS_VERSION:-latest}
     environment:
       - NODE_ENV=${NODE_ENV}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     depends_on:
       - api
     restart: unless-stopped

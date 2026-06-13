@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { AptitudUnidadConductor, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { asegurarConductorExiste } from './asegurar-conductor';
 
 export interface CrearAptitudUnidadInput {
   tipoUnidad: string;
@@ -24,13 +25,8 @@ export interface ActualizarAptitudUnidadInput {
 export class AptitudesUnidadUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async asegurarConductor(conductorId: string): Promise<void> {
-    const conductor = await this.prisma.conductor.findUnique({
-      where: { id: conductorId },
-    });
-    if (!conductor) {
-      throw new NotFoundException(`Conductor con id ${conductorId} no encontrado`);
-    }
+  private asegurarConductor(conductorId: string): Promise<void> {
+    return asegurarConductorExiste(this.prisma, conductorId);
   }
 
   async crear(
@@ -43,8 +39,8 @@ export class AptitudesUnidadUseCase {
       return await this.prisma.aptitudUnidadConductor.create({
         data: {
           conductorId,
-          tipoUnidad: input.tipoUnidad as any,
-          nivel: input.nivel as any ?? undefined,
+          tipoUnidad: input.tipoUnidad,
+          nivel: input.nivel ?? undefined,
           aniosExperiencia: input.aniosExperiencia ?? null,
           notas: input.notas ?? null,
         },
@@ -92,8 +88,8 @@ export class AptitudesUnidadUseCase {
     await this.obtener(conductorId, aptitudId);
 
     const data: Prisma.AptitudUnidadConductorUpdateInput = {};
-    if (input.tipoUnidad !== undefined) data.tipoUnidad = input.tipoUnidad as any;
-    if (input.nivel !== undefined) data.nivel = input.nivel as any;
+    if (input.tipoUnidad !== undefined) data.tipoUnidad = input.tipoUnidad;
+    if (input.nivel !== undefined) data.nivel = input.nivel;
     if (input.aniosExperiencia !== undefined) data.aniosExperiencia = input.aniosExperiencia;
     if (input.notas !== undefined) data.notas = input.notas;
 

@@ -1,18 +1,25 @@
+export interface ContactoCliente {
+  id?: string;
+  nombre: string;
+  email?: string | null;
+  telefono?: string | null;
+  esPrincipal?: boolean;
+  orden?: number;
+}
+
 export interface Cliente {
   id: string;
   razonSocial: string;
   rfc?: string | null;
-  contactoNombre?: string | null;
-  contactoTelefono?: string | null;
-  contactoEmail?: string | null;
+  // Datos fiscales (CFDI 4.0) — códigos de catálogo SAT.
+  regimenFiscal?: string | null;
+  usoCfdi?: string | null;
+  cpFiscal?: string | null;
+  emailFacturacion?: string | null;
   direccion?: string | null;
+  contactos?: ContactoCliente[];
   createdAt: string;
 }
 
-export interface Paginado<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPaginas: number;
-}
+// Contrato único de paginación: reexportado desde shared-types para no divergir.
+export type { Paginado } from '@flotaos/shared-types';

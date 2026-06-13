@@ -13,6 +13,8 @@ out/
 .env
 .env.local
 .env.*.local
+.env.docker
+.env.smoke
 !.env.example
 
 # Prisma
@@ -32,6 +34,13 @@ logs/
 # Docker / certs
 nginx/certs/*
 !nginx/certs/.gitkeep
+infra/traefik/acme.json
+
+# Instancias de cliente (secretos + datos por cliente; no se versionan)
+clientes/
+
+# Respaldos de base de datos (datos; pueden contener información sensible)
+backups/
 
 # Flutter
 apps/mobile/.dart_tool/

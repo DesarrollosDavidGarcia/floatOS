@@ -19,6 +19,11 @@ const badgeVariants = cva(
   },
 );
 
+/** Variantes de color del Badge (fuente única; evita redefinir el union). */
+export type BadgeVariant = NonNullable<
+  VariantProps<typeof badgeVariants>['variant']
+>;
+
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}

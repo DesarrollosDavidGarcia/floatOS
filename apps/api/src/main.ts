@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -12,8 +13,26 @@ async function bootstrap() {
   // no por la IP del reverse proxy.
   app.set('trust proxy', 1);
 
+  // Cabeceras de seguridad básicas (defensa en profundidad; Nginx puede añadir
+  // más). Evita una dependencia externa para lo esencial.
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-DNS-Prefetch-Control', 'off');
+    next();
+  });
+
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: true, credentials: true });
+  // CORS: en producción se restringe vía CORS_ORIGIN (lista coma-separada),
+  // coherente con el gateway WS. Sin la variable (dev) se refleja el origen.
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0)
+    : true;
+  app.enableCors({ origin: corsOrigin, credentials: true });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

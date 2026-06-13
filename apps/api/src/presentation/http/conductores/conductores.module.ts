@@ -7,8 +7,11 @@ import { ActualizarConductorUseCase } from '../../../application/conductores/act
 import { EliminarConductorUseCase } from '../../../application/conductores/eliminar-conductor.usecase';
 import { ListarViajesConductorUseCase } from '../../../application/conductores/listar-viajes-conductor.usecase';
 import { DocumentosConductorUseCase } from '../../../application/conductores/documentos-conductor.usecase';
+import { ArchivosDocumentoConductorUseCase } from '../../../application/conductores/archivos-documento-conductor.usecase';
+import { ArchivosExpedienteModule } from './expediente/archivos-expediente.module';
 
 @Module({
+  imports: [ArchivosExpedienteModule],
   controllers: [ConductoresController],
   providers: [
     CrearConductorUseCase,
@@ -18,6 +21,7 @@ import { DocumentosConductorUseCase } from '../../../application/conductores/doc
     EliminarConductorUseCase,
     ListarViajesConductorUseCase,
     DocumentosConductorUseCase,
+    ArchivosDocumentoConductorUseCase,
   ],
   exports: [
     CrearConductorUseCase,

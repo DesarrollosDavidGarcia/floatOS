@@ -1,24 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { toast } from '@/components/ui/sonner';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { SearchInput } from '@/components/search-input';
+import { PaginacionFooter } from '@/components/paginacion-footer';
+import { EstadoTabla } from '@/components/estado-tabla';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ClienteFormDialog } from '@/components/clientes/cliente-form-dialog';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CeldaPrincipal, unirSub } from '@/components/conductores/expediente/tabla-ui';
 import type { Cliente, Paginado } from './tipos';
 
@@ -46,8 +40,6 @@ export default function ClientesPage() {
   const [page, setPage] = useState(1);
   const debouncedQ = useDebounce(busqueda, 350);
 
-  const [crearOpen, setCrearOpen] = useState(false);
-  const [editando, setEditando] = useState<Cliente | null>(null);
   const [eliminarCliente, setEliminarCliente] = useState<Cliente | null>(null);
 
   const query = useQuery({
@@ -97,20 +89,18 @@ export default function ClientesPage() {
         description="Administra los clientes a los que asignas viajes."
         action={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por razón social, RFC…"
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <Button className="shrink-0" onClick={() => setCrearOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" /> Nuevo cliente
+            <SearchInput
+              value={busqueda}
+              onChange={(v) => {
+                setBusqueda(v);
+                setPage(1);
+              }}
+              placeholder="Buscar por razón social, RFC…"
+            />
+            <Button asChild className="shrink-0">
+              <Link href="/clientes/crear">
+                <Plus /> Nuevo cliente
+              </Link>
             </Button>
           </div>
         }
@@ -124,7 +114,7 @@ export default function ClientesPage() {
                 Cliente
               </TableHead>
               <TableHead className="text-xs uppercase text-muted-foreground">
-                Teléfono
+                Contacto principal
               </TableHead>
               <TableHead className="hidden md:table-cell text-xs uppercase text-muted-foreground">
                 Dirección
@@ -135,155 +125,108 @@ export default function ClientesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {query.isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={4}>
-                    <Skeleton className="h-10 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : query.isError ? (
-              <TableRow>
-                <TableCell colSpan={4} className="py-10 text-center text-destructive">
-                  {apiError(query.error)}
-                </TableCell>
-              </TableRow>
-            ) : filas.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="py-10 text-center text-muted-foreground"
-                >
-                  {debouncedQ
-                    ? 'No se encontraron clientes para tu búsqueda.'
-                    : 'Aún no hay clientes registrados.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filas.map((cliente) => (
-                <TableRow key={cliente.id}>
-                  {/* Cliente: razón social + RFC · contacto */}
-                  <TableCell>
-                    <CeldaPrincipal
-                      titulo={cliente.razonSocial}
-                      subtitulo={unirSub(cliente.rfc, cliente.contactoNombre, cliente.contactoEmail)}
-                    />
-                  </TableCell>
+            <EstadoTabla
+              colSpan={4}
+              loading={query.isLoading}
+              error={query.isError ? apiError(query.error) || 'No se pudieron cargar los clientes.' : null}
+              vacio={filas.length === 0}
+              vacioMensaje={
+                debouncedQ
+                  ? 'No se encontraron clientes para tu búsqueda.'
+                  : 'Aún no hay clientes registrados.'
+              }
+            >
+              {filas.map((cliente) => {
+                const contacto = cliente.contactos?.[0];
+                return (
+                  <TableRow key={cliente.id}>
+                    {/* Cliente: razón social + RFC */}
+                    <TableCell>
+                      <CeldaPrincipal
+                        titulo={
+                          <Link href={`/clientes/${cliente.id}/editar`} className="hover:underline">
+                            {cliente.razonSocial}
+                          </Link>
+                        }
+                        subtitulo={cliente.rfc || undefined}
+                      />
+                    </TableCell>
 
-                  {/* Teléfono */}
-                  <TableCell>{cliente.contactoTelefono || '—'}</TableCell>
+                    {/* Contacto principal: nombre + correo · teléfono */}
+                    <TableCell>
+                      {contacto ? (
+                        <CeldaPrincipal
+                          titulo={contacto.nombre}
+                          subtitulo={unirSub(contacto.email, contacto.telefono)}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
 
-                  {/* Dirección */}
-                  <TableCell className="hidden md:table-cell max-w-[200px] truncate">
-                    {cliente.direccion || '—'}
-                  </TableCell>
+                    {/* Dirección */}
+                    <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+                      {cliente.direccion || '—'}
+                    </TableCell>
 
-                  {/* Acciones */}
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Acciones">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onSelect={() => setEditando(cliente)}>
-                          <Pencil className="h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => setEliminarCliente(cliente)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+                    {/* Acciones */}
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label="Acciones">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/clientes/${cliente.id}/editar`}>
+                              <Pencil className="h-4 w-4" /> Editar
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => setEliminarCliente(cliente)}
+                          >
+                            <Trash2 className="h-4 w-4" /> Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </EstadoTabla>
           </TableBody>
         </Table>
       </div>
 
-      {/* Conteo + paginación — siempre visible cuando hay filas */}
-      {data && filas.length > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {total} {total === 1 ? 'cliente' : 'clientes'} · Página {data.page} de{' '}
-            {totalPaginas}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPaginas}
-              onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
-            >
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Crear */}
-      <ClienteFormDialog open={crearOpen} onOpenChange={setCrearOpen} />
-
-      {/* Editar */}
-      <ClienteFormDialog
-        cliente={editando}
-        open={editando !== null}
-        onOpenChange={(o) => {
-          if (!o) setEditando(null);
-        }}
+      <PaginacionFooter
+        page={page}
+        totalPaginas={totalPaginas}
+        total={total}
+        singular="cliente"
+        plural="clientes"
+        onPage={setPage}
       />
 
       {/* Confirmar eliminación */}
-      <Dialog
+      <ConfirmDialog
         open={Boolean(eliminarCliente)}
         onOpenChange={(o) => {
           if (!o) setEliminarCliente(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar cliente</DialogTitle>
-            <DialogDescription>
-              {eliminarCliente
-                ? `¿Eliminar a "${eliminarCliente.razonSocial}"? Esta acción no se puede deshacer.`
-                : ''}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEliminarCliente(null)}
-              disabled={eliminar.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() =>
-                eliminarCliente && eliminar.mutate(eliminarCliente.id)
-              }
-              disabled={eliminar.isPending}
-            >
-              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Eliminar cliente"
+        description={
+          eliminarCliente
+            ? `¿Eliminar a "${eliminarCliente.razonSocial}"? Esta acción no se puede deshacer.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        onConfirm={async () => {
+          if (eliminarCliente) await eliminar.mutateAsync(eliminarCliente.id);
+        }}
+      />
     </div>
   );
 }
