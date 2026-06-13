@@ -388,7 +388,8 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - Creación con **itinerario multi-escala**: varias paradas, carga por escala (recoger/entregar/reemplazar) y motor de evaluación de unidad
 - **Ruteo por carretera (TomTom)** con caché: distancia y **ETA** reales, **trazo de la ruta** en el mapa; `departAt` con tráfico predicho; fallback geodésico (PostGIS)
 - **Plan multi-día**: el monitorista define la jornada (horas/día, descanso, escala, hora de inicio) → **fecha de llegada estimada**
-- Asignación de unidad y conductor
+- Asignación de unidad y conductor — selector con **nombre completo + chip de disponibilidad** (Disponible / estado de su viaje en curso); el API **rechaza (409) asignar un conductor ocupado**
+- **Regla cotización→conductor**: un viaje con cotización sin aceptar (o rechazada) **no le aparece al conductor** ni puede aceptarlo, mientras siga en ASIGNADO
 - **Duplicar viaje** (copia itinerario + cliente + fecha + plan; sin asignación)
 - Estados: `asignado → aceptado → en camino al origen → cargando → en tránsito → entregado → facturado`
 - Historial y búsqueda
@@ -396,6 +397,7 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 ### 5. Tracking en tiempo real
 - GPS en background desde Flutter (`flutter_background_service` + `geolocator`)
 - Posición en tiempo real vía Socket.io al panel del monitorista
+- **Detalle del viaje en vivo**: estado, historial y posición del conductor se actualizan sin recargar (sala WS `viaje:<id>`)
 - Geocercas: notificación de llegada a origen y destino
 - Link de seguimiento público para cliente final (sin login)
 - Alerta si un viaje lleva N minutos sin actualizar posición
@@ -404,6 +406,7 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 - Login y selección de unidad asignada
 - Lista de viajes asignados (hoy y próximos)
 - Cambio de estado del viaje con un tap
+- Mapa del viaje con la **ruta real por carretera** (reutiliza `rutaGeometria` ya calculada — sin llamadas extra a TomTom)
 - Tracking GPS en background durante viaje
 - POD: foto de mercancía + firma digital del receptor + geolocalización + timestamp
 - Registro de gastos: combustible, casetas, viáticos (foto del ticket)
@@ -1049,6 +1052,73 @@ Sesión dedicada a la **app Flutter del conductor** (Fase 1): de cero a probada 
 - **Fase 2 — Parte B timbrado Carta Porte** (SW Sapien; la configuración ya está desde la Parte A).
 - **Pendiente de Fase 1:** página pública de seguimiento (`/seguimiento/<token>`, API ya existe).
 - **Recordatorios previos:** rotar API key de Brevo; recomendaciones de auditoría web (RFC/CP vs catálogos SAT, `ArchivoSubido` duplicado, logo/CSD transaccional).
+
+### 2026-06-12 — Detalle de viaje en tiempo real (panel ↔ app del conductor) ✅
+
+Rama `feat/tomtom-ruteo`. La página **`/viajes/[id]`** del panel ahora reacciona **en vivo** a lo que hace el conductor desde la app Flutter, sin recargar. Cambio solo de frontend — la API ya emitía todo a la sala `viaje:<id>`.
+
+- **Hook `useViajeEnVivo(viajeId)`** (`components/viajes/use-viaje-en-vivo.ts`): se suscribe a la sala del viaje (reutiliza `lib/socket.ts`, re-suscribe al reconectar); al llegar `viaje:estado` **invalida la query `['viaje', id]`** → badge de estado, historial y botones de transición se refrescan solos; devuelve la última posición GPS recibida; al llegar `alerta` de geocerca muestra un toast ("El conductor llegó a la parada N"). Limpia listeners + `desuscribir` + cierra el socket al desmontar.
+- **Camión en vivo en el mapa del detalle:** `MapaItinerario` acepta `posicionConductor` y pinta el punto rojo (mismo estilo que `/tracking`) con popup de velocidad/hora. La **posición inicial** se siembra con la última conocida (`GET /tracking/:token` vía el `trackingToken` del viaje, solo en estados activos) para no esperar al siguiente punto; los eventos WS la van moviendo. Indicador "en vivo" (punto verde pulsante) en la descripción de la tarjeta del mapa.
+- **Bug corregido en `/tracking`:** el handler de `viaje:estado` esperaba `payload.estado`, pero la API emite `estadoNuevo` → el cambio de estado en vivo del mapa general **nunca se aplicaba** (lo tapaba el `refetchInterval` de 60 s). Corregido a `estadoNuevo`.
+
+**Verificado:** `tsc` web en verde; **smoke E2E del contrato WS** con un cliente socket.io real (admin suscrito a la sala + acciones del conductor por API): suscripción `{ok:true}`, `PATCH estado` → evento `viaje:estado` con `estadoNuevo:'ACEPTADO'`, `POST ubicacion` → evento `ubicacion:actualizada` con lat/lng numéricos y `viajeId` correcto; página de detalle 200; `GET /tracking/:token` devuelve la `ultimaUbicacion` para la siembra inicial. *(Nota: la prueba avanzó el viaje #4 de demo de ASIGNADO → ACEPTADO y la password de app del conductor `pedro` quedó en `Prueba1234!`.)*
+
+### 2026-06-12 — Auditoría del tiempo real + fixes, y ruta TomTom en la app Flutter ✅
+
+Rama `feat/tomtom-ruteo`. Auditoría multiagente del cambio anterior (7 ángulos de búsqueda + 1 verificador por hallazgo): **8 confirmados/plausibles, 4 descartados** (entre ellos un falso "simplificable": el reset de posición al cambiar de viaje es necesario porque App Router no remonta la página al cambiar el `[id]`).
+
+**Fixes aplicados (los 3 de mayor severidad):**
+- **(🔴 UX) `fitBounds` en cada punto GPS:** `puntos`/`conCoords` del `MapaItinerario` ahora son `useMemo` → el efecto `Encuadrar` solo re-encuadra cuando cambian las escalas; antes, cada punto GPS le quitaba el pan/zoom al monitorista.
+- **(🟠 Perf) Re-render de página completa por punto GPS:** la tarjeta del mapa se extrajo a **`MapaViajeCard`** (componente propio que contiene `useViajeEnVivo` + la query de posición inicial) → los puntos GPS re-renderizan solo la tarjeta, no el itinerario/plan/tarjetas.
+- **(🟡 Eficiencia) Invalidación por prefijo:** la query de posición inicial pasa de `['viaje', id, 'ultima-posicion']` a **`['viaje-ultima-posicion', id]`** — el `invalidateQueries(['viaje', id])` de cada cambio de estado ya no re-dispara el GET al endpoint público.
+
+**Pendientes registrados (no bloqueantes):** mover los contratos de payload WS a `shared-types` y tipar las firmas del gateway (la causa raíz del bug `estado`/`estadoNuevo`); extraer marcador de conductor compartido; helper `horaCorta()` en `lib/fecha.ts`; no suscribirse en estados FACTURADO/CANCELADO.
+
+**Ruta por carretera en la app Flutter (sin llamar a TomTom):** el detalle del viaje en la app ahora pinta el **trazo real por carretera** reutilizando `viajes.rutaGeometria` (el snapshot que el API ya persiste y que el `GET /viajes/:id` del conductor ya incluía) — cero llamadas nuevas al servicio de ruteo y cero cambios de backend. `Viaje.fromJson` parsea `rutaGeometria` (pares `[lat, lng]`, tolerante a entradas malformadas) y `_Mapa` dibuja la polilínea **sólida** siguiendo las vías (encuadre a la ruta completa); sin geometría, conserva el punteado entre paradas.
+
+**Verificado:** `tsc` web en verde y detalle 200 tras el refactor; `flutter analyze` 0 issues; **7/7 tests** (+1 de parseo/sanitización de geometría); en vivo: el detalle del conductor del viaje #4 devuelve **554 puntos** `[lat,lng]` (CDMX→QRO) y sigue sin exponer `trackingToken`; `flutter build apk --debug` OK.
+
+### 2026-06-12 — Regla de negocio: viajes con cotización sin aceptar no llegan al conductor ✅
+
+Rama `feat/tomtom-ruteo`. Validación nueva **en el backend** (la app Flutter no necesita cambios): un viaje cuya cotización el cliente **aún no acepta** (BORRADOR/ENVIADA) **o rechazó** no debe aparecerle al conductor ni poder ser aceptado por él.
+
+**Regla (en `visibilidad-conductor.helper.ts`, fuente única):** se oculta el viaje solo si (a) sigue en **ASIGNADO** (el conductor aún no lo acepta), (b) **tiene** cotizaciones y (c) **ninguna** está ACEPTADA. Decisiones de diseño: los viajes **sin cotización siguen visibles** (cotizar es opcional en el sistema); un viaje **ya en curso nunca se oculta** aunque la cotización se reabra después (no desaparecer operaciones en marcha con GPS activo); la regla aplica solo al **conductor autenticado** (`paraConductor`), no al admin filtrando por conductor.
+
+**Aplicada en 3 puntos:** `GET /viajes` del conductor (filtro Prisma `FILTRO_VISIBLE_PARA_CONDUCTOR`); `GET /viajes/:id` del conductor (**404**, sin revelar existencia — mismo criterio que viaje ajeno); y `PATCH /viajes/:id/estado` ASIGNADO→ACEPTADO por conductor (**409** "La cotización del viaje aún no está aceptada por el cliente") — el cierre real, porque ocultar la lista no es seguridad.
+
+**Verificado:** `tsc` API en verde, **41/41 tests**; smoke en vivo (8/8): viaje asignado sin cotización → visible; con cotización BORRADOR → oculto en lista + detalle 404 + aceptar 409; RECHAZADA → sigue oculto; ACEPTADA → visible y aceptar 200; admin filtrando por conductor lo ve siempre.
+
+### 2026-06-12 — Disponibilidad de conductores: chips en el selector + validación de asignación ✅
+
+Rama `feat/tomtom-ruteo`. Al crear/editar/asignar un viaje, el selector de conductor muestra el **nombre completo** y un **chip de disponibilidad**, y el backend **impide asignar un conductor ocupado**.
+
+**Regla (en `disponibilidad-conductor.helper.ts`):** un conductor está **ocupado** si tiene un viaje en estado abierto (`ASIGNADO/ACEPTADO/EN_CAMINO_ORIGEN/CARGANDO/EN_TRANSITO`); los estados cerrados (ENTREGADO/FACTURADO/CANCELADO) lo liberan. **Reasignarlo a su mismo viaje no es conflicto** (se excluye el viaje actual).
+
+**Backend:** `GET /conductores` ahora incluye **`viajeActivo`** (`{id, folio, estado}` del viaje abierto, o `null`) — un solo include extra; `asegurarConductorDisponible` lanza **409** ("El conductor ya tiene el viaje #N en curso (estado)") en **`PATCH /viajes/:id/asignar`** y **`POST /viajes`** con conductor.
+
+**Web:** componente compartido `ConductorSelectItems` (form de viaje + diálogo Asignar): cada opción muestra nombre completo (antes solo el nombre de pila) + chip — **"Disponible"** (verde), el **estado de su viaje** (p. ej. "En tránsito · #7", deshabilitado = espejo del 409), o **"Este viaje"** (seleccionable, al reasignar). Disponibles se listan primero; el catálogo se invalida al guardar asignaciones (chips frescos).
+
+**Verificado:** `tsc` API+web en verde, 41/41 tests; smoke en vivo: listado con `viajeActivo` correcto, asignar ocupado → 409, crear viaje con conductor ocupado → 409, reasignar al mismo viaje → 200, conductor libre → 200 y pasa a ocupado en el listado; conductor con viaje ENTREGADO aparece Disponible; `/viajes/crear` y detalle 200. *(Datos de prueba: conductora `laura`/`Prueba1234!` y un viaje #6 asignado a ella.)*
+
+### 2026-06-12 — Resumen de la sesión 📌
+
+Sesión sobre **tiempo real en el panel** y **reglas de negocio de asignación**. Todo en la rama `feat/tomtom-ruteo` (sin commitear aún). Detalle en las 5 entradas de arriba:
+
+- **Detalle de viaje en tiempo real:** la página `/viajes/[id]` reacciona en vivo a la app del conductor — estado/historial se refrescan solos y el **camión se mueve en el mapa** (hook `useViajeEnVivo` + siembra de última posición). De paso se corrigió un bug latente en `/tracking` (el evento `viaje:estado` emite `estadoNuevo`, no `estado`).
+- **Auditoría multiagente del cambio + 3 fixes** (fitBounds que robaba el pan/zoom en cada punto GPS, re-render de página completa aislado en `MapaViajeCard`, invalidación por prefijo) y pendientes menores registrados.
+- **Ruta TomTom en la app Flutter:** el mapa del detalle pinta el **trazo real por carretera** reutilizando `viajes.rutaGeometria` ya persistida — **cero llamadas nuevas a TomTom** y cero cambios de backend.
+- **Regla cotización→conductor:** un viaje con cotización **sin aceptar o rechazada** no le aparece al conductor (lista + detalle 404) ni puede aceptarlo (409). Solo aplica en ASIGNADO; viajes sin cotización no se afectan.
+- **Disponibilidad de conductores:** selector con **nombre completo + chip** (Disponible / estado del viaje en curso / "Este viaje") y **409 al asignar un conductor ocupado** (asignar y crear).
+
+**Verificado globalmente:** `tsc` API+web en verde, **41/41 tests** API, `flutter analyze` 0 issues, **7/7 tests** mobile, APK debug compila; smokes en vivo de cada flujo (contrato WS, visibilidad por cotización 8/8, disponibilidad).
+
+**Para continuar (próxima sesión):**
+- **Commitear y mergear `feat/tomtom-ruteo` → `main`** (main sigue ~47 commits atrás + todo lo de hoy sin commitear).
+- **Pendientes de auditoría (no bloqueantes):** mover los **contratos de payload WS a `shared-types`** y tipar el gateway (causa raíz del bug `estado`/`estadoNuevo`); marcador de conductor compartido; helper `horaCorta()` en `lib/fecha.ts`; no suscribirse al WS en estados FACTURADO/CANCELADO.
+- **Follow-ups de hoy:** replicar disponibilidad/chips para **unidades** (el helper ya existe); avisar al conductor en vivo cuando su cotización se acepte (hoy aparece al refrescar).
+- **Pendiente de Fase 1:** página pública de seguimiento (`/seguimiento/<token>`, API ya existe); validar GPS background en dispositivo físico.
+- **Fase 2:** endpoints de POD y gastos + pantallas en la app; Parte B del timbrado Carta Porte (SW Sapien).
+- **Recordatorios:** rotar la API key de Brevo; datos fiscales reales del emisor; limpiar datos de prueba (pedro tiene 2 viajes abiertos previos a la regla; conductora `laura` de smoke).
 
 ---
 
