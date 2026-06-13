@@ -10,6 +10,22 @@ double? _aDouble(dynamic v) => switch (v) {
 DateTime? _aFecha(dynamic v) =>
     v == null ? null : DateTime.parse(v as String).toLocal();
 
+/// Polilínea de la ruta por carretera: lista de pares `[lat, lng]` tal como
+/// la persiste el API (`viajes.rutaGeometria`, snapshot de TomTom ya
+/// simplificado). Tolerante a entradas malformadas: las descarta.
+List<List<double>> _aGeometria(dynamic v) {
+  if (v is! List) return const [];
+  final puntos = <List<double>>[];
+  for (final p in v) {
+    if (p is! List || p.length < 2) continue;
+    final lat = _aDouble(p[0]);
+    final lng = _aDouble(p[1]);
+    if (lat == null || lng == null) continue;
+    puntos.add([lat, lng]);
+  }
+  return puntos;
+}
+
 /// Carga de una escala (recoger / entregar).
 class CargaEscala {
   CargaEscala({
@@ -129,6 +145,7 @@ class Viaje {
     this.unidadDescripcion,
     this.escalas = const [],
     this.historial = const [],
+    this.rutaGeometria = const [],
   });
 
   final String id;
@@ -152,6 +169,10 @@ class Viaje {
   final String? unidadDescripcion;
   final List<Escala> escalas;
   final List<HistorialEstado> historial;
+
+  /// Ruta por carretera ya calculada por el API (pares `[lat, lng]`);
+  /// vacía si el viaje no tiene trazo (se aproxima uniendo las paradas).
+  final List<List<double>> rutaGeometria;
 
   String get folioTexto => 'Viaje #$folio';
 
@@ -190,6 +211,7 @@ class Viaje {
       historial: (json['historial'] as List<dynamic>? ?? [])
           .map((h) => HistorialEstado.fromJson(h as Map<String, dynamic>))
           .toList(),
+      rutaGeometria: _aGeometria(json['rutaGeometria']),
     );
   }
 }

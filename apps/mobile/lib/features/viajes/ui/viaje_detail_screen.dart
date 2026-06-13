@@ -344,6 +344,15 @@ class _Mapa extends StatelessWidget {
     }
     if (puntos.isEmpty) return const SizedBox.shrink();
 
+    // Ruta por carretera ya calculada por el API (snapshot de TomTom):
+    // se pinta sólida siguiendo las vías, sin llamar a ningún servicio de
+    // ruteo desde la app. Sin geometría, se une las paradas en punteado.
+    final rutaCarretera = <LatLng>[
+      for (final p in viaje.rutaGeometria) LatLng(p[0], p[1]),
+    ];
+    final usaCarretera = rutaCarretera.length >= 2;
+    final trazo = usaCarretera ? rutaCarretera : puntos;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: SizedBox(
@@ -352,9 +361,9 @@ class _Mapa extends StatelessWidget {
           options: MapOptions(
             initialCenter: puntos.first,
             initialZoom: 13,
-            initialCameraFit: puntos.length > 1
+            initialCameraFit: trazo.length > 1
                 ? CameraFit.coordinates(
-                    coordinates: puntos,
+                    coordinates: trazo,
                     padding: const EdgeInsets.all(36),
                   )
                 : null,
@@ -370,17 +379,19 @@ class _Mapa extends StatelessWidget {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'mx.flotaos.flotaos_conductor',
             ),
-            if (puntos.length > 1)
+            if (trazo.length > 1)
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: puntos,
+                    points: trazo,
                     strokeWidth: 3,
                     color: Theme.of(context)
                         .colorScheme
                         .primary
-                        .withValues(alpha: 0.7),
-                    pattern: const StrokePattern.dotted(),
+                        .withValues(alpha: usaCarretera ? 0.85 : 0.7),
+                    pattern: usaCarretera
+                        ? const StrokePattern.solid()
+                        : const StrokePattern.dotted(),
                   ),
                 ],
               ),

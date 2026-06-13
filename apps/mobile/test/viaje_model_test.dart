@@ -64,6 +64,11 @@ void main() {
             'createdAt': '2026-06-11T10:00:00.000Z',
           }
         ],
+        'rutaGeometria': [
+          [19.43, -99.13],
+          [19.80, -99.55],
+          [20.59, -100.39],
+        ],
       });
 
       expect(viaje.folio, 42);
@@ -75,6 +80,33 @@ void main() {
       expect(viaje.escalas.map((e) => e.orden).toList(), [0, 1]);
       expect(viaje.escalas.last.cargas.single.esRecoger, isFalse);
       expect(viaje.historial.single.estadoNuevo, EstadoViaje.enTransito);
+      // Ruta por carretera persistida por el API: pares [lat, lng].
+      expect(viaje.rutaGeometria, hasLength(3));
+      expect(viaje.rutaGeometria.first, [19.43, -99.13]);
+    });
+
+    test('descarta geometría malformada sin romper el parseo', () {
+      final viaje = Viaje.fromJson({
+        'id': 'v3',
+        'folio': 8,
+        'estado': 'ASIGNADO',
+        'origenDireccion': 'A',
+        'destinoDireccion': 'B',
+        'tipoCarga': 'GENERAL',
+        'pesoKg': 100,
+        'distanciaEstimadaKm': 0,
+        'rutaGeometria': [
+          [19.43, -99.13],
+          'basura',
+          [20.59], // incompleto
+          [null, -100.0],
+          ['20.59', '-100.39'], // tolerante a strings numéricos
+        ],
+      });
+      expect(viaje.rutaGeometria, [
+        [19.43, -99.13],
+        [20.59, -100.39],
+      ]);
     });
 
     test('tolera campos opcionales nulos', () {
