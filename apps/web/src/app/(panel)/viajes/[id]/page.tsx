@@ -1,12 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, ArrowLeft, Building2, Copy, MapPin, Pencil, Truck, User } from 'lucide-react';
+import { ArrowLeft, Building2, Copy, MapPin, Pencil, Truck, User } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
@@ -28,20 +27,8 @@ import { VeredictoUnidadCard } from '@/components/viajes/veredicto-unidad-card';
 import { CotizacionesCard } from '@/components/cotizaciones/cotizaciones-card';
 import { PlanRutaDialog } from '@/components/viajes/plan-ruta-dialog';
 import { formatearDuracion, planificarRuta } from '@/components/viajes/plan-ruta';
+import { MapaViajeCard } from '@/components/viajes/mapa-viaje-card';
 import type { Viaje } from '@/components/viajes/types';
-
-// Mapa con Leaflet: usa `window`, se carga solo en cliente.
-const MapaItinerario = dynamic(
-  () => import('@/components/viajes/mapa-itinerario'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="grid h-full place-items-center text-sm text-muted-foreground">
-        Cargando mapa…
-      </div>
-    ),
-  },
-);
 
 function Dato({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -112,15 +99,6 @@ export default function ViajeDetallePage() {
       </div>
     );
   }
-
-  // Ruta aproximada: hay ≥2 paradas con coordenadas pero no se trazó por carretera
-  // (TomTom no pudo enganchar algún pin a una vía, o no hay key) → se pinta recta.
-  const escalasConCoords = (viaje.escalas ?? []).filter(
-    (e) => e.lat != null && e.lng != null,
-  ).length;
-  const rutaAproximada =
-    escalasConCoords >= 2 &&
-    !(Array.isArray(viaje.rutaGeometria) && viaje.rutaGeometria.length >= 2);
 
   const salidaPlan = viaje.fechaProgramada ? new Date(viaje.fechaProgramada) : null;
   const plan =
@@ -236,36 +214,7 @@ export default function ViajeDetallePage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Mapa del itinerario</CardTitle>
-              <CardDescription>
-                Escalas y ruta en orden (origen → destino).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {rutaAproximada && (
-                <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Ruta aproximada en <strong>línea recta</strong>: no se pudo calcular
-                    por carretera. Revisa que cada parada esté sobre una vía —{' '}
-                    <Link href={`/viajes/${viaje.id}/editar`} className="font-medium underline">
-                      edita el viaje
-                    </Link>{' '}
-                    y vuelve a ubicar el pin con el buscador de direcciones (o acercando
-                    el mapa), luego guarda para recalcular.
-                  </span>
-                </div>
-              )}
-              <div className="h-80 w-full">
-                <MapaItinerario
-                  escalas={viaje.escalas ?? []}
-                  geometria={viaje.rutaGeometria ?? null}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <MapaViajeCard viaje={viaje} />
 
           <Card>
             <CardHeader>

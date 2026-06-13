@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
+  CircleMarker,
   MapContainer,
   Marker,
   Polyline,
@@ -12,6 +13,7 @@ import {
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { EscalaViaje } from './types';
+import type { PosicionViaje } from '@/components/tracking/tipos';
 
 const ZOOM_INICIAL = 6;
 const ZOOM_PUNTO_UNICO = 13;
@@ -50,19 +52,32 @@ function Encuadrar({ puntos }: { puntos: [number, number][] }) {
  * Mapa del itinerario: dibuja cada escala con coordenadas como marcador numerado
  * y la ruta como polilínea. Si llega `geometria` (ruta por carretera de TomTom),
  * la traza siguiendo los caminos; si no, une las escalas con líneas rectas.
+ * `posicionConductor` (opcional) pinta la posición GPS del conductor en vivo.
  * Usa `window` (Leaflet) → montar con next/dynamic({ ssr:false }).
  */
 export default function MapaItinerario({
   escalas,
   geometria,
+  posicionConductor,
 }: {
   escalas: EscalaViaje[];
   geometria?: [number, number][] | null;
+  posicionConductor?: PosicionViaje | null;
 }) {
-  const conCoords = [...escalas]
-    .sort((a, b) => a.orden - b.orden)
-    .filter((e) => e.lat != null && e.lng != null);
-  const puntos = conCoords.map((e) => [e.lat as number, e.lng as number] as [number, number]);
+  // Identidad estable mientras no cambien las escalas: `Encuadrar` depende de
+  // `puntos` y un fitBounds en cada render (p. ej. por la posición GPS en vivo)
+  // le quitaría el pan/zoom al usuario.
+  const conCoords = useMemo(
+    () =>
+      [...escalas]
+        .sort((a, b) => a.orden - b.orden)
+        .filter((e) => e.lat != null && e.lng != null),
+    [escalas],
+  );
+  const puntos = useMemo(
+    () => conCoords.map((e) => [e.lat as number, e.lng as number] as [number, number]),
+    [conCoords],
+  );
 
   // Ruta por carretera si viene; si no, las escalas en línea recta (aproximación).
   const usaCarretera = Boolean(geometria && geometria.length >= 2);
@@ -109,6 +124,35 @@ export default function MapaItinerario({
           </Popup>
         </Marker>
       ))}
+      {/* Posición en vivo del conductor (mismo estilo que el mapa de tracking). */}
+      {posicionConductor ? (
+        <CircleMarker
+          center={[posicionConductor.lat, posicionConductor.lng]}
+          radius={9}
+          pathOptions={{
+            color: '#ffffff',
+            weight: 2,
+            fillColor: '#dc2626',
+            fillOpacity: 0.95,
+          }}
+        >
+          <Popup>
+            <strong>Posición del conductor</strong>
+            {posicionConductor.velocidad != null ? (
+              <>
+                <br />
+                Velocidad: {Math.round(posicionConductor.velocidad)} km/h
+              </>
+            ) : null}
+            {posicionConductor.capturadoEn ? (
+              <>
+                <br />
+                {new Date(posicionConductor.capturadoEn).toLocaleTimeString('es-MX')}
+              </>
+            ) : null}
+          </Popup>
+        </CircleMarker>
+      ) : null}
     </MapContainer>
   );
 }

@@ -30,10 +30,10 @@ const Mapa = dynamic(() => import('@/components/tracking/mapa'), {
   ),
 });
 
-/** Payload del evento WS 'viaje:estado'. */
+/** Payload del evento WS 'viaje:estado' (ver cambiar-estado-viaje.usecase). */
 interface CambioEstadoEvento {
   viajeId: string;
-  estado: EstadoViaje;
+  estadoNuevo: EstadoViaje;
 }
 
 async function cargarViajesActivos(): Promise<ViajeActivo[]> {
@@ -122,8 +122,8 @@ export default function TrackingPage() {
     };
 
     const onEstado = (payload: CambioEstadoEvento) => {
-      if (!payload?.viajeId || !payload.estado) return;
-      setEstadosVivo((prev) => ({ ...prev, [payload.viajeId]: payload.estado }));
+      if (!payload?.viajeId || !payload.estadoNuevo) return;
+      setEstadosVivo((prev) => ({ ...prev, [payload.viajeId]: payload.estadoNuevo }));
     };
 
     socket.on(WS_EVENTS.UBICACION_ACTUALIZADA, onUbicacion);
