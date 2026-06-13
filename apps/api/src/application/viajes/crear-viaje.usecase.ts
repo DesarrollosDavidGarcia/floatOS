@@ -16,6 +16,7 @@ import {
   snapshotRuta,
 } from './viaje-escalas.helper';
 import { CrearViajeInput, RELACIONES_DETALLE } from './viajes.types';
+import { asegurarConductorDisponible } from './disponibilidad-conductor.helper';
 
 /**
  * Caso de uso: crear un viaje con su itinerario de escalas. Valida cliente
@@ -74,6 +75,8 @@ export class CrearViajeUseCase {
           `El conductor ${input.conductorId} está inactivo`,
         );
       }
+      // Un conductor con un viaje abierto no puede recibir otro (409).
+      await asegurarConductorDisponible(this.prisma, input.conductorId);
     }
 
     const sim = simularCarga(itemsDeEscalas(input.escalas));

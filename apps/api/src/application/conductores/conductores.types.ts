@@ -40,6 +40,13 @@ export interface ConductorPublico {
   notasContratacion: string | null;
 }
 
+/** Resumen del viaje abierto que ocupa a un conductor (chip de disponibilidad). */
+export interface ViajeActivoConductor {
+  id: string;
+  folio: number;
+  estado: string;
+}
+
 /** Quita passwordHash y refreshTokenHash de un Conductor de Prisma. */
 export function aConductorPublico(conductor: Conductor): ConductorPublico {
   const { passwordHash: _passwordHash, refreshTokenHash: _refreshTokenHash, ...resto } =

@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AsignarViajeInput, RELACIONES_RESUMEN } from './viajes.types';
+import { asegurarConductorDisponible } from './disponibilidad-conductor.helper';
 
 /** Caso de uso: asignar o reasignar unidad y/o conductor a un viaje. */
 @Injectable()
@@ -61,6 +62,9 @@ export class AsignarViajeUseCase {
           `El conductor ${input.conductorId} está inactivo`,
         );
       }
+      // Un conductor con un viaje abierto no puede recibir otro (409);
+      // reasignarlo al mismo viaje sí está permitido.
+      await asegurarConductorDisponible(this.prisma, input.conductorId, id);
       data.conductor = { connect: { id: input.conductorId } };
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { EstadoViaje } from '@flotaos/shared-types';
 import { api } from '@/lib/api';
 import type { OpcionCatalogo } from './types';
 
@@ -17,6 +18,13 @@ interface UnidadApi {
 interface ConductorApi {
   id: string;
   nombre: string;
+  apellidos: string | null;
+  viajeActivo: { id: string; folio: number; estado: EstadoViaje } | null;
+}
+
+/** Opción del selector de conductor: nombre completo + viaje que lo ocupa. */
+export interface OpcionConductor extends OpcionCatalogo {
+  viajeActivo: { id: string; folio: number; estado: EstadoViaje } | null;
 }
 
 interface PaginadoApi<T> {
@@ -54,15 +62,19 @@ export function useUnidadesCatalogo() {
   });
 }
 
-/** Catálogo de conductores para selects. */
+/** Catálogo de conductores para selects, con su disponibilidad. */
 export function useConductoresCatalogo() {
-  return useQuery<OpcionCatalogo[]>({
+  return useQuery<OpcionConductor[]>({
     queryKey: ['catalogo', 'conductores'],
     queryFn: async () => {
       const { data } = await api.get<PaginadoApi<ConductorApi>>('/conductores', {
         params: { pageSize: 100 },
       });
-      return data.data.map((c) => ({ id: c.id, label: c.nombre }));
+      return data.data.map((c) => ({
+        id: c.id,
+        label: [c.nombre, c.apellidos].filter(Boolean).join(' '),
+        viajeActivo: c.viajeActivo ?? null,
+      }));
     },
   });
 }

@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useConductoresCatalogo, useUnidadesCatalogo } from './catalogos';
+import { ConductorSelectItems } from './conductor-select-items';
 
 const NINGUNO = '__ninguno__';
 
@@ -64,6 +65,8 @@ export function AsignarDialog({
     onSuccess: () => {
       toast.success('Asignación actualizada');
       invalidarViajes(qc, viajeId);
+      // La disponibilidad de los conductores cambió (chips del selector).
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'conductores'] });
       setOpen(false);
     },
     onError: (err) => toast.error(apiError(err)),
@@ -110,11 +113,10 @@ export function AsignarDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NINGUNO}>Sin asignar</SelectItem>
-                {(conductores.data ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
+                <ConductorSelectItems
+                  conductores={conductores.data ?? []}
+                  viajeIdActual={viajeId}
+                />
               </SelectContent>
             </Select>
           </div>

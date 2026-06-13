@@ -24,6 +24,7 @@ import {
   useConductoresCatalogo,
   useUnidadesCatalogo,
 } from '../catalogos';
+import { ConductorSelectItems } from '../conductor-select-items';
 import type { Viaje } from '../types';
 import { ItinerarioBuilder } from './itinerario-builder';
 import { PanelMotor } from './panel-motor';
@@ -81,6 +82,8 @@ export function ViajeFormPage({
     onSuccess: (v) => {
       toast.success(mode === 'crear' ? 'Viaje creado' : 'Viaje actualizado');
       invalidarViajes(qc, v.id);
+      // La disponibilidad de los conductores cambió (chips del selector).
+      void qc.invalidateQueries({ queryKey: ['catalogo', 'conductores'] });
       router.push(`/viajes/${v.id}`);
     },
     onError: (err) => toast.error(apiError(err)),
@@ -171,9 +174,10 @@ export function ViajeFormPage({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NINGUNO}>Sin asignar</SelectItem>
-                    {(conductores.data ?? []).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                    ))}
+                    <ConductorSelectItems
+                      conductores={conductores.data ?? []}
+                      viajeIdActual={viaje?.id}
+                    />
                   </SelectContent>
                 </Select>
               </Campo>
