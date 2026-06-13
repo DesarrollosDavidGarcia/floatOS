@@ -53,9 +53,15 @@ export class ViajesController {
     @Query() filtros: ListarViajesDto,
     @CurrentUser() user: AuthPrincipal,
   ) {
-    // El conductor solo ve sus propios viajes.
+    // El conductor solo ve sus propios viajes, y nunca los que tienen una
+    // cotización sin aceptar por el cliente (paraConductor, no aplica cuando
+    // un admin filtra por conductor).
     if (user.type === 'conductor') {
-      return this.viajes.listar({ ...filtros, conductorId: user.sub });
+      return this.viajes.listar({
+        ...filtros,
+        conductorId: user.sub,
+        paraConductor: true,
+      });
     }
     return this.viajes.listar(filtros);
   }

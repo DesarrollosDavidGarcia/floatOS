@@ -150,4 +150,10 @@ export interface ListarViajesInput {
   q?: string;
   page?: number;
   pageSize?: number;
+  /**
+   * True cuando quien lista es un conductor (no un admin filtrando por
+   * conductor): aplica la regla de visibilidad de cotizaciones
+   * (ver visibilidad-conductor.helper).
+   */
+  paraConductor?: boolean;
 }

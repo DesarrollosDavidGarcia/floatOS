@@ -11,6 +11,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { mensajeTransicionInvalida } from '../../domain/viaje/transiciones-viaje';
 import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 import { CambiarEstadoInput, RELACIONES_RESUMEN } from './viajes.types';
+import { cotizacionSinAceptar } from './visibilidad-conductor.helper';
 
 /**
  * Caso de uso: cambiar el estado de un viaje validando la transición contra
@@ -61,6 +62,18 @@ export class CambiarEstadoViajeUseCase {
     const error = mensajeTransicionInvalida(estadoAnterior, estadoNuevo);
     if (error) {
       throw new BadRequestException(error);
+    }
+
+    // Un conductor no puede aceptar un viaje cuya cotización el cliente aún
+    // no acepta (o rechazó) — espejo de la regla de visibilidad del listado.
+    if (
+      conductorId &&
+      estadoNuevo === EstadoViaje.ACEPTADO &&
+      (await cotizacionSinAceptar(this.prisma, id))
+    ) {
+      throw new ConflictException(
+        'La cotización del viaje aún no está aceptada por el cliente',
+      );
     }
 
     const ahora = new Date();

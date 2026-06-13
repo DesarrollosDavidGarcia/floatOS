@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EstadoViaje } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { RELACIONES_DETALLE } from './viajes.types';
+import { cotizacionSinAceptar } from './visibilidad-conductor.helper';
 
 /** Caso de uso: obtener el detalle de un viaje con su historial de estados. */
 @Injectable()
@@ -24,6 +26,16 @@ export class ObtenerViajeUseCase {
     });
 
     if (!viaje || (conductorId && viaje.conductorId !== conductorId)) {
+      throw new NotFoundException(`Viaje con id ${id} no encontrado`);
+    }
+
+    // Mismo criterio que el listado del conductor: un viaje aún no aceptado
+    // por él (ASIGNADO) con cotización sin aceptar no existe para la app.
+    if (
+      conductorId &&
+      viaje.estado === EstadoViaje.ASIGNADO &&
+      (await cotizacionSinAceptar(this.prisma, id))
+    ) {
       throw new NotFoundException(`Viaje con id ${id} no encontrado`);
     }
 

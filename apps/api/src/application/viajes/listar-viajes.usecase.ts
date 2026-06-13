@@ -4,6 +4,7 @@ import { Paginado } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { paginar } from '../shared/paginar';
 import { ListarViajesInput, SELECCION_LISTADO } from './viajes.types';
+import { FILTRO_VISIBLE_PARA_CONDUCTOR } from './visibilidad-conductor.helper';
 
 /** Caso de uso: listar viajes con filtros, búsqueda y paginación. */
 @Injectable()
@@ -12,6 +13,11 @@ export class ListarViajesUseCase {
 
   async execute(filtros: ListarViajesInput): Promise<Paginado<unknown>> {
     const where: Prisma.ViajeWhereInput = {};
+
+    // Conductor: ocultar viajes ASIGNADO cuya cotización no fue aceptada.
+    if (filtros.paraConductor) {
+      Object.assign(where, FILTRO_VISIBLE_PARA_CONDUCTOR);
+    }
 
     if (filtros.estado) where.estado = filtros.estado;
     if (filtros.clienteId) where.clienteId = filtros.clienteId;
