@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import {
   WS_EVENTS,
   type AlertaLlegadaPayload,
+  type IncidenciaReportadaPayload,
   type ReasignacionViajePayload,
 } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
@@ -253,5 +254,16 @@ export class TrackingGateway implements OnGatewayConnection {
       emisor = emisor.to(salaConductor(payload.conductorNuevoId));
     }
     emisor.emit(WS_EVENTS.VIAJE_REASIGNADO, payload);
+  }
+
+  /**
+   * Avisa al panel (sala admin) y a la sala del viaje que el conductor reportó
+   * una incidencia (avería/choque/etc.). Lo consume la campana del panel.
+   */
+  emitirIncidencia(payload: IncidenciaReportadaPayload): void {
+    this.server
+      .to(salaViaje(payload.viajeId))
+      .to(SALA_ADMIN)
+      .emit(WS_EVENTS.INCIDENCIA_REPORTADA, payload);
   }
 }

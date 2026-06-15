@@ -10,7 +10,11 @@ import {
   useState,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { WS_EVENTS, type AlertaLlegadaPayload } from '@flotaos/shared-types';
+import {
+  WS_EVENTS,
+  type AlertaLlegadaPayload,
+  type IncidenciaReportadaPayload,
+} from '@flotaos/shared-types';
 import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import { toast } from '@/components/ui/sonner';
@@ -188,9 +192,48 @@ export function NotificacionesProvider({ children }: { children: React.ReactNode
       void queryClient.invalidateQueries({ queryKey: ['tracking', 'viajes-activos'] });
     };
 
+    const onIncidencia = (p: IncidenciaReportadaPayload) => {
+      if (!p || !p.viajeId) return;
+      const notif: NotificacionLlegada = {
+        id: `inc-${p.viajeId}-${p.reportadoEn}`,
+        kind: 'incidencia',
+        viajeId: p.viajeId,
+        folio: p.folio,
+        escalaOrden: null,
+        escalaDireccion: p.descripcion ?? p.conductorNombre ?? null,
+        esDestino: false,
+        titulo: p.titulo,
+        recibidaEn: new Date().toISOString(),
+        leida: false,
+      };
+      setNotificaciones((prev) =>
+        prev.some((n) => n.id === notif.id)
+          ? prev
+          : [notif, ...prev].slice(0, MAX_NOTIFS),
+      );
+      toast.warning(p.titulo, {
+        description: p.descripcion ?? (p.varado ? 'El viaje quedó varado' : undefined),
+      });
+      if (
+        permisoRef.current === 'granted' &&
+        typeof window !== 'undefined' &&
+        'Notification' in window
+      ) {
+        try {
+          new Notification(p.titulo, { body: p.descripcion ?? undefined, tag: notif.id });
+        } catch {
+          /* requiere Service Worker en algunos navegadores: se ignora */
+        }
+      }
+      void queryClient.invalidateQueries({ queryKey: ['viaje', p.viajeId] });
+      void queryClient.invalidateQueries({ queryKey: ['tracking', 'viajes-activos'] });
+    };
+
     socket.on(WS_EVENTS.ALERTA, onAlerta);
+    socket.on(WS_EVENTS.INCIDENCIA_REPORTADA, onIncidencia);
     return () => {
       socket.off(WS_EVENTS.ALERTA, onAlerta);
+      socket.off(WS_EVENTS.INCIDENCIA_REPORTADA, onIncidencia);
     };
   }, [queryClient]);
 

@@ -18,6 +18,7 @@ import { AsignarViajeDto } from './dto/asignar-viaje.dto';
 import { CambiarEstadoViajeDto } from './dto/cambiar-estado-viaje.dto';
 import { PlanRutaDto } from './dto/plan-ruta.dto';
 import { GestionarContactosEscalaDto } from './dto/contactos-escala.dto';
+import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import {
@@ -143,5 +144,16 @@ export class ViajesController {
   reanudar(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
     const conductorId = user.type === 'conductor' ? user.sub : undefined;
     return this.viajes.reanudar(id, user.sub, conductorId);
+  }
+
+  /** El conductor (o admin) reporta una incidencia operativa del viaje. */
+  @Post(':id/incidencias')
+  reportarIncidencia(
+    @Param('id') id: string,
+    @Body() dto: ReportarIncidenciaDto,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    const conductorId = user.type === 'conductor' ? user.sub : undefined;
+    return this.viajes.reportarIncidencia(id, dto, user.sub, conductorId);
   }
 }

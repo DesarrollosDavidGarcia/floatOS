@@ -332,6 +332,43 @@ export default function ViajeDetallePage() {
               </CardContent>
             </Card>
           )}
+
+          {(viaje.incidencias?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Incidencias</CardTitle>
+                <CardDescription>
+                  Reportes de avería, choque u otros problemas del viaje.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(viaje.incidencias ?? []).map((inc) => (
+                  <div key={inc.id} className="rounded-md border p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="destructive">{inc.tipo}</Badge>
+                        <Badge variant="outline">{inc.gravedad}</Badge>
+                        {inc.resuelta && <Badge variant="secondary">Resuelta</Badge>}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {fechaLarga(inc.fecha)}
+                      </span>
+                    </div>
+                    <p className="mt-1 font-medium">{inc.titulo}</p>
+                    {inc.descripcion && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">{inc.descripcion}</p>
+                    )}
+                    {inc.lugar && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        <MapPin className="mr-1 inline h-3 w-3" />
+                        {inc.lugar}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">

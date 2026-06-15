@@ -1232,6 +1232,32 @@ Pausa recuperable de un viaje en curso por incidencia (avería/choque), en lugar
 
 **Siguientes:** Fase 3 (conductor reporta incidencia desde la app); Fase 4 (tractor ↔ caja).
 
+### 2026-06-15 — App Flutter: soporte VARADO/reanudar + aviso de reasignación ✅
+
+Parte móvil de las Fases 1 y 2. **`flutter analyze` 0 issues.**
+- **Fix de crash:** la app no conocía `VARADO` y `EstadoViaje.desdeApi` (sin `orElse`) lanzaba al deserializar un viaje varado → se agregó `varado` al enum Dart (con sus casos de color/ícono) y un fallback tolerante en `desdeApi` (estado desconocido → varado, sin romper la pantalla en carretera).
+- **Acciones del conductor:** botón **"Reportar avería / varado"** (marca VARADO desde estados en ruta; apaga el GPS) y **"Reanudar viaje"** (vuelve al estado previo y reactiva GPS/suscripción). Repo: `reanudar()`.
+- **Aviso de reasignación:** `SocketService` escucha `viaje:reasignado` (sala `conductor:<id>`); la lista refresca y muestra snackbar contextual ("Te asignaron…" / "Ya no tienes…").
+
+**Commit:** todo lo de la sesión (contactos + notificaciones + auditoría + Fases 1-2 + móvil) en la rama **`feat/incidencias-notificaciones`** (un commit; main intacto). Falta: Fase 3 (reporte de incidencia con foto/ubicación + alerta al panel) y Fase 4 (tractor↔caja).
+
+### 2026-06-15 — Fase 3: el conductor reporta incidencias desde la app ✅
+
+El conductor reporta un problema (avería/choque/ponchadura) en ruta; opcionalmente deja el viaje en VARADO; el panel se entera en vivo. Verificado **E2E en vivo + 56/56 tests** API, `tsc` web + `flutter analyze` limpios. **Sin migración** (IncidenciaConductor ya existía; `tipo` es string).
+
+**Backend:**
+- `POST /viajes/:id/incidencias` (conductor-dueño o admin) → `ReportarIncidenciaViajeUseCase`: crea `IncidenciaConductor` ligada al viaje (gravedad ALTA por defecto, título derivado), y si `marcarVarado` y el viaje está en ruta lo pasa a **VARADO** (reusa la transición validada). Verifica propiedad (conductor ajeno → 4xx) y que el viaje tenga conductor.
+- Evento WS `incidencia:reportada` (+ `IncidenciaReportadaPayload`) a sala admin + viaje. Catálogo `TIPO_INCIDENCIA` ampliado (AVERIA, PONCHADURA) + enum en shared-types; `TIPOS_INCIDENCIA_CONDUCTOR`.
+- `RELACIONES_DETALLE` incluye `incidencias`.
+
+**Web:** la campana muestra las incidencias en vivo (toast warning + ícono de alerta; sección "Avisos en vivo" generalizada); tarjeta **"Incidencias"** en el detalle del viaje.
+
+**App Flutter:** botón **"Reportar problema"** (reemplaza el de varado) abre una hoja con tipo (chips), descripción y switch "marcar varado"; `POST` al endpoint; apaga el GPS si quedó varado. `SocketService` ya entra a `conductor:<id>`.
+
+**QA:** `reportar-incidencia-viaje.usecase.spec.ts` (crea+VARADO+WS, no-varado fuera de ruta, ajeno 4xx, sin conductor 4xx).
+
+**Pendiente del epic:** Fase 4 (separar tractor ↔ caja). Mejoras opcionales de Fase 3: foto (evidenciaKey/MinIO) y ubicación GPS automática en el reporte.
+
 ---
 
 ## Riesgos técnicos

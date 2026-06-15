@@ -82,7 +82,7 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
           viaje: viaje,
           cambiandoEstado: _cambiandoEstado,
           onAvanzarEstado: () => _avanzarEstado(viaje),
-          onMarcarVarado: () => _marcarVarado(viaje),
+          onReportarProblema: () => _reportarProblema(viaje),
           onReanudar: () => _reanudar(viaje),
         ),
       ),
@@ -165,23 +165,57 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
     }
   }
 
-  /// Reporta una avería / choque marcando el viaje como VARADO (pausa
-  /// recuperable). Reusa el flujo de cambio de estado (apaga el GPS de este
-  /// viaje porque VARADO no requiere tracking).
-  Future<void> _marcarVarado(Viaje viaje) async {
-    final nota = await showModalBottomSheet<String>(
+  /// Reporta una incidencia (avería/choque/etc.). Crea la incidencia en el
+  /// expediente del viaje y, si el conductor lo marca, deja el viaje en VARADO
+  /// (pausa recuperable; apaga el GPS de este viaje). Avisa al panel por WS.
+  Future<void> _reportarProblema(Viaje viaje) async {
+    final reporte =
+        await showModalBottomSheet<({String tipo, String descripcion, bool varado})>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => const _SheetConfirmarCambio(
-        accion: 'Reportar avería / varado',
-        siguiente: EstadoViaje.varado,
-      ),
+      builder: (_) => const _SheetReportarProblema(),
     );
-    if (nota == null || !mounted) return;
-    await _ejecutarCambio(viaje, EstadoViaje.varado, nota);
+    if (reporte == null || !mounted) return;
+
+    final repo = ref.read(viajesRepositoryProvider);
+    final tracking = ref.read(trackingControllerProvider.notifier);
+    final socket = ref.read(socketServiceProvider);
+    final viajeConGps = ref.read(trackingControllerProvider).viajeId;
+
+    setState(() => _cambiandoEstado = true);
+    try {
+      final varado = await repo.reportarIncidencia(
+        viaje.id,
+        tipo: reporte.tipo,
+        descripcion: reporte.descripcion,
+        marcarVarado: reporte.varado,
+      );
+      // VARADO no requiere tracking: apaga el GPS de este viaje.
+      if (varado && viajeConGps == viaje.id) {
+        await tracking.detener();
+        socket.desuscribirViaje(viaje.id);
+      }
+      if (!mounted) return;
+      ref.invalidate(viajeDetalleProvider(widget.viajeId));
+      ref.invalidate(viajesProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            varado ? 'Reportado · viaje marcado como varado' : 'Incidencia reportada',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensajeDeError(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _cambiandoEstado = false);
+    }
   }
 
   /// Reanuda un viaje VARADO: vuelve al estado previo y, si éste requiere
@@ -304,6 +338,116 @@ class _SheetConfirmarCambioState extends State<_SheetConfirmarCambio> {
   }
 }
 
+/// Hoja para reportar un problema del viaje: tipo + descripción + si lo deja varado.
+class _SheetReportarProblema extends StatefulWidget {
+  const _SheetReportarProblema();
+
+  @override
+  State<_SheetReportarProblema> createState() => _SheetReportarProblemaState();
+}
+
+class _SheetReportarProblemaState extends State<_SheetReportarProblema> {
+  static const _tipos = <(String, String)>[
+    ('AVERIA', 'Avería'),
+    ('ACCIDENTE', 'Accidente'),
+    ('PONCHADURA', 'Ponchadura'),
+    ('OTRO', 'Otro'),
+  ];
+
+  String _tipo = 'AVERIA';
+  bool _varado = true;
+  final _descCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          24 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_outlined, color: colores.error),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Reportar problema',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Tipo',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: colores.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final t in _tipos)
+                  ChoiceChip(
+                    label: Text(t.$2),
+                    selected: _tipo == t.$1,
+                    onSelected: (_) => setState(() => _tipo = t.$1),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Descripción (opcional)',
+                hintText: 'Ej. se fundió el motor, sin frenos…',
+              ),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _varado,
+              onChanged: (v) => setState(() => _varado = v),
+              title: const Text('Marcar el viaje como varado'),
+              subtitle: const Text('Pausa el viaje hasta reanudar o reasignar'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                context,
+                (tipo: _tipo, descripcion: _descCtrl.text.trim(), varado: _varado),
+              ),
+              child: const Text('Reportar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────── contenido ───────────────────────────
 
 class _Contenido extends StatelessWidget {
@@ -311,14 +455,14 @@ class _Contenido extends StatelessWidget {
     required this.viaje,
     required this.cambiandoEstado,
     required this.onAvanzarEstado,
-    required this.onMarcarVarado,
+    required this.onReportarProblema,
     required this.onReanudar,
   });
 
   final Viaje viaje;
   final bool cambiandoEstado;
   final VoidCallback onAvanzarEstado;
-  final VoidCallback onMarcarVarado;
+  final VoidCallback onReportarProblema;
   final VoidCallback onReanudar;
 
   @override
@@ -386,9 +530,9 @@ class _Contenido extends StatelessWidget {
                     if (enRuta) ...[
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
-                        onPressed: cambiandoEstado ? null : onMarcarVarado,
+                        onPressed: cambiandoEstado ? null : onReportarProblema,
                         icon: const Icon(Icons.warning_amber_outlined),
-                        label: const Text('Reportar avería / varado'),
+                        label: const Text('Reportar problema'),
                       ),
                     ],
                   ],

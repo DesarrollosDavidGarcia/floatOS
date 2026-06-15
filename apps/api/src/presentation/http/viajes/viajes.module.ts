@@ -11,6 +11,7 @@ import { CambiarEstadoViajeUseCase } from '../../../application/viajes/cambiar-e
 import { ActualizarPlanRutaUseCase } from '../../../application/viajes/actualizar-plan-ruta.usecase';
 import { GestionarContactosEscalaUseCase } from '../../../application/viajes/gestionar-contactos-escala.usecase';
 import { ListarLlegadasRecientesUseCase } from '../../../application/viajes/listar-llegadas-recientes.usecase';
+import { ReportarIncidenciaViajeUseCase } from '../../../application/viajes/reportar-incidencia-viaje.usecase';
 import { MotorViajeService } from '../../../application/viajes/motor-viaje.service';
 import { RoutingModule } from '../../../infrastructure/routing/routing.module';
 import { TrackingModule } from '../../ws/tracking/tracking.module';
@@ -38,6 +39,7 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
     ActualizarPlanRutaUseCase,
     GestionarContactosEscalaUseCase,
     ListarLlegadasRecientesUseCase,
+    ReportarIncidenciaViajeUseCase,
   ],
   exports: [ViajesService],
 })

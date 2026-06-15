@@ -38,14 +38,18 @@ export interface PosicionViaje {
   capturadoEn?: string;
 }
 
-/** Notificación de llegada almacenada en el panel (campana + badge de no leídas). */
+/** Notificación del panel (campana + badge de no leídas): llegada o incidencia. */
 export interface NotificacionLlegada {
   id: string;
+  /** Tipo de notificación; ausente en datos viejos = 'llegada'. */
+  kind?: 'llegada' | 'incidencia';
   viajeId: string;
   folio: number | null;
   escalaOrden: number | null;
   escalaDireccion: string | null;
   esDestino: boolean;
+  /** Título propio (incidencias); las llegadas lo derivan con tituloLlegada(). */
+  titulo?: string | null;
   recibidaEn: string; // ISO de recepción en el cliente
   leida: boolean;
 }

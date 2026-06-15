@@ -59,7 +59,9 @@ const CATALOGOS = {
     ['OTRO', 'Otro'],
   ],
   TIPO_INCIDENCIA: [
+    ['AVERIA', 'Avería'],
     ['ACCIDENTE', 'Accidente'],
+    ['PONCHADURA', 'Ponchadura'],
     ['INFRACCION', 'Infracción'],
     ['SANCION', 'Sanción'],
     ['FALTA', 'Falta'],

@@ -103,7 +103,9 @@ export enum TipoCertificacion {
 }
 
 export enum TipoIncidencia {
+  AVERIA = 'AVERIA',
   ACCIDENTE = 'ACCIDENTE',
+  PONCHADURA = 'PONCHADURA',
   INFRACCION = 'INFRACCION',
   SANCION = 'SANCION',
   FALTA = 'FALTA',
@@ -111,6 +113,14 @@ export enum TipoIncidencia {
   RECONOCIMIENTO = 'RECONOCIMIENTO',
   OTRO = 'OTRO',
 }
+
+/** Tipos de incidencia que el conductor puede reportar en ruta desde la app. */
+export const TIPOS_INCIDENCIA_CONDUCTOR = [
+  'AVERIA',
+  'ACCIDENTE',
+  'PONCHADURA',
+  'OTRO',
+] as const;
 
 export enum GravedadIncidencia {
   BAJA = 'BAJA',
@@ -253,7 +263,22 @@ export const WS_EVENTS = {
   VIAJE_ESTADO_CAMBIADO: 'viaje:estado',
   ALERTA: 'alerta',
   VIAJE_REASIGNADO: 'viaje:reasignado',
+  INCIDENCIA_REPORTADA: 'incidencia:reportada',
 } as const;
+
+/** Payload del evento WS 'incidencia:reportada' (el conductor reporta un problema). */
+export interface IncidenciaReportadaPayload {
+  viajeId: string;
+  folio: number | null;
+  tipo: string;
+  titulo: string;
+  gravedad: string;
+  descripcion: string | null;
+  conductorNombre: string | null;
+  /** true si el reporte además dejó el viaje en VARADO. */
+  varado: boolean;
+  reportadoEn: string;
+}
 
 /** Motivos sugeridos al reasignar un viaje (el panel los ofrece; se guarda string). */
 export const MOTIVOS_REASIGNACION = [

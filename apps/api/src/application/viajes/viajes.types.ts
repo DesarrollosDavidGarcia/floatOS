@@ -32,6 +32,19 @@ export const RELACIONES_DETALLE = {
     include: { cargas: true, contactos: { orderBy: { createdAt: 'asc' } } },
   },
   historialAsignaciones: { orderBy: { createdAt: 'desc' } },
+  incidencias: {
+    orderBy: { fecha: 'desc' },
+    select: {
+      id: true,
+      tipo: true,
+      gravedad: true,
+      titulo: true,
+      descripcion: true,
+      lugar: true,
+      resuelta: true,
+      fecha: true,
+    },
+  },
 } satisfies Prisma.ViajeInclude;
 
 /**

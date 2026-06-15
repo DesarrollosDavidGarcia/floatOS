@@ -72,6 +72,18 @@ export interface HistorialViaje {
   createdAt: string;
 }
 
+/** Incidencia operativa reportada en un viaje (avería, choque, etc.). */
+export interface Incidencia {
+  id: string;
+  tipo: string;
+  gravedad: string;
+  titulo: string;
+  descripcion?: string | null;
+  lugar?: string | null;
+  resuelta: boolean;
+  fecha: string;
+}
+
 /** Entrada del historial de reasignaciones (cambio de unidad y/o conductor). */
 export interface HistorialAsignacion {
   id: string;
@@ -119,6 +131,7 @@ export interface Viaje {
   trackingToken?: string | null;
   historial?: HistorialViaje[];
   historialAsignaciones?: HistorialAsignacion[];
+  incidencias?: Incidencia[];
   createdAt: string;
   updatedAt?: string;
 }

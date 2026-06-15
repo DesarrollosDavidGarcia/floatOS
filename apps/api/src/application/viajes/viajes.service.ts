@@ -12,6 +12,10 @@ import {
   GestionarContactosEscalaUseCase,
 } from './gestionar-contactos-escala.usecase';
 import { ListarLlegadasRecientesUseCase } from './listar-llegadas-recientes.usecase';
+import {
+  ReportarIncidenciaInput,
+  ReportarIncidenciaViajeUseCase,
+} from './reportar-incidencia-viaje.usecase';
 import { MotorViajeService } from './motor-viaje.service';
 import {
   AsignarViajeInput,
@@ -40,6 +44,7 @@ export class ViajesService {
     private readonly actualizarPlanRuta: ActualizarPlanRutaUseCase,
     private readonly gestionarContactos: GestionarContactosEscalaUseCase,
     private readonly listarLlegadas: ListarLlegadasRecientesUseCase,
+    private readonly reportarIncidenciaUC: ReportarIncidenciaViajeUseCase,
     private readonly motor: MotorViajeService,
   ) {}
 
@@ -104,6 +109,21 @@ export class ViajesService {
   /** Reanuda un viaje VARADO al estado en que estaba antes de la incidencia. */
   reanudar(id: string, registradoPor: string, conductorId?: string) {
     return this.cambiarEstadoViaje.reanudar(id, registradoPor, conductorId);
+  }
+
+  /** El conductor (o admin) reporta una incidencia operativa de un viaje. */
+  reportarIncidencia(
+    viajeId: string,
+    input: ReportarIncidenciaInput,
+    registradoPor: string,
+    conductorId?: string,
+  ) {
+    return this.reportarIncidenciaUC.execute(
+      viajeId,
+      input,
+      registradoPor,
+      conductorId,
+    );
   }
 
   /**

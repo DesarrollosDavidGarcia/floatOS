@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, Check, MapPin, MonitorSmartphone, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bell, Check, MapPin, MonitorSmartphone, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { horaCorta } from '@/lib/fecha';
@@ -95,10 +95,10 @@ export function NotificationsBell() {
         </div>
 
         <div className="max-h-96 overflow-auto">
-          {/* Llegadas en vivo */}
+          {/* Avisos en vivo (llegadas + incidencias) */}
           <div className="flex items-center justify-between px-3 pt-2 pb-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Llegadas en vivo
+              Avisos en vivo
             </span>
             {topLlegadas.length > 0 && (
               <div className="flex items-center gap-2">
@@ -125,40 +125,47 @@ export function NotificationsBell() {
           </div>
           {topLlegadas.length === 0 ? (
             <p className="px-3 pb-2 text-xs text-muted-foreground">
-              Sin llegadas recientes.
+              Sin avisos recientes.
             </p>
           ) : (
-            topLlegadas.map((n) => (
-              <Link
-                key={n.id}
-                href={`/viajes/${n.viajeId}`}
-                onClick={() => marcarLeida(n.id)}
-                className={cn(
-                  'flex items-start gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-accent',
-                  !n.leida && 'bg-primary/5',
-                )}
-              >
-                <MapPin
+            topLlegadas.map((n) => {
+              const esIncidencia = n.kind === 'incidencia';
+              return (
+                <Link
+                  key={n.id}
+                  href={`/viajes/${n.viajeId}`}
+                  onClick={() => marcarLeida(n.id)}
                   className={cn(
-                    'mt-0.5 h-4 w-4 shrink-0',
-                    n.esDestino ? 'text-green-600' : 'text-muted-foreground',
+                    'flex items-start gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-accent',
+                    !n.leida && 'bg-primary/5',
                   )}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className={cn('truncate text-sm', !n.leida && 'font-medium')}>
-                    {tituloLlegada(n)}
-                  </p>
-                  {n.escalaDireccion && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {n.escalaDireccion}
+                >
+                  {esIncidencia ? (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  ) : (
+                    <MapPin
+                      className={cn(
+                        'mt-0.5 h-4 w-4 shrink-0',
+                        n.esDestino ? 'text-green-600' : 'text-muted-foreground',
+                      )}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className={cn('truncate text-sm', !n.leida && 'font-medium')}>
+                      {esIncidencia ? (n.titulo ?? 'Incidencia reportada') : tituloLlegada(n)}
                     </p>
-                  )}
-                </div>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {horaCorta(n.recibidaEn)}
-                </span>
-              </Link>
-            ))
+                    {n.escalaDireccion && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {n.escalaDireccion}
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {horaCorta(n.recibidaEn)}
+                  </span>
+                </Link>
+              );
+            })
           )}
 
           {/* Vencimientos de documentos */}
