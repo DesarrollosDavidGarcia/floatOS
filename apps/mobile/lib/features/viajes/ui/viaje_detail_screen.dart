@@ -82,6 +82,8 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
           viaje: viaje,
           cambiandoEstado: _cambiandoEstado,
           onAvanzarEstado: () => _avanzarEstado(viaje),
+          onMarcarVarado: () => _marcarVarado(viaje),
+          onReanudar: () => _reanudar(viaje),
         ),
       ),
     );
@@ -157,6 +159,60 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
             onPressed: () => _ejecutarCambio(viaje, siguiente, nota),
           ),
         ),
+      );
+    } finally {
+      if (mounted) setState(() => _cambiandoEstado = false);
+    }
+  }
+
+  /// Reporta una avería / choque marcando el viaje como VARADO (pausa
+  /// recuperable). Reusa el flujo de cambio de estado (apaga el GPS de este
+  /// viaje porque VARADO no requiere tracking).
+  Future<void> _marcarVarado(Viaje viaje) async {
+    final nota = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const _SheetConfirmarCambio(
+        accion: 'Reportar avería / varado',
+        siguiente: EstadoViaje.varado,
+      ),
+    );
+    if (nota == null || !mounted) return;
+    await _ejecutarCambio(viaje, EstadoViaje.varado, nota);
+  }
+
+  /// Reanuda un viaje VARADO: vuelve al estado previo y, si éste requiere
+  /// tracking, reactiva el GPS y la suscripción a la sala.
+  Future<void> _reanudar(Viaje viaje) async {
+    final repo = ref.read(viajesRepositoryProvider);
+    final tracking = ref.read(trackingControllerProvider.notifier);
+    final socket = ref.read(socketServiceProvider);
+
+    setState(() => _cambiandoEstado = true);
+    try {
+      final actualizado = await repo.reanudar(viaje.id);
+      if (actualizado.estado.requiereTracking) {
+        final error = await tracking.iniciar(viaje.id);
+        socket.suscribirViaje(viaje.id);
+        if (error != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error)),
+          );
+        }
+      }
+      if (!mounted) return;
+      ref.invalidate(viajeDetalleProvider(widget.viajeId));
+      ref.invalidate(viajesProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Viaje reanudado')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mensajeDeError(e))),
       );
     } finally {
       if (mounted) setState(() => _cambiandoEstado = false);
@@ -255,15 +311,21 @@ class _Contenido extends StatelessWidget {
     required this.viaje,
     required this.cambiandoEstado,
     required this.onAvanzarEstado,
+    required this.onMarcarVarado,
+    required this.onReanudar,
   });
 
   final Viaje viaje;
   final bool cambiandoEstado;
   final VoidCallback onAvanzarEstado;
+  final VoidCallback onMarcarVarado;
+  final VoidCallback onReanudar;
 
   @override
   Widget build(BuildContext context) {
     final accion = viaje.estado.accionSiguiente;
+    final esVarado = viaje.estado == EstadoViaje.varado;
+    final enRuta = viaje.estado.requiereTracking;
 
     return Column(
       children: [
@@ -296,28 +358,59 @@ class _Contenido extends StatelessWidget {
             ],
           ),
         ),
-        if (accion != null)
+        if (esVarado || accion != null)
           SafeArea(
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: FilledButton.icon(
-                onPressed: cambiandoEstado ? null : onAvanzarEstado,
-                icon: cambiandoEstado
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Icon(viaje.estado.siguiente!.icono),
-                label: Text(accion),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (esVarado)
+                    FilledButton.icon(
+                      onPressed: cambiandoEstado ? null : onReanudar,
+                      icon: cambiandoEstado
+                          ? const _BotonSpinner()
+                          : const Icon(Icons.play_circle_outline),
+                      label: const Text('Reanudar viaje'),
+                    )
+                  else ...[
+                    FilledButton.icon(
+                      onPressed: cambiandoEstado ? null : onAvanzarEstado,
+                      icon: cambiandoEstado
+                          ? const _BotonSpinner()
+                          : Icon(viaje.estado.siguiente!.icono),
+                      label: Text(accion!),
+                    ),
+                    if (enRuta) ...[
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: cambiandoEstado ? null : onMarcarVarado,
+                        icon: const Icon(Icons.warning_amber_outlined),
+                        label: const Text('Reportar avería / varado'),
+                      ),
+                    ],
+                  ],
+                ],
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Spinner blanco para el botón de acción mientras hay una petición en vuelo.
+class _BotonSpinner extends StatelessWidget {
+  const _BotonSpinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
     );
   }
 }

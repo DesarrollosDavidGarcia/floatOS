@@ -29,8 +29,9 @@ export const RELACIONES_DETALLE = {
   ...RELACIONES_RESUMEN,
   escalas: {
     orderBy: { orden: 'asc' },
-    include: { cargas: true },
+    include: { cargas: true, contactos: { orderBy: { createdAt: 'asc' } } },
   },
+  historialAsignaciones: { orderBy: { createdAt: 'desc' } },
 } satisfies Prisma.ViajeInclude;
 
 /**
@@ -123,6 +124,9 @@ export interface EvaluarViajeInput {
 export interface AsignarViajeInput {
   unidadId?: string | null;
   conductorId?: string | null;
+  /** Motivo de la reasignación (avería/accidente/relevo/…); se guarda en auditoría. */
+  motivo?: string;
+  nota?: string;
 }
 
 /** Datos para cambiar el estado de un viaje. */

@@ -5,6 +5,7 @@ import { UbicacionController } from '../../http/tracking/ubicacion.controller';
 import { TrackingController } from '../../http/tracking/tracking.controller';
 import { RegistrarUbicacionUseCase } from '../../../application/tracking/registrar-ubicacion.usecase';
 import { ObtenerSeguimientoPublicoUseCase } from '../../../application/tracking/obtener-seguimiento-publico.usecase';
+import { EmailModule } from '../../../infrastructure/email/email.module';
 
 /**
  * Módulo de seguimiento en tiempo real (tracking).
@@ -14,7 +15,7 @@ import { ObtenerSeguimientoPublicoUseCase } from '../../../application/tracking/
  */
 @Module({
   // La configuración de verificación se pasa por operación en el gateway.
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), EmailModule],
   controllers: [UbicacionController, TrackingController],
   providers: [
     TrackingGateway,

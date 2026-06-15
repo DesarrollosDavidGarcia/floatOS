@@ -7,7 +7,7 @@ import { MapPin, RadioTower, Truck } from 'lucide-react';
 import { EstadoViaje, WS_EVENTS, type Paginado } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL, ESTADOS_ACTIVOS } from '@/lib/estado-viaje';
-import { getSocket, closeSocket } from '@/lib/socket';
+import { getSocket } from '@/lib/socket';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -156,11 +156,6 @@ export default function TrackingPage() {
       cancelado = true;
     };
   }, [viajesRaw]);
-
-  // Limpia el socket por completo al salir de la vista.
-  useEffect(() => {
-    return () => closeSocket();
-  }, []);
 
   const handleSeleccion = (viaje: ViajeActivo) => {
     setSeleccionado(viaje.id);

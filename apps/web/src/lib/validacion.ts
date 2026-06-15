@@ -20,6 +20,13 @@ export const fechaRequerida = (msg = 'La fecha es obligatoria') =>
 
 const vacio = (v: string | undefined | null) => v == null || v === '';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** True si la cadena tiene forma de email válido (chequeo ligero de cliente). */
+export function esEmail(valor: string): boolean {
+  return EMAIL_RE.test(valor.trim());
+}
+
 /** Número opcional con límites opcionales (min/max/entero). */
 export const numeroOpcional = (
   opts: { min?: number; max?: number; entero?: boolean } = {},

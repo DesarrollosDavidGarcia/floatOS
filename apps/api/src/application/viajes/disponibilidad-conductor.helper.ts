@@ -13,6 +13,7 @@ export const ESTADOS_VIAJE_ABIERTOS: EstadoViaje[] = [
   EstadoViaje.EN_CAMINO_ORIGEN,
   EstadoViaje.CARGANDO,
   EstadoViaje.EN_TRANSITO,
+  EstadoViaje.VARADO,
 ];
 
 /** Etiqueta legible de un estado para mensajes de error. */

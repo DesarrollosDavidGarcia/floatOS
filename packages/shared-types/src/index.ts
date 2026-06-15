@@ -7,18 +7,38 @@ export enum EstadoViaje {
   EN_CAMINO_ORIGEN = 'EN_CAMINO_ORIGEN',
   CARGANDO = 'CARGANDO',
   EN_TRANSITO = 'EN_TRANSITO',
+  VARADO = 'VARADO',
   ENTREGADO = 'ENTREGADO',
   FACTURADO = 'FACTURADO',
   CANCELADO = 'CANCELADO',
 }
 
-/** Transiciones válidas del ciclo de vida de un viaje (MVP). */
+/**
+ * Transiciones válidas del ciclo de vida de un viaje.
+ * VARADO es una pausa recuperable por incidencia (avería/choque): se entra desde
+ * cualquier estado en curso y se sale CANCELANDO o REANUDANDO (acción dedicada
+ * `/viajes/:id/reanudar`, que vuelve al estado previo; por eso VARADO no lista
+ * las transiciones de regreso aquí).
+ */
 export const TRANSICIONES_VIAJE: Record<EstadoViaje, EstadoViaje[]> = {
   [EstadoViaje.ASIGNADO]: [EstadoViaje.ACEPTADO, EstadoViaje.CANCELADO],
   [EstadoViaje.ACEPTADO]: [EstadoViaje.EN_CAMINO_ORIGEN, EstadoViaje.CANCELADO],
-  [EstadoViaje.EN_CAMINO_ORIGEN]: [EstadoViaje.CARGANDO, EstadoViaje.CANCELADO],
-  [EstadoViaje.CARGANDO]: [EstadoViaje.EN_TRANSITO, EstadoViaje.CANCELADO],
-  [EstadoViaje.EN_TRANSITO]: [EstadoViaje.ENTREGADO, EstadoViaje.CANCELADO],
+  [EstadoViaje.EN_CAMINO_ORIGEN]: [
+    EstadoViaje.CARGANDO,
+    EstadoViaje.VARADO,
+    EstadoViaje.CANCELADO,
+  ],
+  [EstadoViaje.CARGANDO]: [
+    EstadoViaje.EN_TRANSITO,
+    EstadoViaje.VARADO,
+    EstadoViaje.CANCELADO,
+  ],
+  [EstadoViaje.EN_TRANSITO]: [
+    EstadoViaje.ENTREGADO,
+    EstadoViaje.VARADO,
+    EstadoViaje.CANCELADO,
+  ],
+  [EstadoViaje.VARADO]: [EstadoViaje.CANCELADO],
   [EstadoViaje.ENTREGADO]: [EstadoViaje.FACTURADO],
   [EstadoViaje.FACTURADO]: [],
   [EstadoViaje.CANCELADO]: [],
@@ -232,7 +252,51 @@ export const WS_EVENTS = {
   UBICACION_ACTUALIZADA: 'ubicacion:actualizada',
   VIAJE_ESTADO_CAMBIADO: 'viaje:estado',
   ALERTA: 'alerta',
+  VIAJE_REASIGNADO: 'viaje:reasignado',
 } as const;
+
+/** Motivos sugeridos al reasignar un viaje (el panel los ofrece; se guarda string). */
+export const MOTIVOS_REASIGNACION = [
+  'AVERIA',
+  'ACCIDENTE',
+  'RELEVO',
+  'INCIDENCIA',
+  'OTRO',
+] as const;
+export type MotivoReasignacion = (typeof MOTIVOS_REASIGNACION)[number];
+
+/** Payload del evento WS 'viaje:reasignado' (cambio de unidad y/o conductor). */
+export interface ReasignacionViajePayload {
+  viajeId: string;
+  folio: number | null;
+  conductorAnteriorId: string | null;
+  conductorNuevoId: string | null;
+  unidadCambio: boolean;
+  conductorCambio: boolean;
+  motivo: string | null;
+}
+
+/** Tipo de alerta de geocerca (por ahora solo llegada a una escala). */
+export type TipoAlerta = 'llegada_escala';
+
+/**
+ * Payload del evento WS 'alerta' de llegada a una escala. Contrato SERIALIZADO
+ * (fechas como string ISO) compartido por el gateway (emisión, apps/api) y el
+ * panel (recepción, apps/web) para evitar drift entre back y front.
+ */
+export interface AlertaLlegadaPayload {
+  tipo: TipoAlerta;
+  viajeId: string;
+  /** Folio del viaje; null si no se pudo resolver. */
+  folio: number | null;
+  escalaOrden: number;
+  escalaAccion: string;
+  escalaDireccion: string;
+  /** true si la escala es el destino final (última del itinerario). */
+  esDestino: boolean;
+  /** ISO 8601 del momento en que se detectó la llegada. */
+  detectadoEn: string;
+}
 
 // ── Paginación (contrato único para todos los listados de la API) ──
 export interface Paginado<T> {

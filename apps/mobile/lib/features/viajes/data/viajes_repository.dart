@@ -67,4 +67,15 @@ class ViajesRepository {
       throw ApiException.desdeDio(e);
     }
   }
+
+  /// PATCH /viajes/:id/reanudar — sale de VARADO al estado previo a la incidencia.
+  Future<Viaje> reanudar(String id) async {
+    try {
+      final res =
+          await _api.dio.patch<Map<String, dynamic>>('/viajes/$id/reanudar');
+      return Viaje.fromJson(res.data!);
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
 }

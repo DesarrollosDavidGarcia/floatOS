@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Topbar } from '@/components/topbar';
+import { NotificacionesProvider } from '@/lib/notificaciones';
 
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -22,9 +23,11 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/30">
-      <Topbar />
-      <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
-    </div>
+    <NotificacionesProvider>
+      <div className="flex min-h-screen flex-col bg-muted/30">
+        <Topbar />
+        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+      </div>
+    </NotificacionesProvider>
   );
 }

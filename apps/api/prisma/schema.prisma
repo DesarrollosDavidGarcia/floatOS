@@ -22,6 +22,7 @@ enum EstadoViaje {
   EN_CAMINO_ORIGEN
   CARGANDO
   EN_TRANSITO
+  VARADO // incidencia en curso (avería/choque): pausa recuperable
   ENTREGADO
   FACTURADO
   CANCELADO
@@ -780,6 +781,8 @@ model Viaje {
   planRuta            Json?
 
   estado        EstadoViaje @default(ASIGNADO)
+  // Estado al que regresar al reanudar tras VARADO (null si no está/estuvo varado).
+  estadoPrevioVarado EstadoViaje?
   trackingToken String      @unique // link público; token aleatorio seguro (ver token.util.ts)
 
   fechaProgramada DateTime?
@@ -795,8 +798,9 @@ model Viaje {
   unidad    Unidad?    @relation(fields: [unidadId], references: [id])
   conductor Conductor? @relation(fields: [conductorId], references: [id])
 
-  escalas     EscalaViaje[]
-  historial   HistorialEstadoViaje[]
+  escalas               EscalaViaje[]
+  historial             HistorialEstadoViaje[]
+  historialAsignaciones HistorialAsignacionViaje[]
   ubicaciones UbicacionConductor[]
   gastos      GastoViaje[]
   evidencias  EvidenciaViaje[]
@@ -829,6 +833,27 @@ model HistorialEstadoViaje {
 
   @@index([viajeId])
   @@map("historial_estado_viaje")
+}
+
+/// Auditoría de reasignaciones (cambio de unidad y/o conductor) de un viaje.
+/// Guarda etiquetas legibles (placas/nombre) para que el historial sobreviva a
+/// la baja de una unidad o conductor. Un campo null = esa dimensión no cambió.
+model HistorialAsignacionViaje {
+  id                String   @id @default(cuid())
+  viajeId           String
+  unidadAnterior    String? // placas previas (o "Sin unidad")
+  unidadNueva       String?
+  conductorAnterior String? // nombre previo (o "Sin conductor")
+  conductorNuevo    String?
+  motivo            String? // catálogo MOTIVOS_REASIGNACION (o libre)
+  nota              String?
+  registradoPor     String? // id de usuario admin
+  createdAt         DateTime @default(now())
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId])
+  @@map("historial_asignacion_viaje")
 }
 
 model UbicacionConductor {
@@ -905,12 +930,32 @@ model EscalaViaje {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  viaje  Viaje         @relation(fields: [viajeId], references: [id], onDelete: Cascade)
-  cargas CargaEscala[]
+  viaje     Viaje            @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+  cargas    CargaEscala[]
+  contactos ContactoEscala[]
 
   @@unique([viajeId, orden])
   @@index([viajeId])
   @@map("escalas_viaje")
+}
+
+/// Persona a cargo en una escala: recibe el aviso de llegada del transportista.
+/// Solo se gestiona cuando el viaje tiene una cotización ACEPTADA. Por ahora el
+/// único canal de aviso es el email; el teléfono se guarda para un SMS futuro.
+model ContactoEscala {
+  id           String    @id @default(cuid())
+  escalaId     String
+  nombre       String
+  email        String? // destinatario del aviso de llegada (único canal actual)
+  telefono     String? // se captura/guarda; SMS pendiente de una fase futura
+  // Sello del email de llegada enviado (registro y dedup por contacto).
+  notificadoEn DateTime?
+  createdAt    DateTime  @default(now())
+
+  escala EscalaViaje @relation(fields: [escalaId], references: [id], onDelete: Cascade)
+
+  @@index([escalaId])
+  @@map("contactos_escala")
 }
 
 /// Carga que se recoge o entrega en una escala. "Reemplazar" = DESCARGA + CARGA en

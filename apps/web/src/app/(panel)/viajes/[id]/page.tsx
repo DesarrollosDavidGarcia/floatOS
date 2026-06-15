@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { ArrowLeft, Building2, Copy, MapPin, Pencil, Truck, User } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Building2, Copy, MapPin, Pencil, PlayCircle, Truck, User } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { invalidarViajes } from '@/lib/query-keys';
+import { fechaLarga, horaCorta } from '@/lib/fecha';
 import { toast } from '@/components/ui/sonner';
 import { ESTADO_VIAJE_BADGE, ESTADO_VIAJE_LABEL } from '@/lib/estado-viaje';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +28,9 @@ import { CotizacionesCard } from '@/components/cotizaciones/cotizaciones-card';
 import { PlanRutaDialog } from '@/components/viajes/plan-ruta-dialog';
 import { formatearDuracion, planificarRuta } from '@/components/viajes/plan-ruta';
 import { MapaViajeCard } from '@/components/viajes/mapa-viaje-card';
+import { ContactosEscalaDialog } from '@/components/viajes/contactos-escala-dialog';
 import type { Viaje } from '@/components/viajes/types';
+import type { Cotizacion } from '@/components/cotizaciones/types';
 
 function Dato({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -37,13 +39,6 @@ function Dato({ label, value }: { label: string; value?: string | null }) {
       <dd className="text-sm">{value && value.length ? value : '—'}</dd>
     </div>
   );
-}
-
-function fechaLarga(iso?: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return format(d, "d 'de' MMMM yyyy, HH:mm", { locale: es });
 }
 
 export default function ViajeDetallePage() {
@@ -61,11 +56,34 @@ export default function ViajeDetallePage() {
     enabled: Boolean(id),
   });
 
+  // Gating de "gente a cargo": solo con una cotización aceptada. Comparte la
+  // misma queryKey que CotizacionesCard, así no se duplica la petición.
+  const { data: cotizaciones } = useQuery<Cotizacion[]>({
+    queryKey: ['cotizaciones', id],
+    queryFn: async () =>
+      (await api.get<Cotizacion[]>(`/viajes/${id}/cotizaciones`)).data,
+    enabled: Boolean(id),
+  });
+  const cotizacionAceptada = (cotizaciones ?? []).some(
+    (c) => c.estado === 'ACEPTADA',
+  );
+
+  const qc = useQueryClient();
+
   const duplicar = useMutation({
     mutationFn: async () => (await api.post<Viaje>(`/viajes/${id}/duplicar`)).data,
     onSuccess: (nuevo) => {
       toast.success(`Viaje duplicado (#${nuevo.folio})`);
       router.push(`/viajes/${nuevo.id}`);
+    },
+    onError: (err) => toast.error(apiError(err)),
+  });
+
+  const reanudar = useMutation({
+    mutationFn: async () => (await api.patch(`/viajes/${id}/reanudar`)).data,
+    onSuccess: () => {
+      toast.success('Viaje reanudado');
+      invalidarViajes(qc, id);
     },
     onError: (err) => toast.error(apiError(err)),
   });
@@ -135,9 +153,19 @@ export default function ViajeDetallePage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {viaje.estado === 'VARADO' && (
+              <Button
+                onClick={() => reanudar.mutate()}
+                disabled={reanudar.isPending}
+              >
+                <PlayCircle />
+                {reanudar.isPending ? 'Reanudando…' : 'Reanudar'}
+              </Button>
+            )}
             <CambiarEstadoDialog viajeId={viaje.id} estadoActual={viaje.estado} />
             <AsignarDialog
               viajeId={viaje.id}
+              estado={viaje.estado}
               unidadIdActual={viaje.unidad?.id ?? viaje.unidadId}
               conductorIdActual={viaje.conductor?.id ?? viaje.conductorId}
             />
@@ -207,6 +235,43 @@ export default function ViajeDetallePage() {
                       {e.notas ? (
                         <p className="mt-0.5 text-xs italic text-muted-foreground">{e.notas}</p>
                       ) : null}
+                      {/* Personas a cargo: reciben el aviso de llegada por email. */}
+                      {(e.contactos?.length || cotizacionAceptada) ? (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {(e.contactos?.length ?? 0) > 0 && (
+                            <span className="text-xs text-muted-foreground">Avisar a:</span>
+                          )}
+                          {(e.contactos ?? []).map((c) => (
+                            <Badge
+                              key={c.id}
+                              variant={c.email ? 'secondary' : 'outline'}
+                              className="font-normal"
+                              title={
+                                c.email
+                                  ? c.notificadoEn
+                                    ? `Avisado el ${fechaLarga(c.notificadoEn)}`
+                                    : 'Pendiente de avisar'
+                                  : 'Solo celular: aún no recibe aviso (SMS no disponible)'
+                              }
+                            >
+                              {c.nombre}
+                              {c.email ? ` · ${c.email}` : ' · solo celular'}
+                              {c.email && c.notificadoEn
+                                ? ` · ✓ ${horaCorta(c.notificadoEn)}`
+                                : ''}
+                            </Badge>
+                          ))}
+                          {cotizacionAceptada && (
+                            <ContactosEscalaDialog
+                              viajeId={viaje.id}
+                              escalaId={e.id}
+                              clienteId={viaje.cliente?.id}
+                              direccion={e.direccion}
+                              contactos={e.contactos ?? []}
+                            />
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -225,6 +290,48 @@ export default function ViajeDetallePage() {
               <HistorialTimeline historial={viaje.historial ?? []} />
             </CardContent>
           </Card>
+
+          {(viaje.historialAsignaciones?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Reasignaciones</CardTitle>
+                <CardDescription>
+                  Cambios de unidad o conductor (con motivo).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(viaje.historialAsignaciones ?? []).map((h) => (
+                  <div key={h.id} className="rounded-md border p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {h.motivo && <Badge variant="outline">{h.motivo}</Badge>}
+                        <span className="text-xs text-muted-foreground">
+                          {fechaLarga(h.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                    {h.conductorNuevo && (
+                      <p className="mt-1">
+                        <User className="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />
+                        Conductor: <span className="text-muted-foreground">{h.conductorAnterior}</span>{' '}
+                        → <span className="font-medium">{h.conductorNuevo}</span>
+                      </p>
+                    )}
+                    {h.unidadNueva && (
+                      <p className="mt-1">
+                        <Truck className="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />
+                        Unidad: <span className="text-muted-foreground">{h.unidadAnterior}</span>{' '}
+                        → <span className="font-medium">{h.unidadNueva}</span>
+                      </p>
+                    )}
+                    {h.nota && (
+                      <p className="mt-1 text-xs italic text-muted-foreground">{h.nota}</p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">

@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { EditarViajeDto } from './dto/editar-viaje.dto';
 import { AsignarViajeDto } from './dto/asignar-viaje.dto';
 import { CambiarEstadoViajeDto } from './dto/cambiar-estado-viaje.dto';
 import { PlanRutaDto } from './dto/plan-ruta.dto';
+import { GestionarContactosEscalaDto } from './dto/contactos-escala.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import {
@@ -66,6 +68,13 @@ export class ViajesController {
     return this.viajes.listar(filtros);
   }
 
+  /** Historial reciente de llegadas (geocercas) para la campana del panel. */
+  @Get('llegadas/recientes')
+  @UseGuards(AdminGuard)
+  llegadasRecientes() {
+    return this.viajes.llegadasRecientes();
+  }
+
   @Get(':id')
   detalle(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
     if (user.type === 'conductor') {
@@ -89,8 +98,12 @@ export class ViajesController {
 
   @Patch(':id/asignar')
   @UseGuards(AdminGuard)
-  asignar(@Param('id') id: string, @Body() dto: AsignarViajeDto) {
-    return this.viajes.asignar(id, dto);
+  asignar(
+    @Param('id') id: string,
+    @Body() dto: AsignarViajeDto,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.viajes.asignar(id, dto, user.sub);
   }
 
   /** Guarda el plan multi-día del viaje (horas/día, descanso, escala, inicio). */
@@ -98,6 +111,20 @@ export class ViajesController {
   @UseGuards(AdminGuard)
   actualizarPlan(@Param('id') id: string, @Body() dto: PlanRutaDto) {
     return this.viajes.actualizarPlan(id, dto);
+  }
+
+  /**
+   * Reemplaza las personas a cargo de una escala (reciben el aviso de llegada
+   * por email). Requiere que el viaje tenga una cotización aceptada.
+   */
+  @Put(':id/escalas/:escalaId/contactos')
+  @UseGuards(AdminGuard)
+  gestionarContactosEscala(
+    @Param('id') id: string,
+    @Param('escalaId') escalaId: string,
+    @Body() dto: GestionarContactosEscalaDto,
+  ) {
+    return this.viajes.gestionarContactosEscala(id, escalaId, dto.contactos);
   }
 
   @Patch(':id/estado')
@@ -109,5 +136,12 @@ export class ViajesController {
     // Admin sin restricción; el conductor solo puede avanzar SUS viajes.
     const conductorId = user.type === 'conductor' ? user.sub : undefined;
     return this.viajes.cambiarEstado(id, dto, user.sub, conductorId);
+  }
+
+  /** Reanuda un viaje VARADO al estado previo a la incidencia. */
+  @Patch(':id/reanudar')
+  reanudar(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    const conductorId = user.type === 'conductor' ? user.sub : undefined;
+    return this.viajes.reanudar(id, user.sub, conductorId);
   }
 }

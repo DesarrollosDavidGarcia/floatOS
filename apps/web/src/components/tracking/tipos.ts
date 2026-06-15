@@ -37,3 +37,15 @@ export interface PosicionViaje {
   velocidad?: number | null;
   capturadoEn?: string;
 }
+
+/** Notificación de llegada almacenada en el panel (campana + badge de no leídas). */
+export interface NotificacionLlegada {
+  id: string;
+  viajeId: string;
+  folio: number | null;
+  escalaOrden: number | null;
+  escalaDireccion: string | null;
+  esDestino: boolean;
+  recibidaEn: string; // ISO de recepción en el cliente
+  leida: boolean;
+}

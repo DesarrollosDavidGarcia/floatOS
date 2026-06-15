@@ -1,22 +1,60 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { EstadoViaje, Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 import { AsignarViajeInput, RELACIONES_RESUMEN } from './viajes.types';
 import { asegurarConductorDisponible } from './disponibilidad-conductor.helper';
+
+/** Estados finales en los que ya no tiene sentido reasignar. */
+const ESTADOS_TERMINALES: ReadonlySet<EstadoViaje> = new Set([
+  EstadoViaje.FACTURADO,
+  EstadoViaje.CANCELADO,
+]);
+
+/** Nombre completo legible de un conductor (o "Sin conductor"). */
+function nombreConductor(c: { nombre: string; apellidos: string | null } | null): string {
+  if (!c) return 'Sin conductor';
+  return `${c.nombre} ${c.apellidos ?? ''}`.trim();
+}
 
 /** Caso de uso: asignar o reasignar unidad y/o conductor a un viaje. */
 @Injectable()
 export class AsignarViajeUseCase {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tracking: TrackingGateway,
+  ) {}
 
-  async execute(id: string, input: AsignarViajeInput) {
+  async execute(id: string, input: AsignarViajeInput, registradoPor?: string) {
     if (input.unidadId === undefined && input.conductorId === undefined) {
       throw new BadRequestException(
         'Debe indicar al menos unidadId o conductorId',
+      );
+    }
+
+    // Estado actual + asignación previa (para el guard y el snapshot de auditoría).
+    const actual = await this.prisma.viaje.findUnique({
+      where: { id },
+      select: {
+        estado: true,
+        folio: true,
+        unidadId: true,
+        conductorId: true,
+        unidad: { select: { placas: true } },
+        conductor: { select: { nombre: true, apellidos: true } },
+      },
+    });
+    if (!actual) {
+      throw new NotFoundException(`Viaje con id ${id} no encontrado`);
+    }
+    if (ESTADOS_TERMINALES.has(actual.estado)) {
+      throw new ConflictException(
+        'No se puede reasignar un viaje finalizado o cancelado',
       );
     }
 
@@ -68,20 +106,62 @@ export class AsignarViajeUseCase {
       data.conductor = { connect: { id: input.conductorId } };
     }
 
-    try {
-      return await this.prisma.viaje.update({
+    // ¿Qué cambió realmente? (compara contra la asignación previa).
+    const unidadNuevaId =
+      input.unidadId === undefined ? actual.unidadId : input.unidadId;
+    const conductorNuevoId =
+      input.conductorId === undefined ? actual.conductorId : input.conductorId;
+    const unidadCambio =
+      input.unidadId !== undefined && unidadNuevaId !== actual.unidadId;
+    const conductorCambio =
+      input.conductorId !== undefined && conductorNuevoId !== actual.conductorId;
+
+    const actualizado = await this.prisma.$transaction(async (tx) => {
+      const viaje = await tx.viaje.update({
         where: { id },
         data,
         include: RELACIONES_RESUMEN,
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        throw new NotFoundException(`Viaje con id ${id} no encontrado`);
+
+      // Auditoría: solo si algo cambió de verdad.
+      if (unidadCambio || conductorCambio) {
+        await tx.historialAsignacionViaje.create({
+          data: {
+            viajeId: id,
+            unidadAnterior: unidadCambio
+              ? (actual.unidad?.placas ?? 'Sin unidad')
+              : null,
+            unidadNueva: unidadCambio
+              ? (unidad?.placas ?? 'Sin unidad')
+              : null,
+            conductorAnterior: conductorCambio
+              ? nombreConductor(actual.conductor)
+              : null,
+            conductorNuevo: conductorCambio
+              ? nombreConductor(conductor)
+              : null,
+            motivo: input.motivo?.trim() || null,
+            nota: input.nota?.trim() || null,
+            registradoPor: registradoPor ?? null,
+          },
+        });
       }
-      throw error;
+      return viaje;
+    });
+
+    // Aviso en tiempo real al conductor saliente, al entrante y al panel.
+    if (unidadCambio || conductorCambio) {
+      this.tracking.emitirReasignacion({
+        viajeId: id,
+        folio: actual.folio,
+        conductorAnteriorId: conductorCambio ? actual.conductorId : null,
+        conductorNuevoId: conductorCambio ? conductorNuevoId : null,
+        unidadCambio,
+        conductorCambio,
+        motivo: input.motivo?.trim() || null,
+      });
     }
+
+    return actualizado;
   }
 }

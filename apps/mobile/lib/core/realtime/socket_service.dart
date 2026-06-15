@@ -10,6 +10,7 @@ abstract final class WsEvents {
   static const ubicacionActualizada = 'ubicacion:actualizada';
   static const viajeEstadoCambiado = 'viaje:estado';
   static const alerta = 'alerta';
+  static const viajeReasignado = 'viaje:reasignado';
 }
 
 /// Conexión Socket.io al namespace /tracking del API.
@@ -24,9 +25,14 @@ class SocketService {
 
   final _alertas = StreamController<Map<String, dynamic>>.broadcast();
   final _cambiosEstado = StreamController<Map<String, dynamic>>.broadcast();
+  final _reasignaciones = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get alertas => _alertas.stream;
   Stream<Map<String, dynamic>> get cambiosEstado => _cambiosEstado.stream;
+
+  /// Reasignaciones de viaje (sala personal `conductor:<id>`): el conductor
+  /// saliente o entrante recibe el aviso aunque no esté en la sala del viaje.
+  Stream<Map<String, dynamic>> get reasignaciones => _reasignaciones.stream;
 
   Future<void> conectar() async {
     if (_socket?.connected == true) return;
@@ -49,6 +55,9 @@ class SocketService {
       })
       ..on(WsEvents.viajeEstadoCambiado, (data) {
         if (data is Map) _cambiosEstado.add(Map<String, dynamic>.from(data));
+      })
+      ..on(WsEvents.viajeReasignado, (data) {
+        if (data is Map) _reasignaciones.add(Map<String, dynamic>.from(data));
       })
       ..onReconnectAttempt((_) async {
         // El access token dura 15 min y un viaje dura horas: si el payload
@@ -89,5 +98,6 @@ class SocketService {
     desconectar();
     _alertas.close();
     _cambiosEstado.close();
+    _reasignaciones.close();
   }
 }

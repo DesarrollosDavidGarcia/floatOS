@@ -29,6 +29,9 @@ export interface EscalaCercana {
   id: string;
   orden: number;
   accion: string;
+  direccion: string;
+  /** Sello de la primera alerta WS de llegada; null si aún no se ha avisado. */
+  llegadaNotificadaEn: Date | null;
 }
 
 /** Vista pública del viaje para el link de seguimiento del cliente final. */

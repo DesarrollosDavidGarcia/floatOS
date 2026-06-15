@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from './api';
+import { closeSocket } from './socket';
 
 /** Usuario autenticado del panel (vista pública que devuelve GET /auth/me). */
 export interface AuthUser {
@@ -46,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await api.post('/auth/logout').catch(() => undefined);
+    // Cierra el socket de tracking: con la cookie ya invalidada, el singleton
+    // global reintentaría conectar en bucle (el gateway lo rechaza). Forzar un
+    // handshake nuevo en el próximo login.
+    closeSocket();
     setUser(null);
     router.push('/login');
   }

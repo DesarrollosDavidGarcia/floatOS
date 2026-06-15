@@ -25,3 +25,15 @@ export function fechaRango(inicio?: string | null, fin?: string | null): string 
   if (!aDate(inicio)) return '—';
   return fin ? `${fechaCorta(inicio)} – ${fechaCorta(fin)}` : fechaCorta(inicio);
 }
+
+/** Solo la hora: "14:30" (o "" si la fecha no es válida). */
+export function horaCorta(iso?: string | null): string {
+  const d = aDate(iso);
+  return d ? format(d, 'HH:mm', { locale: es }) : '';
+}
+
+/** Fecha larga con hora: "15 de junio 2026, 14:30" (o "—"). */
+export function fechaLarga(iso?: string | null): string {
+  const d = aDate(iso);
+  return d ? format(d, "d 'de' MMMM yyyy, HH:mm", { locale: es }) : '—';
+}

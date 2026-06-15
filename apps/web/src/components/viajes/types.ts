@@ -40,6 +40,16 @@ export interface CargaEscala {
   loteRef?: string | null;
 }
 
+/** Persona a cargo en una escala: recibe el aviso de llegada del transportista. */
+export interface ContactoEscala {
+  id: string;
+  nombre: string;
+  email?: string | null;
+  telefono?: string | null;
+  /** Sello del email de llegada enviado; null si aún no se ha avisado. */
+  notificadoEn?: string | null;
+}
+
 /** Escala (parada) del itinerario de un viaje. */
 export interface EscalaViaje {
   id: string;
@@ -50,6 +60,7 @@ export interface EscalaViaje {
   lng?: number | null;
   notas?: string | null;
   cargas: CargaEscala[];
+  contactos?: ContactoEscala[];
 }
 
 /** Entrada del historial de cambios de estado de un viaje. */
@@ -57,6 +68,18 @@ export interface HistorialViaje {
   id: string;
   estadoAnterior: EstadoViaje | null;
   estadoNuevo: EstadoViaje;
+  nota?: string | null;
+  createdAt: string;
+}
+
+/** Entrada del historial de reasignaciones (cambio de unidad y/o conductor). */
+export interface HistorialAsignacion {
+  id: string;
+  unidadAnterior?: string | null;
+  unidadNueva?: string | null;
+  conductorAnterior?: string | null;
+  conductorNuevo?: string | null;
+  motivo?: string | null;
   nota?: string | null;
   createdAt: string;
 }
@@ -95,6 +118,7 @@ export interface Viaje {
   fechaProgramada?: string | null;
   trackingToken?: string | null;
   historial?: HistorialViaje[];
+  historialAsignaciones?: HistorialAsignacion[];
   createdAt: string;
   updatedAt?: string;
 }

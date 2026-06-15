@@ -43,6 +43,7 @@ export class CambiarEstadoViajeUseCase {
         conductorId: true,
         fechaInicio: true,
         fechaEntrega: true,
+        estadoPrevioVarado: true,
       },
     });
     if (!viaje) {
@@ -96,6 +97,13 @@ export class CambiarEstadoViajeUseCase {
     if (estadoNuevo === EstadoViaje.ENTREGADO && !viaje.fechaEntrega) {
       data.fechaEntrega = ahora;
     }
+    // Al marcar VARADO se recuerda el estado previo (para reanudar). Al salir de
+    // VARADO por esta vía (cancelar) se limpia.
+    if (estadoNuevo === EstadoViaje.VARADO) {
+      data.estadoPrevioVarado = estadoAnterior;
+    } else if (estadoAnterior === EstadoViaje.VARADO) {
+      data.estadoPrevioVarado = null;
+    }
 
     // Update condicional al estado leído: si otra petición concurrente ya cambió
     // el estado, el WHERE no matchea, Prisma lanza P2025 y lo traducimos a 409.
@@ -134,6 +142,81 @@ export class CambiarEstadoViajeUseCase {
       return sinToken;
     }
 
+    return actualizado;
+  }
+
+  /**
+   * Reanuda un viaje VARADO devolviéndolo al estado en que estaba antes de la
+   * incidencia (`estadoPrevioVarado`). Acción dedicada (no pasa por la tabla de
+   * transiciones). El conductor solo puede reanudar SUS viajes.
+   */
+  async reanudar(id: string, registradoPor: string, conductorId?: string) {
+    const viaje = await this.prisma.viaje.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        estado: true,
+        conductorId: true,
+        estadoPrevioVarado: true,
+      },
+    });
+    if (!viaje) {
+      throw new NotFoundException(`Viaje con id ${id} no encontrado`);
+    }
+    if (conductorId && viaje.conductorId !== conductorId) {
+      throw new ForbiddenException(
+        'No tiene permiso para reanudar este viaje',
+      );
+    }
+    if (viaje.estado !== EstadoViaje.VARADO) {
+      throw new ConflictException('El viaje no está varado');
+    }
+
+    const destino =
+      (viaje.estadoPrevioVarado as EstadoViaje | null) ??
+      EstadoViaje.EN_TRANSITO;
+
+    let actualizado;
+    try {
+      actualizado = await this.prisma.viaje.update({
+        where: { id, estado: EstadoViaje.VARADO },
+        data: {
+          estado: destino,
+          estadoPrevioVarado: null,
+          historial: {
+            create: {
+              estadoAnterior: EstadoViaje.VARADO,
+              estadoNuevo: destino,
+              nota: 'Viaje reanudado',
+              registradoPor,
+            },
+          },
+        },
+        include: RELACIONES_RESUMEN,
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2025'
+      ) {
+        throw new ConflictException(
+          'El estado del viaje cambió mientras se procesaba la petición; reintente.',
+        );
+      }
+      throw e;
+    }
+
+    this.tracking.emitirCambioEstado(id, {
+      viajeId: id,
+      estadoAnterior: EstadoViaje.VARADO,
+      estadoNuevo: destino,
+      registradoPor,
+    });
+
+    if (conductorId) {
+      const { trackingToken: _omit, ...sinToken } = actualizado;
+      return sinToken;
+    }
     return actualizado;
   }
 }
