@@ -19,6 +19,9 @@ export const RELACIONES_RESUMEN = {
   unidad: {
     select: { id: true, placas: true, tipo: true, marca: true, modelo: true },
   },
+  caja: {
+    select: { id: true, placas: true, tipo: true },
+  },
   conductor: {
     select: { id: true, nombre: true, apellidos: true, telefono: true },
   },
@@ -133,9 +136,10 @@ export interface EvaluarViajeInput {
   unidadIds?: string[];
 }
 
-/** Datos para asignar/reasignar unidad y/o conductor. `null` = desasignar. */
+/** Datos para asignar/reasignar unidad, caja y/o conductor. `null` = desasignar. */
 export interface AsignarViajeInput {
   unidadId?: string | null;
+  cajaId?: string | null;
   conductorId?: string | null;
   /** Motivo de la reasignación (avería/accidente/relevo/…); se guarda en auditoría. */
   motivo?: string;

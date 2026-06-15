@@ -245,6 +245,7 @@ export const CATALOGO_GRUPOS: CatalogoGrupoMeta[] = [
   { grupo: 'TIPO_AUSENCIA', nombre: 'Tipos de ausencia' },
   { grupo: 'TIPO_GASTO', nombre: 'Tipos de gasto' },
   { grupo: 'TIPO_UNIDAD', nombre: 'Tipos de unidad (flota)' },
+  { grupo: 'TIPO_CAJA', nombre: 'Tipos de caja / remolque' },
   { grupo: 'MARCA_UNIDAD', nombre: 'Marcas (flota)' },
   { grupo: 'MODELO_UNIDAD', nombre: 'Modelos (flota)' },
   { grupo: 'ASEGURADORA', nombre: 'Aseguradoras' },
@@ -297,6 +298,7 @@ export interface ReasignacionViajePayload {
   conductorAnteriorId: string | null;
   conductorNuevoId: string | null;
   unidadCambio: boolean;
+  cajaCambio: boolean;
   conductorCambio: boolean;
   motivo: string | null;
 }

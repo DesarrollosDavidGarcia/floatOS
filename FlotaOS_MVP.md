@@ -1258,6 +1258,25 @@ El conductor reporta un problema (avería/choque/ponchadura) en ruta; opcionalme
 
 **Pendiente del epic:** Fase 4 (separar tractor ↔ caja). Mejoras opcionales de Fase 3: foto (evidenciaKey/MinIO) y ubicación GPS automática en el reporte.
 
+### 2026-06-15 — Fase 4: separar tractor ↔ caja / remolque ✅
+
+La caja/remolque es ahora una entidad propia: el viaje referencia **tractor (unidad) + caja**, y se puede **intercambiar solo la caja** (escenario de choque) sin tocar tractor ni conductor. Verificado **E2E en vivo + 56/56 tests** API, `tsc` web + `flutter analyze` limpios. Migración `20260615150000_caja`.
+
+> Alcance: el **motor de cálculo/cotización siguen usando la capacidad de la Unidad** (no se reescribieron, para no desestabilizar algo tan probado). Integrar la capacidad de la caja al motor queda como follow-up.
+
+**Backend:**
+- Modelo **`Caja`** (placas únicas, tipo `TIPO_CAJA`, capacidadKg/M3, etc.); `Viaje.cajaId` + relación; CRUD `CajasUseCase` + `CajasController` (`/cajas`, AdminGuard) espejo de Unidades.
+- **Intercambio de caja** por el flujo de reasignación (`AsignarViajeUseCase` acepta `cajaId`): valida activa, audita (columnas `cajaAnterior/cajaNueva` en `HistorialAsignacionViaje`), y el payload WS `viaje:reasignado` lleva `cajaCambio`. `RELACIONES_RESUMEN` incluye `caja`.
+- Catálogo `TIPO_CAJA` (seed + `CATALOGO_GRUPOS`).
+
+**Web:** página **`/flota/cajas`** (CRUD, enlazada desde Flota) + `CajaFormDialog`; selector de **caja** en `AsignarDialog`; caja en la tarjeta de Asignación y línea de caja en el historial de Reasignaciones del detalle.
+
+**App Flutter:** `Viaje.cajaPlacas` + chip de la caja en el detalle.
+
+**Verificado E2E:** crear 2 cajas → asignar una → **intercambiar solo la caja** (CAJA-001→CAJA-002, motivo ACCIDENTE): la caja cambió, el conductor siguió igual, y la auditoría registró solo el cambio de caja.
+
+**Con esto el epic de incidencias/reasignación (Fases 1-4) queda completo.** Follow-ups opcionales: capacidad de caja en el motor; odómetro; foto/GPS en el reporte de incidencia.
+
 ---
 
 ## Riesgos técnicos

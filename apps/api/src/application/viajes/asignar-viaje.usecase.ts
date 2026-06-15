@@ -31,9 +31,13 @@ export class AsignarViajeUseCase {
   ) {}
 
   async execute(id: string, input: AsignarViajeInput, registradoPor?: string) {
-    if (input.unidadId === undefined && input.conductorId === undefined) {
+    if (
+      input.unidadId === undefined &&
+      input.cajaId === undefined &&
+      input.conductorId === undefined
+    ) {
       throw new BadRequestException(
-        'Debe indicar al menos unidadId o conductorId',
+        'Debe indicar al menos unidadId, cajaId o conductorId',
       );
     }
 
@@ -44,8 +48,10 @@ export class AsignarViajeUseCase {
         estado: true,
         folio: true,
         unidadId: true,
+        cajaId: true,
         conductorId: true,
         unidad: { select: { placas: true } },
+        caja: { select: { placas: true } },
         conductor: { select: { nombre: true, apellidos: true } },
       },
     });
@@ -60,9 +66,12 @@ export class AsignarViajeUseCase {
 
     // Validaciones de existencia solo cuando se asigna un id (string). `null`
     // significa desasignar; `undefined` significa no tocar ese campo.
-    const [unidad, conductor] = await Promise.all([
+    const [unidad, caja, conductor] = await Promise.all([
       typeof input.unidadId === 'string'
         ? this.prisma.unidad.findUnique({ where: { id: input.unidadId } })
+        : Promise.resolve(null),
+      typeof input.cajaId === 'string'
+        ? this.prisma.caja.findUnique({ where: { id: input.cajaId } })
         : Promise.resolve(null),
       typeof input.conductorId === 'string'
         ? this.prisma.conductor.findUnique({ where: { id: input.conductorId } })
@@ -87,6 +96,18 @@ export class AsignarViajeUseCase {
       data.unidad = { connect: { id: input.unidadId } };
     }
 
+    if (input.cajaId === null) {
+      data.caja = { disconnect: true };
+    } else if (typeof input.cajaId === 'string') {
+      if (!caja) {
+        throw new NotFoundException(`Caja con id ${input.cajaId} no encontrada`);
+      }
+      if (!caja.activo) {
+        throw new BadRequestException(`La caja ${input.cajaId} está inactiva`);
+      }
+      data.caja = { connect: { id: input.cajaId } };
+    }
+
     if (input.conductorId === null) {
       data.conductor = { disconnect: true };
     } else if (typeof input.conductorId === 'string') {
@@ -109,12 +130,17 @@ export class AsignarViajeUseCase {
     // ¿Qué cambió realmente? (compara contra la asignación previa).
     const unidadNuevaId =
       input.unidadId === undefined ? actual.unidadId : input.unidadId;
+    const cajaNuevaId =
+      input.cajaId === undefined ? actual.cajaId : input.cajaId;
     const conductorNuevoId =
       input.conductorId === undefined ? actual.conductorId : input.conductorId;
     const unidadCambio =
       input.unidadId !== undefined && unidadNuevaId !== actual.unidadId;
+    const cajaCambio =
+      input.cajaId !== undefined && cajaNuevaId !== actual.cajaId;
     const conductorCambio =
       input.conductorId !== undefined && conductorNuevoId !== actual.conductorId;
+    const huboCambio = unidadCambio || cajaCambio || conductorCambio;
 
     const actualizado = await this.prisma.$transaction(async (tx) => {
       const viaje = await tx.viaje.update({
@@ -124,7 +150,7 @@ export class AsignarViajeUseCase {
       });
 
       // Auditoría: solo si algo cambió de verdad.
-      if (unidadCambio || conductorCambio) {
+      if (huboCambio) {
         await tx.historialAsignacionViaje.create({
           data: {
             viajeId: id,
@@ -134,6 +160,10 @@ export class AsignarViajeUseCase {
             unidadNueva: unidadCambio
               ? (unidad?.placas ?? 'Sin unidad')
               : null,
+            cajaAnterior: cajaCambio
+              ? (actual.caja?.placas ?? 'Sin caja')
+              : null,
+            cajaNueva: cajaCambio ? (caja?.placas ?? 'Sin caja') : null,
             conductorAnterior: conductorCambio
               ? nombreConductor(actual.conductor)
               : null,
@@ -150,13 +180,14 @@ export class AsignarViajeUseCase {
     });
 
     // Aviso en tiempo real al conductor saliente, al entrante y al panel.
-    if (unidadCambio || conductorCambio) {
+    if (huboCambio) {
       this.tracking.emitirReasignacion({
         viajeId: id,
         folio: actual.folio,
         conductorAnteriorId: conductorCambio ? actual.conductorId : null,
         conductorNuevoId: conductorCambio ? conductorNuevoId : null,
         unidadCambio,
+        cajaCambio,
         conductorCambio,
         motivo: input.motivo?.trim() || null,
       });

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Building2, Copy, MapPin, Pencil, PlayCircle, Truck, User } from 'lucide-react';
+import { ArrowLeft, Building2, Container, Copy, MapPin, Pencil, PlayCircle, Truck, User } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { invalidarViajes } from '@/lib/query-keys';
 import { fechaLarga, horaCorta } from '@/lib/fecha';
@@ -167,6 +167,7 @@ export default function ViajeDetallePage() {
               viajeId={viaje.id}
               estado={viaje.estado}
               unidadIdActual={viaje.unidad?.id ?? viaje.unidadId}
+              cajaIdActual={viaje.caja?.id ?? viaje.cajaId}
               conductorIdActual={viaje.conductor?.id ?? viaje.conductorId}
             />
             <Button asChild variant="outline">
@@ -324,6 +325,13 @@ export default function ViajeDetallePage() {
                         → <span className="font-medium">{h.unidadNueva}</span>
                       </p>
                     )}
+                    {h.cajaNueva && (
+                      <p className="mt-1">
+                        <Container className="mr-1 inline h-3.5 w-3.5 text-muted-foreground" />
+                        Caja: <span className="text-muted-foreground">{h.cajaAnterior}</span>{' '}
+                        → <span className="font-medium">{h.cajaNueva}</span>
+                      </p>
+                    )}
                     {h.nota && (
                       <p className="mt-1 text-xs italic text-muted-foreground">{h.nota}</p>
                     )}
@@ -400,6 +408,13 @@ export default function ViajeDetallePage() {
                           .join(' · ')
                       : 'Sin asignar'}
                   </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Container className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Caja / remolque</p>
+                  <p className="font-medium">{viaje.caja?.placas ?? 'Sin asignar'}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

@@ -16,6 +16,20 @@ export interface Unidad {
   activo: boolean;
 }
 
+/** Caja / remolque intercambiable de la flota. */
+export interface Caja {
+  id: string;
+  placas: string;
+  tipo: string;
+  marca?: string | null;
+  anio?: number | null;
+  capacidadKg?: number | null;
+  capacidadM3?: number | null;
+  aseguradora?: string | null;
+  numeroPoliza?: string | null;
+  activo: boolean;
+}
+
 export interface DocumentoUnidad {
   id: string;
   tipo: TipoDocumentoUnidad;

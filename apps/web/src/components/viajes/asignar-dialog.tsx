@@ -27,7 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useConductoresCatalogo, useUnidadesCatalogo } from './catalogos';
+import {
+  useCajasCatalogo,
+  useConductoresCatalogo,
+  useUnidadesCatalogo,
+} from './catalogos';
 import { ConductorSelectItems } from './conductor-select-items';
 
 const NINGUNO = '__ninguno__';
@@ -51,41 +55,48 @@ export function AsignarDialog({
   viajeId,
   estado,
   unidadIdActual,
+  cajaIdActual,
   conductorIdActual,
 }: {
   viajeId: string;
   estado?: EstadoViaje;
   unidadIdActual?: string | null;
+  cajaIdActual?: string | null;
   conductorIdActual?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [unidadId, setUnidadId] = useState<string>(unidadIdActual ?? NINGUNO);
+  const [cajaId, setCajaId] = useState<string>(cajaIdActual ?? NINGUNO);
   const [conductorId, setConductorId] = useState<string>(conductorIdActual ?? NINGUNO);
   const [motivo, setMotivo] = useState<string>(NINGUNO);
   const [nota, setNota] = useState<string>('');
   const qc = useQueryClient();
 
   const unidades = useUnidadesCatalogo();
+  const cajas = useCajasCatalogo();
   const conductores = useConductoresCatalogo();
 
   useEffect(() => {
     if (open) {
       setUnidadId(unidadIdActual ?? NINGUNO);
+      setCajaId(cajaIdActual ?? NINGUNO);
       setConductorId(conductorIdActual ?? NINGUNO);
       setMotivo(NINGUNO);
       setNota('');
     }
-  }, [open, unidadIdActual, conductorIdActual]);
+  }, [open, unidadIdActual, cajaIdActual, conductorIdActual]);
 
   const mutar = useMutation({
     mutationFn: async () => {
       const body: {
         unidadId?: string | null;
+        cajaId?: string | null;
         conductorId?: string | null;
         motivo?: string;
         nota?: string;
       } = {
         unidadId: unidadId === NINGUNO ? null : unidadId,
+        cajaId: cajaId === NINGUNO ? null : cajaId,
         conductorId: conductorId === NINGUNO ? null : conductorId,
         motivo: motivo === NINGUNO ? undefined : motivo,
         nota: nota.trim() || undefined,
@@ -103,7 +114,7 @@ export function AsignarDialog({
     onError: (err) => toast.error(apiError(err)),
   });
 
-  const tieneAsignacion = Boolean(unidadIdActual || conductorIdActual);
+  const tieneAsignacion = Boolean(unidadIdActual || cajaIdActual || conductorIdActual);
   const enCurso = estado ? ESTADOS_EN_CURSO.includes(estado) : false;
 
   return (
@@ -141,6 +152,22 @@ export function AsignarDialog({
                 {(unidades.data ?? []).map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="asignar-caja">Caja / remolque</Label>
+            <Select value={cajaId} onValueChange={setCajaId}>
+              <SelectTrigger id="asignar-caja">
+                <SelectValue placeholder={cajas.isLoading ? 'Cargando…' : 'Sin asignar'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NINGUNO}>Sin asignar</SelectItem>
+                {(cajas.data ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.label}
                   </SelectItem>
                 ))}
               </SelectContent>

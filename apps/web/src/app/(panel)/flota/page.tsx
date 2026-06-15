@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, MoreHorizontal, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react';
+import { Container, FileText, MoreHorizontal, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
@@ -103,6 +104,11 @@ export default function FlotaPage() {
         description="Unidades de la flotilla y sus documentos."
         action={
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <Button variant="outline" className="shrink-0" asChild>
+              <Link href="/flota/cajas">
+                <Container /> Cajas
+              </Link>
+            </Button>
             <SearchInput
               value={busqueda}
               onChange={(v) => {

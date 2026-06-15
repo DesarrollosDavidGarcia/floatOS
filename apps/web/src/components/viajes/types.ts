@@ -18,6 +18,13 @@ export interface UnidadResumen {
   modelo?: string | null;
 }
 
+/** Resumen de caja / remolque embebido en el viaje. */
+export interface CajaResumen {
+  id: string;
+  placas: string;
+  tipo?: string | null;
+}
+
 /** Resumen de conductor embebido en el viaje. */
 export interface ConductorResumen {
   id: string;
@@ -89,6 +96,8 @@ export interface HistorialAsignacion {
   id: string;
   unidadAnterior?: string | null;
   unidadNueva?: string | null;
+  cajaAnterior?: string | null;
+  cajaNueva?: string | null;
   conductorAnterior?: string | null;
   conductorNuevo?: string | null;
   motivo?: string | null;
@@ -105,6 +114,8 @@ export interface Viaje {
   clienteId: string;
   unidad?: UnidadResumen | null;
   unidadId?: string | null;
+  caja?: CajaResumen | null;
+  cajaId?: string | null;
   conductor?: ConductorResumen | null;
   conductorId?: string | null;
   origenDireccion: string;

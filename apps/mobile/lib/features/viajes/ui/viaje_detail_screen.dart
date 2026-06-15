@@ -481,11 +481,21 @@ class _Contenido extends StatelessWidget {
                 children: [
                   EstadoChip(viaje.estado),
                   const Spacer(),
-                  if (viaje.unidadPlacas != null)
-                    _Pill(
-                      icono: Icons.local_shipping_outlined,
-                      texto: viaje.unidadPlacas!,
-                    ),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      if (viaje.unidadPlacas != null)
+                        _Pill(
+                          icono: Icons.local_shipping_outlined,
+                          texto: viaje.unidadPlacas!,
+                        ),
+                      if (viaje.cajaPlacas != null)
+                        _Pill(
+                          icono: Icons.inventory_2_outlined,
+                          texto: viaje.cajaPlacas!,
+                        ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

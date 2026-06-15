@@ -140,6 +140,14 @@ const CATALOGOS = {
     ['PIPA', 'Pipa'],
     ['OTRO', 'Otro'],
   ],
+  TIPO_CAJA: [
+    ['SECA', 'Caja seca'],
+    ['REFRIGERADA', 'Caja refrigerada'],
+    ['ISOTERMICA', 'Caja isotérmica'],
+    ['PLATAFORMA', 'Plataforma'],
+    ['TOLVA', 'Tolva'],
+    ['OTRO', 'Otro'],
+  ],
   ASEGURADORA: [
     ['QUALITAS', 'Quálitas'],
     ['GNP', 'GNP'],

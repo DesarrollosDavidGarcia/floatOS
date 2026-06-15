@@ -11,6 +11,10 @@ export class AsignarViajeDto {
 
   @IsOptional()
   @IsString()
+  cajaId?: string | null;
+
+  @IsOptional()
+  @IsString()
   conductorId?: string | null;
 
   @IsOptional()

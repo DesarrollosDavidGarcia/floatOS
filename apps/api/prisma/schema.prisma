@@ -361,6 +361,28 @@ model Unidad {
   @@map("unidades")
 }
 
+/// Caja / remolque intercambiable. El tractor (Unidad) tira de la caja; una caja
+/// puede ir con distintos tractores y se puede cambiar a media operación (p. ej.
+/// tras un choque) sin cambiar el tractor.
+model Caja {
+  id           String   @id @default(cuid())
+  placas       String   @unique
+  tipo         String // catálogo TIPO_CAJA (seca, refrigerada, etc.)
+  marca        String?
+  anio         Int?
+  capacidadKg  Decimal? @db.Decimal(10, 2)
+  capacidadM3  Decimal? @db.Decimal(10, 3)
+  aseguradora  String?
+  numeroPoliza String?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  viajes Viaje[]
+
+  @@map("cajas")
+}
+
 /// Categoría de un archivo adjunto a una unidad.
 enum CategoriaArchivoUnidad {
   POLIZA_SEGURO
@@ -749,7 +771,8 @@ model Viaje {
   id            String      @id @default(cuid())
   folio         Int         @unique @default(autoincrement())
   clienteId     String
-  unidadId      String?
+  unidadId      String? // tractor
+  cajaId        String? // caja / remolque (intercambiable)
   conductorId   String?
 
   // Origen / destino — DERIVADOS de las escalas (primera = origen, última = destino).
@@ -796,6 +819,7 @@ model Viaje {
 
   cliente   Cliente    @relation(fields: [clienteId], references: [id])
   unidad    Unidad?    @relation(fields: [unidadId], references: [id])
+  caja      Caja?      @relation(fields: [cajaId], references: [id])
   conductor Conductor? @relation(fields: [conductorId], references: [id])
 
   escalas               EscalaViaje[]
@@ -811,6 +835,7 @@ model Viaje {
 
   @@index([clienteId])
   @@index([unidadId])
+  @@index([cajaId])
   @@index([conductorId])
   // El listado filtra por estado y ordena por createdAt desc (índice compuesto);
   // fechaProgramada se usa en el filtro de rango; createdAt en el orden por defecto.
@@ -843,6 +868,8 @@ model HistorialAsignacionViaje {
   viajeId           String
   unidadAnterior    String? // placas previas (o "Sin unidad")
   unidadNueva       String?
+  cajaAnterior      String? // placas de caja previas (o "Sin caja")
+  cajaNueva         String?
   conductorAnterior String? // nombre previo (o "Sin conductor")
   conductorNuevo    String?
   motivo            String? // catálogo MOTIVOS_REASIGNACION (o libre)
