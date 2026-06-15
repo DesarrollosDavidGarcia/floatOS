@@ -1277,6 +1277,16 @@ La caja/remolque es ahora una entidad propia: el viaje referencia **tractor (uni
 
 **Con esto el epic de incidencias/reasignación (Fases 1-4) queda completo.** Follow-ups opcionales: capacidad de caja en el motor; odómetro; foto/GPS en el reporte de incidencia.
 
+### 2026-06-15 — Auditoría del epic (Fases 1-4) + fixes ✅
+
+Revisión multiagente (4 lentes) del epic. Veredicto: bien construido (locks correctos, autorización, geocerca, caja integrada al patrón; 0 problemas de rendimiento). Aplicado y verificado (**64/64 tests**, E2E):
+- **P0 — incidencia↔VARADO atómico:** la transición a VARADO al reportar ahora es **best-effort** (try/catch): si falla por concurrencia, igual se crea la incidencia y se emite el aviso al panel (no más huérfanas/duplicadas ni aviso perdido).
+- **P1 — doble-uso de caja:** `asegurarCajaDisponible` → **409** si la caja ya está en otro viaje abierto (espejo del de conductores). E2E confirmado.
+- **P1 — tipado WS:** `CambioEstadoViajePayload` en shared-types; `emitirCambioEstado` tipado (antes `unknown`). Estandarizado el doble import de `EstadoViaje` en `reportar-incidencia` (solo shared-types).
+- **QA:** `cajas.usecase.spec` (409/404), spec del **swap de solo-caja** (audita caja, no toca unidad/conductor, `cajaCambio`), y rama de **conductor ocupado** (409).
+
+**Backlog de la auditoría (no aplicado):** capacidad de caja en el motor de cálculo (sobrecarga no detectada al cambiar a caja menor); chip de disponibilidad de caja en el selector; valor `desconocido` en el enum Dart (el fallback a `varado` arrastra efectos en estados futuros); ENTREGADO sigue siendo reasignable; extraer tarjetas del detalle del viaje (reasignaciones/incidencias) y helper de transición en `cambiar-estado`; unificar labels TIPO/MOTIVO en shared-types; foto+GPS/odómetro/documentos de caja.
+
 ---
 
 ## Riesgos técnicos

@@ -45,3 +45,29 @@ export async function asegurarConductorDisponible(
     );
   }
 }
+
+/**
+ * Lanza 409 si la caja ya está enganchada a otro viaje abierto. La caja física
+ * no se clona: no puede ir en dos viajes a la vez. `viajeIdActual` excluye al
+ * propio viaje (reasignar la misma caja al mismo viaje no es conflicto).
+ */
+export async function asegurarCajaDisponible(
+  prisma: PrismaService,
+  cajaId: string,
+  viajeIdActual?: string,
+): Promise<void> {
+  const ocupadaEn = await prisma.viaje.findFirst({
+    where: {
+      cajaId,
+      estado: { in: ESTADOS_VIAJE_ABIERTOS },
+      ...(viajeIdActual ? { NOT: { id: viajeIdActual } } : {}),
+    },
+    select: { folio: true, estado: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (ocupadaEn) {
+    throw new ConflictException(
+      `La caja ya está en el viaje #${ocupadaEn.folio} en curso (${etiquetaEstado(ocupadaEn.estado)})`,
+    );
+  }
+}

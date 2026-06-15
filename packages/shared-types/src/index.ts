@@ -303,6 +303,15 @@ export interface ReasignacionViajePayload {
   motivo: string | null;
 }
 
+/** Payload del evento WS 'viaje:estado' (cambio de estado del viaje). */
+export interface CambioEstadoViajePayload {
+  viajeId: string;
+  estadoAnterior: EstadoViaje;
+  estadoNuevo: EstadoViaje;
+  nota?: string;
+  registradoPor?: string;
+}
+
 /** Tipo de alerta de geocerca (por ahora solo llegada a una escala). */
 export type TipoAlerta = 'llegada_escala';
 

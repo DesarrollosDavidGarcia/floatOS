@@ -8,7 +8,10 @@ import { EstadoViaje, Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 import { AsignarViajeInput, RELACIONES_RESUMEN } from './viajes.types';
-import { asegurarConductorDisponible } from './disponibilidad-conductor.helper';
+import {
+  asegurarCajaDisponible,
+  asegurarConductorDisponible,
+} from './disponibilidad-conductor.helper';
 
 /** Estados finales en los que ya no tiene sentido reasignar. */
 const ESTADOS_TERMINALES: ReadonlySet<EstadoViaje> = new Set([
@@ -105,6 +108,8 @@ export class AsignarViajeUseCase {
       if (!caja.activo) {
         throw new BadRequestException(`La caja ${input.cajaId} está inactiva`);
       }
+      // Una caja ya enganchada a otro viaje abierto no puede ir en este (409).
+      await asegurarCajaDisponible(this.prisma, input.cajaId, id);
       data.caja = { connect: { id: input.cajaId } };
     }
 

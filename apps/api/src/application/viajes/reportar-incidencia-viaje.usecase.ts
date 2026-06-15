@@ -1,10 +1,10 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { EstadoViaje } from '@prisma/client';
-import { EstadoViaje as EstadoViajeShared } from '@flotaos/shared-types';
+import { EstadoViaje } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 import { CambiarEstadoViajeUseCase } from './cambiar-estado-viaje.usecase';
@@ -45,6 +45,8 @@ function nombreConductor(c: { nombre: string; apellidos: string | null } | null)
  */
 @Injectable()
 export class ReportarIncidenciaViajeUseCase {
+  private readonly logger = new Logger(ReportarIncidenciaViajeUseCase.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tracking: TrackingGateway,
@@ -101,15 +103,24 @@ export class ReportarIncidenciaViajeUseCase {
 
     // Si se pidió y el viaje está en ruta, lo deja en VARADO (reutiliza la
     // transición validada del use case de estado: historial + WS + estado previo).
+    // Best-effort: la incidencia ya quedó registrada; si la pausa falla (p. ej. el
+    // estado cambió concurrentemente → 409), NO se pierde el reporte ni el aviso
+    // al panel, solo `varado` queda en false.
     let varado = false;
-    if (input.marcarVarado && ESTADOS_EN_RUTA.has(viaje.estado)) {
-      await this.cambiarEstado.execute(
-        viajeId,
-        { estado: EstadoViajeShared.VARADO, nota: titulo },
-        registradoPor,
-        conductorId,
-      );
-      varado = true;
+    if (input.marcarVarado && ESTADOS_EN_RUTA.has(viaje.estado as EstadoViaje)) {
+      try {
+        await this.cambiarEstado.execute(
+          viajeId,
+          { estado: EstadoViaje.VARADO, nota: titulo },
+          registradoPor,
+          conductorId,
+        );
+        varado = true;
+      } catch (e) {
+        this.logger.warn(
+          `Incidencia registrada pero no se pudo marcar VARADO (viaje ${viajeId}): ${(e as Error).message}`,
+        );
+      }
     }
 
     this.tracking.emitirIncidencia({

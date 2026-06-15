@@ -18,6 +18,7 @@ function prismaMock(actual: Record<string, unknown>, overrides: Record<string, u
       findFirst: jest.fn().mockResolvedValue(null),
     },
     unidad: { findUnique: jest.fn() },
+    caja: { findUnique: jest.fn() },
     conductor: { findUnique: jest.fn() },
     $transaction: jest.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
     ...overrides,
@@ -97,5 +98,57 @@ describe('AsignarViajeUseCase', () => {
 
     expect(crearHistorial).not.toHaveBeenCalled();
     expect(tracking.emitirReasignacion).not.toHaveBeenCalled();
+  });
+
+  it('intercambia solo la caja: audita la caja y no toca unidad/conductor', async () => {
+    const { prisma, crearHistorial } = prismaMock({
+      estado: EstadoViaje.EN_TRANSITO,
+      folio: 6,
+      unidadId: 'u1',
+      cajaId: 'cajaVieja',
+      conductorId: 'c1',
+      unidad: { placas: 'TRACTOR-1' },
+      caja: { placas: 'CAJA-A' },
+      conductor: { nombre: 'Laura', apellidos: 'Méndez' },
+    });
+    prisma.caja.findUnique = jest
+      .fn()
+      .mockResolvedValue({ id: 'cajaNueva', activo: true, placas: 'CAJA-B' });
+    const { uc, tracking } = crear(prisma);
+
+    await uc.execute('v1', { cajaId: 'cajaNueva', motivo: 'ACCIDENTE' });
+
+    const data = crearHistorial.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      cajaAnterior: 'CAJA-A',
+      cajaNueva: 'CAJA-B',
+      unidadAnterior: null, // la unidad no cambió
+      conductorAnterior: null, // el conductor no cambió
+    });
+    const payload = (tracking.emitirReasignacion as jest.Mock).mock.calls[0][0];
+    expect(payload).toMatchObject({ cajaCambio: true, unidadCambio: false, conductorCambio: false });
+  });
+
+  it('rechaza asignar un conductor ya ocupado en otro viaje (409)', async () => {
+    const { prisma } = prismaMock({
+      estado: EstadoViaje.ASIGNADO,
+      folio: 6,
+      conductorId: null,
+      unidad: null,
+      caja: null,
+      conductor: null,
+    });
+    prisma.conductor.findUnique = jest
+      .fn()
+      .mockResolvedValue({ id: 'c2', activo: true, nombre: 'Pedro', apellidos: 'Ruiz' });
+    // El conductor ya tiene un viaje abierto.
+    prisma.viaje.findFirst = jest
+      .fn()
+      .mockResolvedValue({ folio: 9, estado: EstadoViaje.EN_TRANSITO });
+    const { uc } = crear(prisma);
+
+    await expect(
+      uc.execute('v1', { conductorId: 'c2' }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

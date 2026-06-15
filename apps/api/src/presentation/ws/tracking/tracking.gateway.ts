@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import {
   WS_EVENTS,
   type AlertaLlegadaPayload,
+  type CambioEstadoViajePayload,
   type IncidenciaReportadaPayload,
   type ReasignacionViajePayload,
 } from '@flotaos/shared-types';
@@ -220,7 +221,10 @@ export class TrackingGateway implements OnGatewayConnection {
   }
 
   /** Reemite un cambio de estado del viaje a la sala. */
-  emitirCambioEstado(viajeId: string, payload: unknown): void {
+  emitirCambioEstado(
+    viajeId: string,
+    payload: CambioEstadoViajePayload,
+  ): void {
     this.server
       .to(salaViaje(viajeId))
       .emit(WS_EVENTS.VIAJE_ESTADO_CAMBIADO, payload);
