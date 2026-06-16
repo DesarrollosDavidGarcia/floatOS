@@ -62,6 +62,25 @@ export function useUnidadesCatalogo() {
   });
 }
 
+interface CajaApi {
+  id: string;
+  placas: string;
+  tipo?: string | null;
+}
+
+/** Catálogo de cajas / remolques para selects. */
+export function useCajasCatalogo() {
+  return useQuery<OpcionCatalogo[]>({
+    queryKey: ['catalogo', 'cajas'],
+    queryFn: async () => {
+      const { data } = await api.get<PaginadoApi<CajaApi>>('/cajas', {
+        params: { pageSize: 100 },
+      });
+      return data.data.map((c) => ({ id: c.id, label: c.placas }));
+    },
+  });
+}
+
 /** Catálogo de conductores para selects, con su disponibilidad. */
 export function useConductoresCatalogo() {
   return useQuery<OpcionConductor[]>({

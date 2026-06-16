@@ -143,6 +143,7 @@ class Viaje {
     this.clienteNombre,
     this.unidadPlacas,
     this.unidadDescripcion,
+    this.cajaPlacas,
     this.escalas = const [],
     this.historial = const [],
     this.rutaGeometria = const [],
@@ -167,6 +168,7 @@ class Viaje {
   final String? clienteNombre;
   final String? unidadPlacas;
   final String? unidadDescripcion;
+  final String? cajaPlacas;
   final List<Escala> escalas;
   final List<HistorialEstado> historial;
 
@@ -179,6 +181,7 @@ class Viaje {
   factory Viaje.fromJson(Map<String, dynamic> json) {
     final cliente = json['cliente'] as Map<String, dynamic>?;
     final unidad = json['unidad'] as Map<String, dynamic>?;
+    final caja = json['caja'] as Map<String, dynamic>?;
     final marcaModelo = [
       unidad?['marca'] as String?,
       unidad?['modelo'] as String?,
@@ -204,6 +207,7 @@ class Viaje {
       clienteNombre: cliente?['razonSocial'] as String?,
       unidadPlacas: unidad?['placas'] as String?,
       unidadDescripcion: marcaModelo.isEmpty ? null : marcaModelo,
+      cajaPlacas: caja?['placas'] as String?,
       escalas: (json['escalas'] as List<dynamic>? ?? [])
           .map((e) => Escala.fromJson(e as Map<String, dynamic>))
           .toList()

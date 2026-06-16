@@ -7,6 +7,15 @@ import { EditarViajeUseCase } from './editar-viaje.usecase';
 import { AsignarViajeUseCase } from './asignar-viaje.usecase';
 import { CambiarEstadoViajeUseCase } from './cambiar-estado-viaje.usecase';
 import { ActualizarPlanRutaUseCase } from './actualizar-plan-ruta.usecase';
+import {
+  ContactoEscalaInput,
+  GestionarContactosEscalaUseCase,
+} from './gestionar-contactos-escala.usecase';
+import { ListarLlegadasRecientesUseCase } from './listar-llegadas-recientes.usecase';
+import {
+  ReportarIncidenciaInput,
+  ReportarIncidenciaViajeUseCase,
+} from './reportar-incidencia-viaje.usecase';
 import { MotorViajeService } from './motor-viaje.service';
 import {
   AsignarViajeInput,
@@ -33,6 +42,9 @@ export class ViajesService {
     private readonly asignarViaje: AsignarViajeUseCase,
     private readonly cambiarEstadoViaje: CambiarEstadoViajeUseCase,
     private readonly actualizarPlanRuta: ActualizarPlanRutaUseCase,
+    private readonly gestionarContactos: GestionarContactosEscalaUseCase,
+    private readonly listarLlegadas: ListarLlegadasRecientesUseCase,
+    private readonly reportarIncidenciaUC: ReportarIncidenciaViajeUseCase,
     private readonly motor: MotorViajeService,
   ) {}
 
@@ -71,8 +83,8 @@ export class ViajesService {
     return this.editarViaje.execute(id, input);
   }
 
-  asignar(id: string, input: AsignarViajeInput) {
-    return this.asignarViaje.execute(id, input);
+  asignar(id: string, input: AsignarViajeInput, registradoPor?: string) {
+    return this.asignarViaje.execute(id, input, registradoPor);
   }
 
   /** Guarda el plan multi-día del viaje (planeación de la llegada estimada). */
@@ -92,5 +104,42 @@ export class ViajesService {
       registradoPor,
       conductorId,
     );
+  }
+
+  /** Reanuda un viaje VARADO al estado en que estaba antes de la incidencia. */
+  reanudar(id: string, registradoPor: string, conductorId?: string) {
+    return this.cambiarEstadoViaje.reanudar(id, registradoPor, conductorId);
+  }
+
+  /** El conductor (o admin) reporta una incidencia operativa de un viaje. */
+  reportarIncidencia(
+    viajeId: string,
+    input: ReportarIncidenciaInput,
+    registradoPor: string,
+    conductorId?: string,
+  ) {
+    return this.reportarIncidenciaUC.execute(
+      viajeId,
+      input,
+      registradoPor,
+      conductorId,
+    );
+  }
+
+  /**
+   * Reemplaza las personas a cargo (gente que recibe el aviso de llegada) de una
+   * escala. Requiere que el viaje tenga una cotización aceptada.
+   */
+  gestionarContactosEscala(
+    viajeId: string,
+    escalaId: string,
+    contactos: ContactoEscalaInput[],
+  ) {
+    return this.gestionarContactos.execute(viajeId, escalaId, contactos);
+  }
+
+  /** Historial reciente de llegadas (geocercas) para la campana del panel. */
+  llegadasRecientes() {
+    return this.listarLlegadas.execute();
   }
 }

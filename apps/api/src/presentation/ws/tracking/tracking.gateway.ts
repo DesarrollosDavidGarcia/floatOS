@@ -9,7 +9,13 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { WS_EVENTS } from '@flotaos/shared-types';
+import {
+  WS_EVENTS,
+  type AlertaLlegadaPayload,
+  type CambioEstadoViajePayload,
+  type IncidenciaReportadaPayload,
+  type ReasignacionViajePayload,
+} from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { COOKIE_ACCESS, valorDeCookie } from '../../http/auth/cookies';
 
@@ -17,6 +23,18 @@ import { COOKIE_ACCESS, valorDeCookie } from '../../http/auth/cookies';
 function salaViaje(viajeId: string): string {
   return `viaje:${viajeId}`;
 }
+
+/** Sala personal de un conductor (avisos dirigidos: reasignación, etc.). */
+function salaConductor(conductorId: string): string {
+  return `conductor:${conductorId}`;
+}
+
+/**
+ * Sala global de monitoristas: todos los admin se unen al conectarse y reciben
+ * las alertas de llegada de CUALQUIER viaje (notificaciones globales del panel),
+ * sin tener que estar suscritos a la sala de cada viaje.
+ */
+const SALA_ADMIN = 'admin';
 
 /** Principal autenticado almacenado en client.data tras el handshake. */
 interface SocketPrincipal {
@@ -98,6 +116,15 @@ export class TrackingGateway implements OnGatewayConnection {
         type: payload.type,
       };
       client.data.principal = principal;
+      // El monitorista entra a la sala global de admin para recibir las alertas
+      // de llegada de todos los viajes (notificaciones globales del panel). El
+      // conductor entra a su sala personal para recibir avisos dirigidos (p. ej.
+      // que lo reasignaron o le asignaron un viaje).
+      if (principal.type === 'admin') {
+        void client.join(SALA_ADMIN);
+      } else {
+        void client.join(salaConductor(principal.sub));
+      }
       this.logger.debug(
         `Cliente ${client.id} autenticado como ${principal.type}:${principal.sub}`,
       );
@@ -194,14 +221,53 @@ export class TrackingGateway implements OnGatewayConnection {
   }
 
   /** Reemite un cambio de estado del viaje a la sala. */
-  emitirCambioEstado(viajeId: string, payload: unknown): void {
+  emitirCambioEstado(
+    viajeId: string,
+    payload: CambioEstadoViajePayload,
+  ): void {
     this.server
       .to(salaViaje(viajeId))
       .emit(WS_EVENTS.VIAJE_ESTADO_CAMBIADO, payload);
   }
 
-  /** Emite una alerta (p. ej. geocerca de llegada) a la sala del viaje. */
-  emitirAlerta(viajeId: string, payload: unknown): void {
-    this.server.to(salaViaje(viajeId)).emit(WS_EVENTS.ALERTA, payload);
+  /**
+   * Emite una alerta (p. ej. geocerca de llegada) a la sala del viaje y a la sala
+   * global de admin. Socket.io deduplica: un admin presente en ambas salas recibe
+   * el evento una sola vez.
+   */
+  emitirAlerta(viajeId: string, payload: AlertaLlegadaPayload): void {
+    this.server
+      .to(salaViaje(viajeId))
+      .to(SALA_ADMIN)
+      .emit(WS_EVENTS.ALERTA, payload);
+  }
+
+  /**
+   * Avisa de una reasignación (cambio de unidad y/o conductor) a la sala del
+   * viaje (conductor saliente, aún suscrito), a las salas personales del
+   * conductor saliente y entrante, y a la sala de admin. Socket.io deduplica.
+   */
+  emitirReasignacion(payload: ReasignacionViajePayload): void {
+    let emisor = this.server
+      .to(salaViaje(payload.viajeId))
+      .to(SALA_ADMIN);
+    if (payload.conductorAnteriorId) {
+      emisor = emisor.to(salaConductor(payload.conductorAnteriorId));
+    }
+    if (payload.conductorNuevoId) {
+      emisor = emisor.to(salaConductor(payload.conductorNuevoId));
+    }
+    emisor.emit(WS_EVENTS.VIAJE_REASIGNADO, payload);
+  }
+
+  /**
+   * Avisa al panel (sala admin) y a la sala del viaje que el conductor reportó
+   * una incidencia (avería/choque/etc.). Lo consume la campana del panel.
+   */
+  emitirIncidencia(payload: IncidenciaReportadaPayload): void {
+    this.server
+      .to(salaViaje(payload.viajeId))
+      .to(SALA_ADMIN)
+      .emit(WS_EVENTS.INCIDENCIA_REPORTADA, payload);
   }
 }

@@ -1120,6 +1120,173 @@ Sesión sobre **tiempo real en el panel** y **reglas de negocio de asignación**
 - **Fase 2:** endpoints de POD y gastos + pantallas en la app; Parte B del timbrado Carta Porte (SW Sapien).
 - **Recordatorios:** rotar la API key de Brevo; datos fiscales reales del emisor; limpiar datos de prueba (pedro tiene 2 viajes abiertos previos a la regla; conductora `laura` de smoke).
 
+### 2026-06-15 — Personas a cargo por escala: aviso de llegada por email ✅
+
+Cuando un viaje tiene una **cotización ACEPTADA**, se pueden registrar **personas a cargo en cada parada** (nombre + email + celular opcional) que reciben un **email automático** al detectar la llegada del transportista. Reusa la geocerca existente; el celular se guarda pero el **SMS queda pendiente** (canal único hoy: email).
+
+**Modelo de datos:** nuevo `ContactoEscala` (hijo de `EscalaViaje`, `onDelete: Cascade`) con `nombre`, `email?`, `telefono?`, `notificadoEn?`. Migración `20260615120000_contactos_escala`. ⚠️ **Gotcha PostGIS:** `prisma migrate dev` rompe porque el *shadow DB* no tiene PostGIS (la extensión se habilita fuera de las migraciones) → `P3006 / type "geography" does not exist`. Como la tabla es normal, se escribió el `migration.sql` a mano y se aplicó con **`migrate deploy`** (sin shadow DB).
+
+**Backend:**
+- Endpoint **`PUT /viajes/:id/escalas/:escalaId/contactos`** (AdminGuard) — reemplazo idempotente de la lista. **Gate de negocio:** solo si el viaje tiene una cotización ACEPTADA, si no **409**; valida que la escala pertenezca al viaje (si no, 404). Use case `gestionar-contactos-escala.usecase.ts`.
+- Los contactos vienen anidados en `GET /viajes/:id` (se agregaron a `RELACIONES_DETALLE`).
+- **Aviso automático** enganchado en la geocerca (`registrar-ubicacion.usecase.ts`): al marcar la llegada a una escala, envía email a sus contactos con email vía el `EmailService` existente (Brevo/SMTP) y sella `notificadoEn` (constancia + dedup por contacto). Best-effort: nunca tumba el tracking. `TrackingModule` ahora importa `EmailModule`.
+
+**Web:**
+- Componente `contactos-escala-dialog.tsx`: botón "Avisar a…" por escala + diálogo de edición de filas (reusa `ExpedienteFormDialog`/`Campo`).
+- En `/viajes/[id]`, bajo cada escala se muestran los contactos como chips y el botón **solo si hay cotización aceptada** (query compartida con `CotizacionesCard`).
+- **Limitación conocida (decisión MVP):** editar el itinerario borra y recrea las escalas (`editar-viaje.usecase.ts`) → borraría los contactos; el form de edición **avisa** cuando el viaje ya tiene contactos, en vez de re-emparejar por orden.
+
+**Verificado:** `tsc --noEmit` web en verde; API compila y mapea la ruta. Smoke en vivo: sin cotización aceptada → **409**; tras aceptar una cotización → PUT **200** y los 2 contactos persisten y se devuelven anidados en la escala en `GET /viajes/:id`. *(No probado en vivo el envío real de email — requiere GPS dentro del radio + proveedor configurado; sin proveedor el log muestra `[correo deshabilitado]`. Datos de prueba: una cotización aceptada + contactos Ana/Juan en un viaje demo.)*
+
+### 2026-06-15 — Notificaciones de llegada en el panel (tiempo real global) ✅
+
+El monitorista recibe avisos en **todo el panel** cuando el transportista llega a una parada/destino, sin tener que estar viendo ese viaje. Reusa la geocerca existente (que solo emitía un toast en el detalle del viaje abierto).
+
+**Backend:**
+- **Sala global `admin`** en `TrackingGateway`: cada admin se une al conectarse (handshake); `emitirAlerta` emite a la sala del viaje **y** a la de admin (Socket.io deduplica → sin doble evento para quien esté en ambas).
+- **Payload de la alerta enriquecido** (`registrar-ubicacion.usecase.ts`): además de lo previo, incluye `folio`, `escalaDireccion` y **`esDestino`** (orden === última escala) para distinguir "llegó al destino" de una parada intermedia. Se calcula `folio` + `maxOrden` una vez por lote (`Promise.all`), reusando el `folio` también para el email de contactos.
+
+**Web:**
+- **`NotificacionesProvider`** (`lib/notificaciones.tsx`) montado una vez en el layout del panel: escucha el evento WS una sola vez, acumula llegadas (persistidas en `localStorage`, máx. 50), dispara **toast** (verde si es destino), **notificación de escritorio** (Notification API, con permiso) e **invalida** las queries `['viaje', id]`/`['viajes']`/`['tracking','viajes-activos']`.
+- **Campana** (`notifications-bell.tsx`): nueva sección **"Llegadas en vivo"** + vencimientos, **badge de no leídas** (se marcan al abrir) y botón para activar avisos de escritorio; cada item enlaza al detalle.
+- **Socket = singleton de sesión:** se quitaron los `closeSocket()` de `use-viaje-en-vivo` y de `/tracking` (matarían el socket del proveedor global) y el toast de llegada se centralizó en el proveedor (antes solo salía en el detalle abierto y se habría duplicado).
+
+**Verificado:** API+web compilan (0 errores), `tsc --noEmit` web limpio. **E2E en vivo:** un socket admin global recibió la alerta `llegada_escala` con `esDestino:true, folio:6, escalaDireccion` tras postear GPS de la conductora (`laura`) en el destino del viaje #6. ⚠️ Notification API requiere contexto seguro (localhost/HTTPS). El historial de la campana es por navegador (localStorage), no en BD.
+
+### 2026-06-15 — Auditoría de la sesión (multiagente) + fixes P0/P1 ✅
+
+Revisión multiagente (4 lentes en paralelo: correctitud/bugs, calidad/arquitectura, rendimiento, QA/UX) sobre el diff de la sesión (contactos por escala + notificaciones). Se descartó el hallazgo "fuga cross-tenant" por la arquitectura **instancia-por-cliente** (sala `admin` global es correcta).
+
+**Aplicado (P0 + P1), verificado:**
+- **P0 — regresión del socket:** `logout()` ahora llama `closeSocket()` (`lib/auth.tsx`). Sin esto, el singleton global reintentaba conectar en bucle con la cookie ya invalidada (el gateway lo rechazaba).
+- **P1 — email no bloquea la ingesta de GPS:** `notificarContactos` pasó a **fire-and-forget** (`void … .catch`) en `registrar-ubicacion.usecase.ts`; el WS de llegada ya se emite antes. E2E: POST de ubicación con 2 contactos respondió en **64 ms**.
+- **P1 — HTML injection en el email:** se escapan entidades de `nombre`/`direccion` (texto libre) antes de interpolar en el `html` (helper `escaparHtml`).
+- **P1 — invalidación de más:** se quitó `invalidateQueries(['viajes'])` por alerta (refetch innecesario del listado pesado); quedan `['viaje',id]` y `['tracking','viajes-activos']`.
+
+**Backlog de la auditoría (no aplicado — pendiente):**
+- **Calidad (P2):** mover el contrato del payload WS de la alerta a `shared-types` y tipar `emitirAlerta` (hay drift back↔front; cierra pendiente conocido); cablear botón "Limpiar" en la campana y no marcar leídas con solo abrirla; mover `horaCorta`/`fechaLarga` a `lib/fecha.ts`; diálogo de contactos a `react-hook-form` (o al menos `EMAIL_RE`→`lib/validacion.ts`).
+- **Robustez (P3):** `evaluarGeocercas` debería filtrar por estado de viaje activo (evitar avisos fantasma en ENTREGADO/CANCELADO); contacto agregado *después* de la llegada nunca se avisa (el sello de escala gana); política de re-entrada a la geocerca.
+- **Funcionalidad (insights):** preservar contactos al editar itinerario (re-emparejar por `orden`); persistir historial de llegadas en BD + backfill (resuelve reload/multi-dispositivo/offline); reusar `ContactoCliente` como autocompletar; indicador "no notificable" (solo celular) y mostrar `notificadoEn` en el detalle.
+- **QA:** cobertura cero en tracking/viajes; `apps/web` sin runner de tests. Top specs (con mocks de Prisma/Gateway/Email): gating 409/404 de contactos, dedup de geocerca, cálculo de `esDestino`, `notificarContactos` best-effort, `tituloLlegada`.
+
+### 2026-06-15 — Resolución del backlog de la auditoría ✅
+
+Se resolvió el backlog P2/P3 + insights + QA de la auditoría. Verificado **E2E en vivo + 45/45 tests** API (41 previos + 4 nuevos), `tsc` web limpio.
+
+**Calidad (P2):**
+- **Contrato WS compartido:** nuevo `AlertaLlegadaPayload` en `packages/shared-types` (8 campos serializados; se eliminaron `evento/radioMetros/ubicacion` que el front no usaba, `detectadoEn` como string ISO). `emitirAlerta` quedó tipado y el front lo importa → fin del drift. Requiere `npm run build:types`.
+- **Campana:** botones **"Limpiar"** y **"Leídas"**; ahora marca leída al **hacer click** en el item (antes con solo abrir el dropdown). `horaCorta`/`fechaLarga` movidos a `lib/fecha.ts`; `esEmail` a `lib/validacion.ts`.
+
+**Robustez (P3):**
+- `evaluarGeocercas` **salta estados cerrados** (`ENTREGADO/FACTURADO/CANCELADO`) → sin avisos/emails fantasma por GPS residual.
+- **Contacto agregado tarde** ahora sí recibe email mientras el conductor siga en el radio: la query dejó de filtrar por `llegadaNotificadaEn` (el aviso WS sigue deduplicado por escala; el email por `contactoEscala.notificadoEn`).
+
+**Funcionalidad:**
+- **Preservar contactos al editar itinerario:** `EditarViajeUseCase` re-empareja los contactos por `orden` dentro de la transacción (antes la cascada los borraba). El aviso del form de edición se ajustó.
+- **Historial de llegadas en BD + backfill:** `GET /viajes/llegadas/recientes` (desde `escalas_viaje.llegadaNotificadaEn`, últimos 7 días) hidrata la campana al montar el panel → sobrevive recargas/otros dispositivos/llegadas offline. ID estable `viajeId-escalaOrden` para deduplicar en vivo ↔ historial.
+- **Autocompletar** el diálogo de contactos desde los `ContactoCliente` del cliente del viaje (datalist + autofill de email/celular).
+- **Detalle del viaje:** los chips de contacto muestran `notificadoEn` ("✓ HH:mm") y marcan "solo celular" los **no notificables**.
+
+**QA:** `gestionar-contactos-escala.usecase.spec.ts` (404 / 409 / reemplazo / lista vacía).
+
+**Deferidos (bajo valor / infra):** migración del diálogo a react-hook-form; runner de tests del web (Vitest+jsdom) + specs unit de la geocerca (cubierta por E2E); SMS/WhatsApp.
+
+### 2026-06-15 — Reasignación de viajes: motivo + auditoría + aviso (Fase 1 de incidencias) ✅
+
+Primera fase del epic de incidencias operativas (varado → reasignar; choque → cambiar unidad). Hace que reasignar deje de ser "ciego". Verificado **E2E en vivo + 48/48 tests** API, `tsc` web limpio.
+
+**Datos:** nueva tabla `HistorialAsignacionViaje` (etiquetas legibles unidad/conductor anterior→nuevo, `motivo`, nota, `registradoPor`, fecha; null = esa dimensión no cambió). Migración `20260615130000_historial_asignacion_viaje` (a mano + `migrate deploy`).
+
+**Backend:**
+- `AsignarViajeUseCase`: acepta `motivo`/`nota`, **bloquea reasignar viajes terminales** (FACTURADO/CANCELADO → 409), calcula qué cambió de verdad, y en una transacción actualiza el viaje + escribe la auditoría (solo si hubo cambio).
+- **Aviso en tiempo real** `viaje:reasignado` (nuevo `WS_EVENTS` + `ReasignacionViajePayload` en shared-types) al conductor saliente, al entrante y al panel. El gateway ahora mete a cada conductor en su **sala personal** `conductor:<id>` al conectarse (mirror de la sala `admin`) — base también para las fases 2/3.
+- `RELACIONES_DETALLE` incluye `historialAsignaciones`.
+
+**Web:**
+- `AsignarDialog`: selector de **motivo** (`MOTIVOS_REASIGNACION`) + nota, y **advertencia** si el viaje está en curso (EN_CAMINO_ORIGEN/CARGANDO/EN_TRÁNSITO).
+- Detalle del viaje: nueva tarjeta **"Reasignaciones"** con el historial (de→a, motivo, nota, fecha).
+
+**QA:** `asignar-viaje.usecase.spec.ts` (409 terminal, auditoría+WS al cambiar conductor, no-op al reasignar al mismo).
+
+**Verificado E2E:** reasignar #6 Laura→Pedro (motivo AVERIA) escribió la auditoría y devolvió 200; reasignar de vuelta a Laura con su socket conectado → recibió `viaje:reasignado` en su sala personal con el payload tipado. *(La app Flutter aún no consume `conductor:<id>` ni `viaje:reasignado` — queda para la parte móvil.)*
+
+**Siguientes fases (pendientes):** Fase 2 estado recuperable `VARADO`; Fase 3 el conductor reporta incidencia desde la app; Fase 4 separar tractor ↔ caja/remolque (la grande, requiere diseño propio).
+
+### 2026-06-15 — Estado recuperable VARADO (Fase 2 de incidencias) ✅
+
+Pausa recuperable de un viaje en curso por incidencia (avería/choque), en lugar de cancelar. Verificado **E2E en vivo + 52/52 tests** API, `tsc` web limpio.
+
+**Máquina de estados:** nuevo `VARADO` (enum Prisma + shared-types). Transiciones: EN_CAMINO_ORIGEN/CARGANDO/EN_TRANSITO → **VARADO**; VARADO → solo CANCELADO (la vuelta es por acción dedicada). Campo nuevo `Viaje.estadoPrevioVarado` para recordar a dónde reanudar. Migración `20260615140000_viaje_varado` (`ALTER TYPE … ADD VALUE 'VARADO' BEFORE 'ENTREGADO'` + columna).
+
+**Backend:**
+- `CambiarEstadoViajeUseCase`: al entrar a VARADO guarda `estadoPrevioVarado`; al salir lo limpia. Nuevo método `reanudar()` (acción dedicada, no pasa por la tabla): vuelve a `estadoPrevioVarado`, registra historial, emite WS; el conductor solo reanuda SUS viajes (403 ajeno; 409 si no está varado).
+- Endpoint `PATCH /viajes/:id/reanudar` (admin o conductor-dueño).
+- **Geocerca pausada** estando VARADO (se sumó a `ESTADOS_SIN_GEOCERCA`) → no avisos/emails de llegada mientras está detenido.
+- El conductor varado **sigue contando como ocupado** (`ESTADOS_VIAJE_ABIERTOS` incluye VARADO), así que para liberarlo se reasigna (Fase 1).
+
+**Web:** etiqueta/badge "Varado" (rojo) + incluido en activos del mapa; el `CambiarEstadoDialog` ofrece "Varado" como transición desde los estados en curso; botón **"Reanudar"** en el detalle cuando está varado.
+
+**QA:** `reanudar-viaje.usecase.spec.ts` (reanuda al previo + limpia, 409 si no varado, 403 ajeno, respaldo EN_TRANSITO).
+
+**Verificado E2E:** #6 avanzado a EN_TRANSITO → VARADO (guardó previo=EN_TRANSITO) → VARADO→ENTREGADO rechazado 400 → GPS en geocerca estando varado **no** emitió alerta → reanudar volvió a EN_TRANSITO y limpió el previo. *(Parte Flutter del flujo pendiente, como Fase 1.)*
+
+**Siguientes:** Fase 3 (conductor reporta incidencia desde la app); Fase 4 (tractor ↔ caja).
+
+### 2026-06-15 — App Flutter: soporte VARADO/reanudar + aviso de reasignación ✅
+
+Parte móvil de las Fases 1 y 2. **`flutter analyze` 0 issues.**
+- **Fix de crash:** la app no conocía `VARADO` y `EstadoViaje.desdeApi` (sin `orElse`) lanzaba al deserializar un viaje varado → se agregó `varado` al enum Dart (con sus casos de color/ícono) y un fallback tolerante en `desdeApi` (estado desconocido → varado, sin romper la pantalla en carretera).
+- **Acciones del conductor:** botón **"Reportar avería / varado"** (marca VARADO desde estados en ruta; apaga el GPS) y **"Reanudar viaje"** (vuelve al estado previo y reactiva GPS/suscripción). Repo: `reanudar()`.
+- **Aviso de reasignación:** `SocketService` escucha `viaje:reasignado` (sala `conductor:<id>`); la lista refresca y muestra snackbar contextual ("Te asignaron…" / "Ya no tienes…").
+
+**Commit:** todo lo de la sesión (contactos + notificaciones + auditoría + Fases 1-2 + móvil) en la rama **`feat/incidencias-notificaciones`** (un commit; main intacto). Falta: Fase 3 (reporte de incidencia con foto/ubicación + alerta al panel) y Fase 4 (tractor↔caja).
+
+### 2026-06-15 — Fase 3: el conductor reporta incidencias desde la app ✅
+
+El conductor reporta un problema (avería/choque/ponchadura) en ruta; opcionalmente deja el viaje en VARADO; el panel se entera en vivo. Verificado **E2E en vivo + 56/56 tests** API, `tsc` web + `flutter analyze` limpios. **Sin migración** (IncidenciaConductor ya existía; `tipo` es string).
+
+**Backend:**
+- `POST /viajes/:id/incidencias` (conductor-dueño o admin) → `ReportarIncidenciaViajeUseCase`: crea `IncidenciaConductor` ligada al viaje (gravedad ALTA por defecto, título derivado), y si `marcarVarado` y el viaje está en ruta lo pasa a **VARADO** (reusa la transición validada). Verifica propiedad (conductor ajeno → 4xx) y que el viaje tenga conductor.
+- Evento WS `incidencia:reportada` (+ `IncidenciaReportadaPayload`) a sala admin + viaje. Catálogo `TIPO_INCIDENCIA` ampliado (AVERIA, PONCHADURA) + enum en shared-types; `TIPOS_INCIDENCIA_CONDUCTOR`.
+- `RELACIONES_DETALLE` incluye `incidencias`.
+
+**Web:** la campana muestra las incidencias en vivo (toast warning + ícono de alerta; sección "Avisos en vivo" generalizada); tarjeta **"Incidencias"** en el detalle del viaje.
+
+**App Flutter:** botón **"Reportar problema"** (reemplaza el de varado) abre una hoja con tipo (chips), descripción y switch "marcar varado"; `POST` al endpoint; apaga el GPS si quedó varado. `SocketService` ya entra a `conductor:<id>`.
+
+**QA:** `reportar-incidencia-viaje.usecase.spec.ts` (crea+VARADO+WS, no-varado fuera de ruta, ajeno 4xx, sin conductor 4xx).
+
+**Pendiente del epic:** Fase 4 (separar tractor ↔ caja). Mejoras opcionales de Fase 3: foto (evidenciaKey/MinIO) y ubicación GPS automática en el reporte.
+
+### 2026-06-15 — Fase 4: separar tractor ↔ caja / remolque ✅
+
+La caja/remolque es ahora una entidad propia: el viaje referencia **tractor (unidad) + caja**, y se puede **intercambiar solo la caja** (escenario de choque) sin tocar tractor ni conductor. Verificado **E2E en vivo + 56/56 tests** API, `tsc` web + `flutter analyze` limpios. Migración `20260615150000_caja`.
+
+> Alcance: el **motor de cálculo/cotización siguen usando la capacidad de la Unidad** (no se reescribieron, para no desestabilizar algo tan probado). Integrar la capacidad de la caja al motor queda como follow-up.
+
+**Backend:**
+- Modelo **`Caja`** (placas únicas, tipo `TIPO_CAJA`, capacidadKg/M3, etc.); `Viaje.cajaId` + relación; CRUD `CajasUseCase` + `CajasController` (`/cajas`, AdminGuard) espejo de Unidades.
+- **Intercambio de caja** por el flujo de reasignación (`AsignarViajeUseCase` acepta `cajaId`): valida activa, audita (columnas `cajaAnterior/cajaNueva` en `HistorialAsignacionViaje`), y el payload WS `viaje:reasignado` lleva `cajaCambio`. `RELACIONES_RESUMEN` incluye `caja`.
+- Catálogo `TIPO_CAJA` (seed + `CATALOGO_GRUPOS`).
+
+**Web:** página **`/flota/cajas`** (CRUD, enlazada desde Flota) + `CajaFormDialog`; selector de **caja** en `AsignarDialog`; caja en la tarjeta de Asignación y línea de caja en el historial de Reasignaciones del detalle.
+
+**App Flutter:** `Viaje.cajaPlacas` + chip de la caja en el detalle.
+
+**Verificado E2E:** crear 2 cajas → asignar una → **intercambiar solo la caja** (CAJA-001→CAJA-002, motivo ACCIDENTE): la caja cambió, el conductor siguió igual, y la auditoría registró solo el cambio de caja.
+
+**Con esto el epic de incidencias/reasignación (Fases 1-4) queda completo.** Follow-ups opcionales: capacidad de caja en el motor; odómetro; foto/GPS en el reporte de incidencia.
+
+### 2026-06-15 — Auditoría del epic (Fases 1-4) + fixes ✅
+
+Revisión multiagente (4 lentes) del epic. Veredicto: bien construido (locks correctos, autorización, geocerca, caja integrada al patrón; 0 problemas de rendimiento). Aplicado y verificado (**64/64 tests**, E2E):
+- **P0 — incidencia↔VARADO atómico:** la transición a VARADO al reportar ahora es **best-effort** (try/catch): si falla por concurrencia, igual se crea la incidencia y se emite el aviso al panel (no más huérfanas/duplicadas ni aviso perdido).
+- **P1 — doble-uso de caja:** `asegurarCajaDisponible` → **409** si la caja ya está en otro viaje abierto (espejo del de conductores). E2E confirmado.
+- **P1 — tipado WS:** `CambioEstadoViajePayload` en shared-types; `emitirCambioEstado` tipado (antes `unknown`). Estandarizado el doble import de `EstadoViaje` en `reportar-incidencia` (solo shared-types).
+- **QA:** `cajas.usecase.spec` (409/404), spec del **swap de solo-caja** (audita caja, no toca unidad/conductor, `cajaCambio`), y rama de **conductor ocupado** (409).
+
+**Backlog de la auditoría (no aplicado):** capacidad de caja en el motor de cálculo (sobrecarga no detectada al cambiar a caja menor); chip de disponibilidad de caja en el selector; valor `desconocido` en el enum Dart (el fallback a `varado` arrastra efectos en estados futuros); ENTREGADO sigue siendo reasignable; extraer tarjetas del detalle del viaje (reasignaciones/incidencias) y helper de transición en `cambiar-estado`; unificar labels TIPO/MOTIVO en shared-types; foto+GPS/odómetro/documentos de caja.
+
 ---
 
 ## Riesgos técnicos

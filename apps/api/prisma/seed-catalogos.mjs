@@ -59,7 +59,9 @@ const CATALOGOS = {
     ['OTRO', 'Otro'],
   ],
   TIPO_INCIDENCIA: [
+    ['AVERIA', 'Avería'],
     ['ACCIDENTE', 'Accidente'],
+    ['PONCHADURA', 'Ponchadura'],
     ['INFRACCION', 'Infracción'],
     ['SANCION', 'Sanción'],
     ['FALTA', 'Falta'],
@@ -136,6 +138,14 @@ const CATALOGOS = {
     ['CAMIONETA', 'Camioneta'],
     ['PLATAFORMA', 'Plataforma'],
     ['PIPA', 'Pipa'],
+    ['OTRO', 'Otro'],
+  ],
+  TIPO_CAJA: [
+    ['SECA', 'Caja seca'],
+    ['REFRIGERADA', 'Caja refrigerada'],
+    ['ISOTERMICA', 'Caja isotérmica'],
+    ['PLATAFORMA', 'Plataforma'],
+    ['TOLVA', 'Tolva'],
     ['OTRO', 'Otro'],
   ],
   ASEGURADORA: [

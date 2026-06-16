@@ -7,6 +7,7 @@ export const ESTADO_VIAJE_LABEL: Record<EstadoViaje, string> = {
   [EstadoViaje.EN_CAMINO_ORIGEN]: 'En camino al origen',
   [EstadoViaje.CARGANDO]: 'Cargando',
   [EstadoViaje.EN_TRANSITO]: 'En tránsito',
+  [EstadoViaje.VARADO]: 'Varado',
   [EstadoViaje.ENTREGADO]: 'Entregado',
   [EstadoViaje.FACTURADO]: 'Facturado',
   [EstadoViaje.CANCELADO]: 'Cancelado',
@@ -18,15 +19,17 @@ export const ESTADO_VIAJE_BADGE: Record<EstadoViaje, BadgeVariant> = {
   [EstadoViaje.EN_CAMINO_ORIGEN]: 'warning',
   [EstadoViaje.CARGANDO]: 'warning',
   [EstadoViaje.EN_TRANSITO]: 'warning',
+  [EstadoViaje.VARADO]: 'destructive',
   [EstadoViaje.ENTREGADO]: 'success',
   [EstadoViaje.FACTURADO]: 'success',
   [EstadoViaje.CANCELADO]: 'destructive',
 };
 
-/** Estados que cuentan como "viaje activo" (en curso). */
+/** Estados que cuentan como "viaje activo" (en curso, incluye el varado). */
 export const ESTADOS_ACTIVOS: EstadoViaje[] = [
   EstadoViaje.ACEPTADO,
   EstadoViaje.EN_CAMINO_ORIGEN,
   EstadoViaje.CARGANDO,
   EstadoViaje.EN_TRANSITO,
+  EstadoViaje.VARADO,
 ];

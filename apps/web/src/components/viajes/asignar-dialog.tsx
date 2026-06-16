@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserCog } from 'lucide-react';
+import { AlertTriangle, UserCog } from 'lucide-react';
+import { MOTIVOS_REASIGNACION } from '@flotaos/shared-types';
+import type { EstadoViaje } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { invalidarViajes } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -24,40 +27,79 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useConductoresCatalogo, useUnidadesCatalogo } from './catalogos';
+import {
+  useCajasCatalogo,
+  useConductoresCatalogo,
+  useUnidadesCatalogo,
+} from './catalogos';
 import { ConductorSelectItems } from './conductor-select-items';
 
 const NINGUNO = '__ninguno__';
 
+/** Estados "en curso": reasignar aquí afecta una operación en marcha → se advierte. */
+const ESTADOS_EN_CURSO: EstadoViaje[] = [
+  'EN_CAMINO_ORIGEN',
+  'CARGANDO',
+  'EN_TRANSITO',
+] as EstadoViaje[];
+
+const MOTIVO_LABEL: Record<string, string> = {
+  AVERIA: 'Avería',
+  ACCIDENTE: 'Accidente',
+  RELEVO: 'Relevo de conductor',
+  INCIDENCIA: 'Incidencia',
+  OTRO: 'Otro',
+};
+
 export function AsignarDialog({
   viajeId,
+  estado,
   unidadIdActual,
+  cajaIdActual,
   conductorIdActual,
 }: {
   viajeId: string;
+  estado?: EstadoViaje;
   unidadIdActual?: string | null;
+  cajaIdActual?: string | null;
   conductorIdActual?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [unidadId, setUnidadId] = useState<string>(unidadIdActual ?? NINGUNO);
+  const [cajaId, setCajaId] = useState<string>(cajaIdActual ?? NINGUNO);
   const [conductorId, setConductorId] = useState<string>(conductorIdActual ?? NINGUNO);
+  const [motivo, setMotivo] = useState<string>(NINGUNO);
+  const [nota, setNota] = useState<string>('');
   const qc = useQueryClient();
 
   const unidades = useUnidadesCatalogo();
+  const cajas = useCajasCatalogo();
   const conductores = useConductoresCatalogo();
 
   useEffect(() => {
     if (open) {
       setUnidadId(unidadIdActual ?? NINGUNO);
+      setCajaId(cajaIdActual ?? NINGUNO);
       setConductorId(conductorIdActual ?? NINGUNO);
+      setMotivo(NINGUNO);
+      setNota('');
     }
-  }, [open, unidadIdActual, conductorIdActual]);
+  }, [open, unidadIdActual, cajaIdActual, conductorIdActual]);
 
   const mutar = useMutation({
     mutationFn: async () => {
-      const body: { unidadId?: string | null; conductorId?: string | null } = {
+      const body: {
+        unidadId?: string | null;
+        cajaId?: string | null;
+        conductorId?: string | null;
+        motivo?: string;
+        nota?: string;
+      } = {
         unidadId: unidadId === NINGUNO ? null : unidadId,
+        cajaId: cajaId === NINGUNO ? null : cajaId,
         conductorId: conductorId === NINGUNO ? null : conductorId,
+        motivo: motivo === NINGUNO ? undefined : motivo,
+        nota: nota.trim() || undefined,
       };
       const { data } = await api.patch(`/viajes/${viajeId}/asignar`, body);
       return data;
@@ -72,7 +114,8 @@ export function AsignarDialog({
     onError: (err) => toast.error(apiError(err)),
   });
 
-  const tieneAsignacion = Boolean(unidadIdActual || conductorIdActual);
+  const tieneAsignacion = Boolean(unidadIdActual || cajaIdActual || conductorIdActual);
+  const enCurso = estado ? ESTADOS_EN_CURSO.includes(estado) : false;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -89,6 +132,15 @@ export function AsignarDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {enCurso && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Este viaje está <strong>en curso</strong>. Reasignar afecta una
+                operación en marcha; indica el motivo para dejar constancia.
+              </p>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="asignar-unidad">Unidad</Label>
             <Select value={unidadId} onValueChange={setUnidadId}>
@@ -100,6 +152,22 @@ export function AsignarDialog({
                 {(unidades.data ?? []).map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="asignar-caja">Caja / remolque</Label>
+            <Select value={cajaId} onValueChange={setCajaId}>
+              <SelectTrigger id="asignar-caja">
+                <SelectValue placeholder={cajas.isLoading ? 'Cargando…' : 'Sin asignar'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NINGUNO}>Sin asignar</SelectItem>
+                {(cajas.data ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -120,6 +188,37 @@ export function AsignarDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {tieneAsignacion && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="asignar-motivo">Motivo de la reasignación</Label>
+                <Select value={motivo} onValueChange={setMotivo}>
+                  <SelectTrigger id="asignar-motivo">
+                    <SelectValue placeholder="Opcional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NINGUNO}>Sin especificar</SelectItem>
+                    {MOTIVOS_REASIGNACION.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {MOTIVO_LABEL[m] ?? m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="asignar-nota">Nota</Label>
+                <Textarea
+                  id="asignar-nota"
+                  value={nota}
+                  onChange={(e) => setNota(e.target.value)}
+                  placeholder="Detalle de lo ocurrido (opcional)"
+                  rows={2}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <DialogFooter>

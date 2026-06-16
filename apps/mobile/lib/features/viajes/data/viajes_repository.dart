@@ -67,4 +67,41 @@ class ViajesRepository {
       throw ApiException.desdeDio(e);
     }
   }
+
+  /// PATCH /viajes/:id/reanudar — sale de VARADO al estado previo a la incidencia.
+  Future<Viaje> reanudar(String id) async {
+    try {
+      final res =
+          await _api.dio.patch<Map<String, dynamic>>('/viajes/$id/reanudar');
+      return Viaje.fromJson(res.data!);
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
+
+  /// POST /viajes/:id/incidencias — el conductor reporta un problema (avería,
+  /// choque, etc.). Devuelve true si además dejó el viaje en VARADO.
+  Future<bool> reportarIncidencia(
+    String viajeId, {
+    required String tipo,
+    String? descripcion,
+    String? lugar,
+    bool marcarVarado = false,
+  }) async {
+    try {
+      final res = await _api.dio.post<Map<String, dynamic>>(
+        '/viajes/$viajeId/incidencias',
+        data: {
+          'tipo': tipo,
+          if (descripcion != null && descripcion.isNotEmpty)
+            'descripcion': descripcion,
+          if (lugar != null && lugar.isNotEmpty) 'lugar': lugar,
+          'marcarVarado': marcarVarado,
+        },
+      );
+      return (res.data?['varado'] as bool?) ?? false;
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
 }

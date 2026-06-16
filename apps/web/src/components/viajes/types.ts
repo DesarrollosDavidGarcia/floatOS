@@ -18,6 +18,13 @@ export interface UnidadResumen {
   modelo?: string | null;
 }
 
+/** Resumen de caja / remolque embebido en el viaje. */
+export interface CajaResumen {
+  id: string;
+  placas: string;
+  tipo?: string | null;
+}
+
 /** Resumen de conductor embebido en el viaje. */
 export interface ConductorResumen {
   id: string;
@@ -40,6 +47,16 @@ export interface CargaEscala {
   loteRef?: string | null;
 }
 
+/** Persona a cargo en una escala: recibe el aviso de llegada del transportista. */
+export interface ContactoEscala {
+  id: string;
+  nombre: string;
+  email?: string | null;
+  telefono?: string | null;
+  /** Sello del email de llegada enviado; null si aún no se ha avisado. */
+  notificadoEn?: string | null;
+}
+
 /** Escala (parada) del itinerario de un viaje. */
 export interface EscalaViaje {
   id: string;
@@ -50,6 +67,7 @@ export interface EscalaViaje {
   lng?: number | null;
   notas?: string | null;
   cargas: CargaEscala[];
+  contactos?: ContactoEscala[];
 }
 
 /** Entrada del historial de cambios de estado de un viaje. */
@@ -57,6 +75,32 @@ export interface HistorialViaje {
   id: string;
   estadoAnterior: EstadoViaje | null;
   estadoNuevo: EstadoViaje;
+  nota?: string | null;
+  createdAt: string;
+}
+
+/** Incidencia operativa reportada en un viaje (avería, choque, etc.). */
+export interface Incidencia {
+  id: string;
+  tipo: string;
+  gravedad: string;
+  titulo: string;
+  descripcion?: string | null;
+  lugar?: string | null;
+  resuelta: boolean;
+  fecha: string;
+}
+
+/** Entrada del historial de reasignaciones (cambio de unidad y/o conductor). */
+export interface HistorialAsignacion {
+  id: string;
+  unidadAnterior?: string | null;
+  unidadNueva?: string | null;
+  cajaAnterior?: string | null;
+  cajaNueva?: string | null;
+  conductorAnterior?: string | null;
+  conductorNuevo?: string | null;
+  motivo?: string | null;
   nota?: string | null;
   createdAt: string;
 }
@@ -70,6 +114,8 @@ export interface Viaje {
   clienteId: string;
   unidad?: UnidadResumen | null;
   unidadId?: string | null;
+  caja?: CajaResumen | null;
+  cajaId?: string | null;
   conductor?: ConductorResumen | null;
   conductorId?: string | null;
   origenDireccion: string;
@@ -95,6 +141,8 @@ export interface Viaje {
   fechaProgramada?: string | null;
   trackingToken?: string | null;
   historial?: HistorialViaje[];
+  historialAsignaciones?: HistorialAsignacion[];
+  incidencias?: Incidencia[];
   createdAt: string;
   updatedAt?: string;
 }

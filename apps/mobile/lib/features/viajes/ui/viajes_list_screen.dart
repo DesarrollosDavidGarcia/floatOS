@@ -23,6 +23,7 @@ class _ViajesListScreenState extends ConsumerState<ViajesListScreen>
   SegmentoViajes _segmento = SegmentoViajes.activos;
   StreamSubscription<Map<String, dynamic>>? _subAlertas;
   StreamSubscription<Map<String, dynamic>>? _subEstados;
+  StreamSubscription<Map<String, dynamic>>? _subReasignaciones;
 
   @override
   void initState() {
@@ -47,6 +48,27 @@ class _ViajesListScreenState extends ConsumerState<ViajesListScreen>
         // sincronización de tracking del listen de abajo hace el resto).
         ref.invalidate(viajesProvider);
       });
+      _subReasignaciones = socket.reasignaciones.listen((p) {
+        if (!mounted) return;
+        // El monitorista te reasignó (entrante o saliente): refrescar la lista
+        // y avisar (al saliente le desaparece el viaje; al entrante le aparece).
+        ref.invalidate(viajesProvider);
+        final auth = ref.read(authProvider);
+        final yo = auth is AuthConSesion ? auth.conductor.id : null;
+        final folio = p['folio'];
+        final cual = folio != null ? 'el viaje #$folio' : 'un viaje';
+        final String mensaje;
+        if (yo != null && p['conductorNuevoId'] == yo) {
+          mensaje = 'Te asignaron $cual';
+        } else if (yo != null && p['conductorAnteriorId'] == yo) {
+          mensaje = 'Ya no tienes $cual (reasignado)';
+        } else {
+          mensaje = 'Cambió la asignación de $cual';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(mensaje)),
+        );
+      });
     });
   }
 
@@ -55,6 +77,7 @@ class _ViajesListScreenState extends ConsumerState<ViajesListScreen>
     WidgetsBinding.instance.removeObserver(this);
     _subAlertas?.cancel();
     _subEstados?.cancel();
+    _subReasignaciones?.cancel();
     super.dispose();
   }
 

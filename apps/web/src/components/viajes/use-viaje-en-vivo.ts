@@ -3,23 +3,17 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WS_EVENTS } from '@flotaos/shared-types';
-import { getSocket, closeSocket } from '@/lib/socket';
-import { toast } from '@/components/ui/sonner';
+import { getSocket } from '@/lib/socket';
 import type { PosicionViaje, UbicacionEvento } from '@/components/tracking/tipos';
-
-/** Payload del evento WS 'alerta' (geocerca de llegada a una parada). */
-interface AlertaEvento {
-  tipo?: string;
-  viajeId?: string;
-  escalaOrden?: number;
-}
 
 /**
  * Mantiene el detalle de un viaje sincronizado en tiempo real con la app del
  * conductor: se suscribe a la sala `viaje:<id>` del gateway de tracking y
  * - refresca la query ['viaje', id] cuando el conductor avanza el estado,
- * - devuelve la última posición GPS recibida en vivo (para pintar el camión),
- * - notifica con un toast la llegada a una parada (geocerca).
+ * - devuelve la última posición GPS recibida en vivo (para pintar el camión).
+ *
+ * Las alertas de llegada (geocerca) las maneja el proveedor global de
+ * notificaciones (ver lib/notificaciones), no este hook, para no duplicar avisos.
  */
 export function useViajeEnVivo(viajeId: string | undefined): PosicionViaje | null {
   const queryClient = useQueryClient();
@@ -54,26 +48,16 @@ export function useViajeEnVivo(viajeId: string | undefined): PosicionViaje | nul
       void queryClient.invalidateQueries({ queryKey: ['viaje', viajeId] });
     };
 
-    const onAlerta = (p: AlertaEvento) => {
-      if (p?.viajeId !== viajeId || p.tipo !== 'llegada_escala') return;
-      toast.info(
-        p.escalaOrden != null
-          ? `El conductor llegó a la parada ${p.escalaOrden + 1}`
-          : 'El conductor llegó a una parada',
-      );
-    };
-
     socket.on(WS_EVENTS.UBICACION_ACTUALIZADA, onUbicacion);
     socket.on(WS_EVENTS.VIAJE_ESTADO_CAMBIADO, onEstado);
-    socket.on(WS_EVENTS.ALERTA, onAlerta);
 
     return () => {
       socket.off('connect', suscribir);
       socket.off(WS_EVENTS.UBICACION_ACTUALIZADA, onUbicacion);
       socket.off(WS_EVENTS.VIAJE_ESTADO_CAMBIADO, onEstado);
-      socket.off(WS_EVENTS.ALERTA, onAlerta);
       socket.emit('desuscribir', { viajeId });
-      closeSocket();
+      // No se cierra el socket: es un singleton de sesión que el proveedor global
+      // de notificaciones mantiene vivo para escuchar llegadas en todo el panel.
     };
   }, [viajeId, queryClient]);
 

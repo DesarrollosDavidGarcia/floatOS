@@ -22,6 +22,30 @@ export interface ListarUnidadesInput {
   pageSize?: number;
 }
 
+/** Datos de entrada para crear una caja / remolque. */
+export interface CrearCajaInput {
+  placas: string;
+  tipo: string;
+  marca?: string;
+  anio?: number;
+  capacidadKg?: number;
+  capacidadM3?: number;
+  aseguradora?: string;
+  numeroPoliza?: string;
+}
+
+/** Datos de entrada para actualizar una caja (campos opcionales). */
+export type ActualizarCajaInput = Partial<CrearCajaInput> & {
+  activo?: boolean;
+};
+
+/** Parámetros de búsqueda/paginación de cajas. */
+export interface ListarCajasInput {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 /**
  * Datos de entrada para crear un documento de unidad.
  * Las fechas llegan como string (ISO) y el caso de uso las convierte a Date.

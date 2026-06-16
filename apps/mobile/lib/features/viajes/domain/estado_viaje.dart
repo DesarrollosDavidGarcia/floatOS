@@ -8,6 +8,7 @@ enum EstadoViaje {
   enCaminoOrigen('EN_CAMINO_ORIGEN', 'En camino al origen'),
   cargando('CARGANDO', 'Cargando'),
   enTransito('EN_TRANSITO', 'En tránsito'),
+  varado('VARADO', 'Varado'),
   entregado('ENTREGADO', 'Entregado'),
   facturado('FACTURADO', 'Facturado'),
   cancelado('CANCELADO', 'Cancelado');
@@ -18,8 +19,12 @@ enum EstadoViaje {
   final String api;
   final String etiqueta;
 
-  static EstadoViaje desdeApi(String valor) =>
-      EstadoViaje.values.firstWhere((e) => e.api == valor);
+  /// Resuelve el estado del API. Si llega un valor desconocido (p. ej. un
+  /// estado nuevo del backend que esta versión de la app aún no conoce), cae a
+  /// `varado` —activo, sin acción de avance— en lugar de lanzar y romper la
+  /// pantalla del conductor en carretera.
+  static EstadoViaje desdeApi(String valor) => EstadoViaje.values
+      .firstWhere((e) => e.api == valor, orElse: () => EstadoViaje.varado);
 
   /// Transiciones que el conductor avanza desde la app (sin cancelar:
   /// la cancelación la gestiona el monitorista desde el panel).
@@ -55,6 +60,7 @@ enum EstadoViaje {
         enCaminoOrigen => const Color(0xFF7C3AED),
         cargando => const Color(0xFFD97706),
         enTransito => const Color(0xFF0891B2),
+        varado => const Color(0xFFEA580C),
         entregado => const Color(0xFF16A34A),
         facturado => const Color(0xFF15803D),
         cancelado => const Color(0xFFDC2626),
@@ -68,6 +74,7 @@ enum EstadoViaje {
         enCaminoOrigen => const Color(0xFF6D28D9),
         cargando => const Color(0xFFB45309),
         enTransito => const Color(0xFF0E7490),
+        varado => const Color(0xFFC2410C),
         entregado => const Color(0xFF15803D),
         facturado => const Color(0xFF166534),
         cancelado => const Color(0xFFB91C1C),
@@ -79,6 +86,7 @@ enum EstadoViaje {
         enCaminoOrigen => Icons.near_me_outlined,
         cargando => Icons.archive_outlined,
         enTransito => Icons.local_shipping_outlined,
+        varado => Icons.warning_amber_outlined,
         entregado => Icons.check_circle_outline,
         facturado => Icons.receipt_long_outlined,
         cancelado => Icons.cancel_outlined,

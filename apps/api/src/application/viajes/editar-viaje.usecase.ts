@@ -82,12 +82,50 @@ export class EditarViajeUseCase {
       escalas: { create: nestedEscalasCreate(input.escalas) },
     };
 
-    // Reemplazo atómico del itinerario: borrar escalas (cascada → cargas) y recrear.
+    // Reemplazo atómico del itinerario: borrar escalas (cascada → cargas y
+    // contactos) y recrear. Los contactos de aviso de llegada se conservan
+    // re-emparejándolos por `orden` (la parada en la misma posición los hereda);
+    // las paradas que desaparezcan pierden sus contactos.
     return this.prisma.$transaction(async (tx) => {
+      const previas = await tx.escalaViaje.findMany({
+        where: { viajeId: id },
+        select: {
+          orden: true,
+          contactos: { select: { nombre: true, email: true, telefono: true } },
+        },
+      });
+      const contactosPorOrden = new Map(
+        previas
+          .filter((e) => e.contactos.length > 0)
+          .map((e) => [e.orden, e.contactos]),
+      );
+
       await tx.escalaViaje.deleteMany({ where: { viajeId: id } });
-      return tx.viaje.update({
+      await tx.viaje.update({ where: { id }, data });
+
+      if (contactosPorOrden.size > 0) {
+        const nuevas = await tx.escalaViaje.findMany({
+          where: { viajeId: id },
+          select: { id: true, orden: true },
+        });
+        const aCrear = nuevas.flatMap((n) => {
+          const cs = contactosPorOrden.get(n.orden);
+          return cs
+            ? cs.map((c) => ({
+                escalaId: n.id,
+                nombre: c.nombre,
+                email: c.email,
+                telefono: c.telefono,
+              }))
+            : [];
+        });
+        if (aCrear.length > 0) {
+          await tx.contactoEscala.createMany({ data: aCrear });
+        }
+      }
+
+      return tx.viaje.findUniqueOrThrow({
         where: { id },
-        data,
         include: RELACIONES_DETALLE,
       });
     });
