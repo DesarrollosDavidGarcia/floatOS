@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -64,34 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Identidad ──
-                    Container(
-                      width: 84,
-                      height: 84,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            colores.primary,
-                            colores.primary.withValues(alpha: 0.75),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colores.primary.withValues(alpha: 0.35),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.local_shipping_rounded,
-                        color: Colors.white,
-                        size: 44,
-                      ),
-                    ),
+                    const RepaintBoundary(child: _LogoFlota()),
                     const SizedBox(height: 24),
                     Text(
                       'FlotaOS',
@@ -110,7 +85,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           .bodyLarge
                           ?.copyWith(color: colores.onSurfaceVariant),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 28),
+
+                    // ── Desfile de transporte ──
+                    const RepaintBoundary(child: _DesfileTransporte()),
+                    const SizedBox(height: 36),
 
                     if (avisoSesion != null) ...[
                       _Aviso(texto: avisoSesion, color: colores.tertiary),
@@ -186,6 +165,181 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Logo de FlotaOS con un leve vaivén tipo "conduciendo".
+class _LogoFlota extends StatefulWidget {
+  const _LogoFlota();
+
+  @override
+  State<_LogoFlota> createState() => _LogoFlotaState();
+}
+
+class _LogoFlotaState extends State<_LogoFlota>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 84,
+      height: 84,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colores.primary,
+            colores.primary.withValues(alpha: 0.75),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: colores.primary.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final v = _controller.value * 2 * math.pi;
+          // Vaivén horizontal suave + pequeño "bote" vertical de marcha.
+          final dx = math.sin(v) * 3;
+          final dy = -math.sin(v * 2).abs() * 2;
+          return Transform.translate(offset: Offset(dx, dy), child: child);
+        },
+        child: const Icon(
+          Icons.local_shipping_rounded,
+          color: Colors.white,
+          size: 44,
+        ),
+      ),
+    );
+  }
+}
+
+/// Banda de íconos de transporte que cruzan la pantalla en bucle continuo,
+/// con desvanecido en ambos bordes.
+class _DesfileTransporte extends StatefulWidget {
+  const _DesfileTransporte();
+
+  @override
+  State<_DesfileTransporte> createState() => _DesfileTransporteState();
+}
+
+class _DesfileTransporteState extends State<_DesfileTransporte>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const _iconos = <IconData>[
+    Icons.local_shipping_rounded,
+    Icons.directions_bus_rounded,
+    Icons.flight_rounded,
+    Icons.directions_boat_rounded,
+    Icons.train_rounded,
+    Icons.airport_shuttle_rounded,
+    Icons.two_wheeler_rounded,
+    Icons.local_shipping_outlined,
+  ];
+
+  static const double _itemAncho = 56;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    final anchoSecuencia = _iconos.length * _itemAncho;
+
+    // Dos secuencias idénticas seguidas: al desplazar una secuencia completa,
+    // el contenido vuelve a coincidir y el bucle es imperceptible.
+    final fila = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var copia = 0; copia < 2; copia++)
+          for (final icono in _iconos)
+            SizedBox(
+              width: _itemAncho,
+              child: Icon(
+                icono,
+                size: 26,
+                color: colores.primary.withValues(alpha: 0.55),
+              ),
+            ),
+      ],
+    );
+
+    return SizedBox(
+      height: 44,
+      width: double.infinity,
+      child: ClipRect(
+        child: ShaderMask(
+          shaderCallback: (rect) => const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Colors.transparent,
+              Colors.white,
+              Colors.white,
+              Colors.transparent,
+            ],
+            stops: [0.0, 0.12, 0.88, 1.0],
+          ).createShader(rect),
+          blendMode: BlendMode.dstIn,
+          // El Row es más ancho que la tarjeta; OverflowBox le da ancho
+          // ilimitado para que no reporte desbordamiento de layout.
+          child: OverflowBox(
+            alignment: Alignment.centerLeft,
+            maxWidth: double.infinity,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(-_controller.value * anchoSecuencia, 0),
+                  child: child,
+                );
+              },
+              child: fila,
             ),
           ),
         ),
