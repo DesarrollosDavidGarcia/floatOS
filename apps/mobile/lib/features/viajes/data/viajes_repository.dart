@@ -86,6 +86,7 @@ class ViajesRepository {
     required String tipo,
     String? descripcion,
     String? lugar,
+    String? gravedad,
     bool marcarVarado = false,
   }) async {
     try {
@@ -96,6 +97,7 @@ class ViajesRepository {
           if (descripcion != null && descripcion.isNotEmpty)
             'descripcion': descripcion,
           if (lugar != null && lugar.isNotEmpty) 'lugar': lugar,
+          if (gravedad != null && gravedad.isNotEmpty) 'gravedad': gravedad,
           'marcarVarado': marcarVarado,
         },
       );

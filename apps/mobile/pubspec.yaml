@@ -41,8 +41,7 @@ dependencies:
   go_router: ^17.3.0
   flutter_secure_storage: ^10.3.1
   socket_io_client: ^3.1.5
-  flutter_map: ^8.3.0
-  latlong2: ^0.9.1
+  google_maps_flutter: ^2.10.0
   geolocator: ^14.0.2
   google_fonts: ^8.1.0
   intl: ^0.20.2

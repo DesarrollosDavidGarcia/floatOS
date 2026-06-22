@@ -15,6 +15,12 @@
         android:label="FlotaOS Conductor"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Google Maps SDK for Android. La key se restringe por package + huella
+             SHA-1 en Google Cloud (es seguro incluirla en el APK). Requiere
+             habilitar "Maps SDK for Android" en el proyecto. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBOCaxR_6cu7_TmbEXaWG3nKbWbuaRnmn4"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

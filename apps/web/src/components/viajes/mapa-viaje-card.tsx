@@ -14,10 +14,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useViajeEnVivo } from './use-viaje-en-vivo';
+import { LazyMount } from '@/components/mapa/lazy-mount';
+import { MapaEstatico } from '@/components/mapa/mapa-estatico';
 import type { Viaje } from './types';
 import type { PosicionViaje } from '@/components/tracking/tipos';
 
-// Mapa con Leaflet: usa `window`, se carga solo en cliente.
+// Mapa con Google Maps: usa `window`, se carga solo en cliente.
 const MapaItinerario = dynamic(() => import('./mapa-itinerario'), {
   ssr: false,
   loading: () => (
@@ -112,11 +114,23 @@ export function MapaViajeCard({ viaje }: { viaje: Viaje }) {
           </div>
         )}
         <div className="h-80 w-full">
-          <MapaItinerario
-            escalas={viaje.escalas ?? []}
-            geometria={viaje.rutaGeometria ?? null}
-            posicionConductor={posicionConductor}
-          />
+          {/* Viaje activo → mapa dinámico (posición del conductor en vivo).
+              Finalizado/sin GPS → imagen estática (1 petición, más barata). En
+              ambos casos el mapa solo se inicializa al entrar en pantalla. */}
+          <LazyMount>
+            {viajeActivo ? (
+              <MapaItinerario
+                escalas={viaje.escalas ?? []}
+                geometria={viaje.rutaGeometria ?? null}
+                posicionConductor={posicionConductor}
+              />
+            ) : (
+              <MapaEstatico
+                escalas={viaje.escalas ?? []}
+                geometria={viaje.rutaGeometria ?? null}
+              />
+            )}
+          </LazyMount>
         </div>
       </CardContent>
     </Card>

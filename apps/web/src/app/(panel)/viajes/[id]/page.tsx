@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Building2, Container, Copy, MapPin, Pencil, PlayCircle, Truck, User } from 'lucide-react';
+import { ArrowLeft, Building2, Container, Copy, MapPin, Pencil, PlayCircle, Siren, Truck, User } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { invalidarViajes } from '@/lib/query-keys';
 import { fechaLarga, horaCorta } from '@/lib/fecha';
 import { toast } from '@/components/ui/sonner';
@@ -350,10 +351,23 @@ export default function ViajeDetallePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {(viaje.incidencias ?? []).map((inc) => (
-                  <div key={inc.id} className="rounded-md border p-3 text-sm">
+                {(viaje.incidencias ?? []).map((inc) => {
+                  const esCritica =
+                    inc.tipo === 'PANICO' || inc.gravedad?.toUpperCase() === 'CRITICA';
+                  return (
+                  <div
+                    key={inc.id}
+                    className={cn(
+                      'rounded-md border p-3 text-sm',
+                      esCritica && !inc.resuelta &&
+                        'border-destructive/60 bg-destructive/5',
+                    )}
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
+                        {esCritica && (
+                          <Siren className="h-4 w-4 shrink-0 text-destructive" />
+                        )}
                         <Badge variant="destructive">{inc.tipo}</Badge>
                         <Badge variant="outline">{inc.gravedad}</Badge>
                         {inc.resuelta && <Badge variant="secondary">Resuelta</Badge>}
@@ -373,7 +387,8 @@ export default function ViajeDetallePage() {
                       </p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           )}

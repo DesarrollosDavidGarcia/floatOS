@@ -41,6 +41,34 @@ export interface RouteProvider {
   calcular(puntos: PuntoRuta[], opts?: CalcularOpts): Promise<RutaCalculada>;
 }
 
+/**
+ * Proveedor de ruteo por CARRETERA (TomTom, Google…). Sobre `RouteProvider`
+ * añade lo que el orquestador necesita para tratarlos de forma intercambiable:
+ * si está disponible (hay key) y una etiqueta de proveedor para segmentar la
+ * caché. El proveedor concreto se elige por env `ROUTING_PROVIDER`.
+ */
+export interface CarreteraProvider extends RouteProvider {
+  /** Etiqueta del proveedor (p. ej. 'TOMTOM' | 'GOOGLE') — segmenta `ruta_cache`. */
+  readonly proveedor: string;
+  /** true si hay key configurada y el ruteo por carretera está disponible. */
+  disponible(): boolean;
+}
+
+/** Token DI del proveedor de carretera activo (resuelto por `ROUTING_PROVIDER`). */
+export const CARRETERA_PROVIDER = Symbol('CARRETERA_PROVIDER');
+
+/**
+ * Error de tope diario superado; el orquestador lo distingue por `instanceof`
+ * para degradar a geodésica con un mensaje específico. Compartido por los
+ * proveedores de carretera que imponen un tope defensivo de llamadas/día.
+ */
+export class LimiteDiarioError extends Error {
+  constructor(proveedor = 'ruteo') {
+    super(`Tope diario de ${proveedor} superado`);
+    this.name = 'LimiteDiarioError';
+  }
+}
+
 /** Decimales con que se redondean las coords en la clave de caché (~11 m). */
 export const DECIMALES_CLAVE_RUTA = 4;
 

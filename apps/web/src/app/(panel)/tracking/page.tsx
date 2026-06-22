@@ -20,7 +20,7 @@ import type {
   ViajeActivo,
 } from '@/components/tracking/tipos';
 
-// El mapa usa Leaflet (window) — debe cargarse sólo en cliente.
+// El mapa usa Google Maps (window) — debe cargarse sólo en cliente.
 const Mapa = dynamic(() => import('@/components/tracking/mapa'), {
   ssr: false,
   loading: () => (

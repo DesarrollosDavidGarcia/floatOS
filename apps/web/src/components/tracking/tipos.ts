@@ -50,6 +50,10 @@ export interface NotificacionLlegada {
   esDestino: boolean;
   /** Título propio (incidencias); las llegadas lo derivan con tituloLlegada(). */
   titulo?: string | null;
+  /** Gravedad de la incidencia (ALTA/CRITICA…); solo para kind 'incidencia'. */
+  gravedad?: string | null;
+  /** true si la incidencia es una emergencia (pánico/SOS) — resalta en rojo. */
+  critica?: boolean;
   recibidaEn: string; // ISO de recepción en el cliente
   leida: boolean;
 }

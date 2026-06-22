@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import type {
-  CalcularOpts,
-  PuntoLatLng,
-  PuntoRuta,
-  RouteProvider,
-  RutaCalculada,
+import {
+  LimiteDiarioError,
+  type CalcularOpts,
+  type CarreteraProvider,
+  type PuntoLatLng,
+  type PuntoRuta,
+  type RutaCalculada,
 } from './route-provider';
 import { normalizarGeometria } from './polyline.util';
 
@@ -16,13 +17,8 @@ export const TOPE_DIARIO_DEFAULT = 2000;
 const DECIMALES_URL = 6;
 const PROVEEDOR = 'TOMTOM';
 
-/** Error de tope diario superado; el orquestador lo distingue por `instanceof`. */
-export class LimiteDiarioError extends Error {
-  constructor() {
-    super('Tope diario de ruteo TomTom superado');
-    this.name = 'LimiteDiarioError';
-  }
-}
+// Re-exporta el error compartido para no romper imports existentes (specs, etc.).
+export { LimiteDiarioError } from './route-provider';
 
 /**
  * Ruteo por carretera vía TomTom Routing API (calculateRoute). La key es POR
@@ -35,9 +31,10 @@ export class LimiteDiarioError extends Error {
  * `traffic=false` mantiene el resultado estable (cacheable a largo plazo).
  */
 @Injectable()
-export class TomTomRouteProvider implements RouteProvider {
+export class TomTomRouteProvider implements CarreteraProvider {
   constructor(private readonly prisma: PrismaService) {}
 
+  readonly proveedor = PROVEEDOR;
   private dia = '';
   private cuenta = 0;
 
@@ -86,7 +83,7 @@ export class TomTomRouteProvider implements RouteProvider {
     if (puntos.length < 2) {
       return { km: 0, tiempoMin: null, metodo: 'RUTA', geometria: null, advertencias: [] };
     }
-    if (!(await this.dentroDelTope())) throw new LimiteDiarioError();
+    if (!(await this.dentroDelTope())) throw new LimiteDiarioError('ruteo TomTom');
 
     const locs = puntos
       .map((p) => `${p.lat.toFixed(DECIMALES_URL)},${p.lng.toFixed(DECIMALES_URL)}`)
