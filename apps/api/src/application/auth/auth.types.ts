@@ -9,6 +9,7 @@ export interface UsuarioPublico {
   id: string;
   nombre: string;
   email: string;
+  rol: Usuario['rol'];
   activo: boolean;
   type: 'admin';
 }
@@ -19,6 +20,7 @@ export function aUsuarioPublico(usuario: Usuario): UsuarioPublico {
     id: usuario.id,
     nombre: usuario.nombre,
     email: usuario.email,
+    rol: usuario.rol,
     activo: usuario.activo,
     type: 'admin',
   };

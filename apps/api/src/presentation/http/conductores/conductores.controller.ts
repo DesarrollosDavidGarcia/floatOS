@@ -42,6 +42,7 @@ import { ActualizarDocumentoConductorDto } from './dto/actualizar-documento-cond
 import { DiasVencimientoDto } from '../shared/dias-vencimiento.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('conductores')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -61,6 +62,7 @@ export class ConductoresController {
   // ─────────────────────────── Conductores ───────────────────────────
 
   @Post()
+  @Roles('ADMIN')
   crear(@Body() dto: CrearConductorDto): Promise<ConductorPublico> {
     return this.crearConductor.execute(dto);
   }
@@ -87,6 +89,7 @@ export class ConductoresController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   actualizar(
     @Param('id') id: string,
     @Body() dto: ActualizarConductorDto,
@@ -95,6 +98,7 @@ export class ConductoresController {
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   eliminar(@Param('id') id: string): Promise<void> {
     return this.eliminarConductor.execute(id);
@@ -115,6 +119,7 @@ export class ConductoresController {
   // ─────────────────── Documentos de un conductor ────────────────────
 
   @Post(':conductorId/documentos')
+  @Roles('ADMIN')
   crearDocumento(
     @Param('conductorId') conductorId: string,
     @Body() dto: CrearDocumentoConductorDto,
@@ -138,6 +143,7 @@ export class ConductoresController {
   }
 
   @Patch(':conductorId/documentos/:docId')
+  @Roles('ADMIN')
   actualizarDocumento(
     @Param('conductorId') conductorId: string,
     @Param('docId') docId: string,
@@ -147,6 +153,7 @@ export class ConductoresController {
   }
 
   @Delete(':conductorId/documentos/:docId')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   eliminarDocumento(
     @Param('conductorId') conductorId: string,
@@ -159,6 +166,7 @@ export class ConductoresController {
 
   /** Sube uno o varios archivos (PDF o imagen) a un documento del conductor. */
   @Post(':conductorId/documentos/:docId/archivos')
+  @Roles('ADMIN')
   @UseInterceptors(
     FilesInterceptor('archivos', 10, { limits: { fileSize: TAMANO_MAX_BYTES } }),
   )
@@ -188,6 +196,7 @@ export class ConductoresController {
   }
 
   @Delete(':conductorId/documentos/:docId/archivos/:archivoId')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminarArchivo(
     @Param('conductorId') conductorId: string,
@@ -215,6 +224,7 @@ export class ConductoresController {
 
   /** Sube uno o varios archivos (PDF o imagen) a un registro del expediente. */
   @Post(':conductorId/expediente/:seccion/:registroId/archivos')
+  @Roles('ADMIN')
   @UseInterceptors(
     FilesInterceptor('archivos', 10, { limits: { fileSize: TAMANO_MAX_BYTES } }),
   )
@@ -261,6 +271,7 @@ export class ConductoresController {
   }
 
   @Delete(':conductorId/expediente/:seccion/:registroId/archivos/:archivoId')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminarArchivoExpediente(
     @Param('conductorId') conductorId: string,

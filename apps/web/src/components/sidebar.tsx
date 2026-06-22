@@ -2,62 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Truck,
-  MapPin,
-  Container,
-  Users,
-  Building2,
-  BellRing,
-  ListChecks,
-  Settings,
-  type LucideIcon,
-} from 'lucide-react';
+import { Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
-const GRUPOS: NavGroup[] = [
-  {
-    label: 'Operación',
-    items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/viajes', label: 'Viajes', icon: Truck },
-      { href: '/tracking', label: 'Mapa en vivo', icon: MapPin },
-    ],
-  },
-  {
-    label: 'Gestión',
-    items: [
-      { href: '/flota', label: 'Flota', icon: Container },
-      { href: '/conductores', label: 'Conductores', icon: Users },
-      { href: '/clientes', label: 'Clientes', icon: Building2 },
-    ],
-  },
-  {
-    label: 'Sistema',
-    items: [
-      { href: '/alertas', label: 'Alertas', icon: BellRing },
-      { href: '/catalogos', label: 'Catálogos', icon: ListChecks },
-      { href: '/configuracion', label: 'Configuración', icon: Settings },
-    ],
-  },
-];
+import { useAuth } from '@/lib/auth';
+import { GRUPOS, itemVisible } from '@/lib/navegacion';
 
 /** Contenido del sidebar (marca + navegación + footer), reutilizable en el
  *  drawer móvil. `onNavigate` se llama al hacer clic en un enlace (para cerrar). */
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const rol = user?.rol;
+
+  // Solo grupos con al menos un item visible para el rol actual.
+  const grupos = GRUPOS.map((grupo) => ({
+    ...grupo,
+    items: grupo.items.filter((item) => itemVisible(item, rol)),
+  })).filter((grupo) => grupo.items.length > 0);
 
   return (
     <>
@@ -69,7 +30,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto p-3">
-        {GRUPOS.map((grupo) => (
+        {grupos.map((grupo) => (
           <div key={grupo.label} className="space-y-1">
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
               {grupo.label}

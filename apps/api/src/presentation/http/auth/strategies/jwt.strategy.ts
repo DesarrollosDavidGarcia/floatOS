@@ -8,6 +8,7 @@ import { COOKIE_ACCESS, leerCookie } from '../cookies';
 interface JwtPayload {
   sub?: string;
   type?: 'admin' | 'conductor';
+  rol?: 'ADMIN' | 'MONITORISTA';
 }
 
 /**
@@ -36,6 +37,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!payload?.sub || (payload.type !== 'admin' && payload.type !== 'conductor')) {
       throw new UnauthorizedException('Token inválido');
     }
-    return { sub: payload.sub, type: payload.type };
+    // El rol solo aplica a admins; tokens antiguos sin rol se tratan como ADMIN.
+    const rol = payload.type === 'admin' ? payload.rol ?? 'ADMIN' : undefined;
+    return { sub: payload.sub, type: payload.type, rol };
   }
 }

@@ -58,6 +58,8 @@ export class RefreshTokenUseCase {
     const tokens = await this.authService.generarTokens({
       sub: entidad.id,
       type,
+      // Re-lee el rol actual del admin para que cambios de rol se propaguen al renovar.
+      rol: type === 'admin' ? (entidad as Usuario).rol : undefined,
     });
     const refreshTokenHash = await this.authService.hashRefreshToken(
       tokens.refreshToken,

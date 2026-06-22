@@ -17,9 +17,11 @@ import {
 import { ActualizarEmpresaDto } from './dto/actualizar-empresa.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('empresa')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class EmpresaController {
   constructor(private readonly empresa: EmpresaUseCase) {}
 

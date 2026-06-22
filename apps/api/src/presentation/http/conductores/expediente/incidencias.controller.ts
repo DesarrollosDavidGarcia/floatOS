@@ -13,12 +13,14 @@ import {
 import { IncidenciaConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { IncidenciasUseCase } from '../../../../application/conductores/expediente/incidencias.usecase';
 import { CrearIncidenciaDto } from './dto/crear-incidencia.dto';
 import { ActualizarIncidenciaDto } from './dto/actualizar-incidencia.dto';
 
 @Controller('conductores/:conductorId/incidencias')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class IncidenciasController {
   constructor(private readonly incidencias: IncidenciasUseCase) {}
 

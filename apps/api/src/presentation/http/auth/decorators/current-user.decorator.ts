@@ -4,6 +4,8 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export interface AuthPrincipal {
   sub: string;
   type: 'admin' | 'conductor';
+  /** Rol del panel. Solo presente cuando type === 'admin'. */
+  rol?: 'ADMIN' | 'MONITORISTA';
 }
 
 /**

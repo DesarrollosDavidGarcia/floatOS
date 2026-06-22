@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Container, FileText, MoreHorizontal, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { useSoloLectura } from '@/lib/auth';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { PageHeader } from '@/components/page-header';
@@ -32,6 +33,7 @@ import {
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { CeldaPrincipal } from '@/components/conductores/expediente/tabla-ui';
 import { UnidadFormDialog } from '@/components/flota/unidad-form-dialog';
+import { UnidadFotoMini } from '@/components/flota/unidad-foto';
 import { DocumentosDialog } from '@/components/flota/documentos-dialog';
 import { ArchivosDialog } from '@/components/flota/archivos-dialog';
 import type { Paginado, Unidad } from '@/components/flota/types';
@@ -40,6 +42,7 @@ const PAGE_SIZE = 10;
 
 export default function FlotaPage() {
   const queryClient = useQueryClient();
+  const soloLectura = useSoloLectura();
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
   const qDebounced = useDebounce(busqueda);
@@ -117,9 +120,11 @@ export default function FlotaPage() {
               }}
               placeholder="Buscar por placas, tipo, marca…"
             />
-            <Button className="shrink-0" onClick={abrirNueva}>
-              <Plus /> Nueva unidad
-            </Button>
+            {!soloLectura && (
+              <Button className="shrink-0" onClick={abrirNueva}>
+                <Plus /> Nueva unidad
+              </Button>
+            )}
           </div>
         }
       />
@@ -165,8 +170,10 @@ export default function FlotaPage() {
             >
               {unidades.map((u) => (
                 <TableRow key={u.id}>
-                  {/* Unidad: placas + tipo · marca/modelo */}
+                  {/* Unidad: foto + placas + tipo · marca/modelo */}
                   <TableCell>
+                    <div className="flex items-center gap-3">
+                    <UnidadFotoMini fotoUrl={u.fotoUrl} placas={u.placas} />
                     <CeldaPrincipal
                       titulo={u.placas}
                       subtitulo={
@@ -187,6 +194,7 @@ export default function FlotaPage() {
                         </>
                       }
                     />
+                    </div>
                   </TableCell>
 
                   {/* Año */}
@@ -217,31 +225,33 @@ export default function FlotaPage() {
 
                   {/* Acciones */}
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Acciones">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onSelect={() => abrirDocumentos(u)}>
-                          <FileText className="h-4 w-4" /> Documentos
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => abrirArchivos(u)}>
-                          <Paperclip className="h-4 w-4" /> Archivos
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => abrirEdicion(u)}>
-                          <Pencil className="h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => setEliminarUnidad(u)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {!soloLectura && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label="Acciones">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onSelect={() => abrirDocumentos(u)}>
+                            <FileText className="h-4 w-4" /> Documentos
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => abrirArchivos(u)}>
+                            <Paperclip className="h-4 w-4" /> Archivos
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => abrirEdicion(u)}>
+                            <Pencil className="h-4 w-4" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => setEliminarUnidad(u)}
+                          >
+                            <Trash2 className="h-4 w-4" /> Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

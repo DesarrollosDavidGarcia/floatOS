@@ -13,12 +13,14 @@ import {
 import { EventoLaboralConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { EventosLaboralesUseCase } from '../../../../application/conductores/expediente/eventos-laborales.usecase';
 import { CrearEventoLaboralDto } from './dto/crear-evento-laboral.dto';
 import { ActualizarEventoLaboralDto } from './dto/actualizar-evento-laboral.dto';
 
 @Controller('conductores/:conductorId/eventos-laborales')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class EventosLaboralesController {
   constructor(private readonly eventosLaborales: EventosLaboralesUseCase) {}
 

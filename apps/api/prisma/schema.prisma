@@ -210,16 +210,25 @@ model CatalogoItem {
 
 // ──────────────────────────── Usuarios ───────────────────────────
 
-/// Admin del panel web (dueño de la flotilla). Una instancia = un admin (MVP).
+/// Rol de un usuario del panel. ADMIN tiene acceso total; MONITORISTA solo
+/// opera viajes (crear/editar/asignar), monitoreo en vivo y lectura de
+/// clientes/flota.
+enum RolUsuario {
+  ADMIN
+  MONITORISTA
+}
+
+/// Usuario del panel web. ADMIN (dueño de la flotilla) o MONITORISTA.
 model Usuario {
-  id               String   @id @default(cuid())
-  email            String   @unique
+  id               String     @id @default(cuid())
+  email            String     @unique
   passwordHash     String
   nombre           String
-  activo           Boolean  @default(true)
+  rol              RolUsuario @default(ADMIN)
+  activo           Boolean    @default(true)
   refreshTokenHash String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   @@map("usuarios")
 }

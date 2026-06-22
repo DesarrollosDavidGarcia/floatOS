@@ -12,7 +12,11 @@ export class LoginAdminUseCase {
   ) {}
 
   async execute(email: string, password: string): Promise<AuthResponse> {
-    const usuario = await this.prisma.usuario.findUnique({ where: { email } });
+    // Normalizamos a minúsculas: el email se almacena en minúsculas al crear el
+    // usuario, así el login es insensible a mayúsculas.
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { email: email.toLowerCase() },
+    });
     if (!usuario || !usuario.activo) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -28,6 +32,7 @@ export class LoginAdminUseCase {
     const tokens = await this.authService.generarTokens({
       sub: usuario.id,
       type: 'admin',
+      rol: usuario.rol,
     });
 
     const refreshTokenHash = await this.authService.hashRefreshToken(

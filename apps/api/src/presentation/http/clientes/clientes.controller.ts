@@ -21,6 +21,7 @@ import { EliminarClienteUseCase } from '../../../application/clientes/eliminar-c
 import { SucursalesClienteUseCase } from '../../../application/clientes/sucursales-cliente.usecase';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CrearClienteDto } from './dto/crear-cliente.dto';
 import { ActualizarClienteDto } from './dto/actualizar-cliente.dto';
 import { ListarClientesDto } from './dto/listar-clientes.dto';
@@ -39,6 +40,7 @@ export class ClientesController {
   ) {}
 
   @Post()
+  @Roles('ADMIN')
   crear(@Body() dto: CrearClienteDto): Promise<Cliente> {
     return this.crearCliente.execute(dto);
   }
@@ -54,6 +56,7 @@ export class ClientesController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   actualizar(
     @Param('id') id: string,
     @Body() dto: ActualizarClienteDto,
@@ -62,6 +65,7 @@ export class ClientesController {
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminar(@Param('id') id: string): Promise<void> {
     await this.eliminarCliente.execute(id);
@@ -77,6 +81,7 @@ export class ClientesController {
   }
 
   @Post(':clienteId/sucursales')
+  @Roles('ADMIN')
   crearSucursal(
     @Param('clienteId') clienteId: string,
     @Body() dto: CrearSucursalDto,
@@ -85,6 +90,7 @@ export class ClientesController {
   }
 
   @Patch(':clienteId/sucursales/:sucursalId')
+  @Roles('ADMIN')
   actualizarSucursal(
     @Param('clienteId') clienteId: string,
     @Param('sucursalId') sucursalId: string,
@@ -94,6 +100,7 @@ export class ClientesController {
   }
 
   @Delete(':clienteId/sucursales/:sucursalId')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminarSucursal(
     @Param('clienteId') clienteId: string,

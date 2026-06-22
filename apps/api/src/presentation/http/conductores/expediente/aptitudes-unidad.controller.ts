@@ -13,12 +13,14 @@ import {
 import { AptitudUnidadConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { AptitudesUnidadUseCase } from '../../../../application/conductores/expediente/aptitudes-unidad.usecase';
 import { CrearAptitudUnidadDto } from './dto/crear-aptitud-unidad.dto';
 import { ActualizarAptitudUnidadDto } from './dto/actualizar-aptitud-unidad.dto';
 
 @Controller('conductores/:conductorId/aptitudes-unidad')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class AptitudesUnidadController {
   constructor(private readonly aptitudesUnidad: AptitudesUnidadUseCase) {}
 

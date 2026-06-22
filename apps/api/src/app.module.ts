@@ -20,6 +20,7 @@ import { CotizacionesModule } from './presentation/http/cotizaciones/cotizacione
 import { EmpresaModule } from './presentation/http/empresa/empresa.module';
 import { TrackingModule } from './presentation/ws/tracking/tracking.module';
 import { AlertasModule } from './presentation/http/alertas/alertas.module';
+import { UsuariosModule } from './presentation/http/usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     EmpresaModule,
     TrackingModule,
     AlertasModule,
+    UsuariosModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

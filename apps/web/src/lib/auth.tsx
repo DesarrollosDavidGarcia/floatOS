@@ -11,6 +11,8 @@ export interface AuthUser {
   nombre: string;
   email?: string;
   type: string;
+  /** Rol del panel. Solo presente para admins (type === 'admin'). */
+  rol?: 'ADMIN' | 'MONITORISTA';
 }
 
 interface AuthContextValue {
@@ -66,4 +68,10 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
   return ctx;
+}
+
+/** True si el usuario actual es monitorista (acceso de solo lectura a gestión). */
+export function useSoloLectura() {
+  const { user } = useAuth();
+  return user?.rol === 'MONITORISTA';
 }
