@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Bell, Check, MapPin, MonitorSmartphone, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bell, Check, MapPin, MonitorSmartphone, Siren, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { horaCorta } from '@/lib/fecha';
@@ -130,6 +130,7 @@ export function NotificationsBell() {
           ) : (
             topLlegadas.map((n) => {
               const esIncidencia = n.kind === 'incidencia';
+              const esCritica = esIncidencia && n.critica;
               return (
                 <Link
                   key={n.id}
@@ -138,9 +139,13 @@ export function NotificationsBell() {
                   className={cn(
                     'flex items-start gap-2 border-b px-3 py-2 last:border-b-0 hover:bg-accent',
                     !n.leida && 'bg-primary/5',
+                    // Las emergencias quedan resaltadas en rojo aunque ya se hayan leído.
+                    esCritica && 'bg-destructive/10 hover:bg-destructive/15',
                   )}
                 >
-                  {esIncidencia ? (
+                  {esCritica ? (
+                    <Siren className="mt-0.5 h-4 w-4 shrink-0 animate-pulse text-destructive" />
+                  ) : esIncidencia ? (
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                   ) : (
                     <MapPin
@@ -151,9 +156,20 @@ export function NotificationsBell() {
                     />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className={cn('truncate text-sm', !n.leida && 'font-medium')}>
+                    <p
+                      className={cn(
+                        'truncate text-sm',
+                        !n.leida && 'font-medium',
+                        esCritica && 'font-semibold text-destructive',
+                      )}
+                    >
                       {esIncidencia ? (n.titulo ?? 'Incidencia reportada') : tituloLlegada(n)}
                     </p>
+                    {esCritica && (
+                      <span className="mt-0.5 inline-flex items-center rounded bg-destructive px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        Emergencia
+                      </span>
+                    )}
                     {n.escalaDireccion && (
                       <p className="truncate text-xs text-muted-foreground">
                         {n.escalaDireccion}
