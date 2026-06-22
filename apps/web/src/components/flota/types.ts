@@ -13,6 +13,8 @@ export interface Unidad {
   capacidadKg?: number | null;
   aseguradora?: string | null;
   numeroPoliza?: string | null;
+  /** URL temporal de la foto de referencia (null si no tiene). */
+  fotoUrl?: string | null;
   activo: boolean;
 }
 

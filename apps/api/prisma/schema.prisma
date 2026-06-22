@@ -359,6 +359,7 @@ model Unidad {
   capacidadTanqueL Decimal? @db.Decimal(8, 2)  // litros de tanque (autonomía = rendimiento * tanque)
   aseguradora   String?
   numeroPoliza  String?
+  fotoKey       String?  // foto de referencia del vehículo (objeto en MinIO)
   activo        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
