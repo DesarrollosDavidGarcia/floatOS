@@ -1,0 +1,123 @@
+{
+  "name": "FlotaOS — Bot de cotización",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cotizar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Mensaje entrante",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "cotizar-bot"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.novita.ai/openai/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.NOVITA_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $env.NOVITA_MODEL_BOT }}\",\n  \"temperature\": 0,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"Eres un asistente de cotizacion de transporte de carga en Mexico. Del mensaje del usuario extrae y devuelve SOLO un objeto JSON con: origen (ciudad o direccion), destino (ciudad o direccion), pesoKg (numero en kilogramos; si dan toneladas multiplica por 1000), numEscalas (paradas intermedias ademas del destino, default 0). Si falta un dato, usa null.\" },\n    { \"role\": \"user\", \"content\": {{ JSON.stringify($json.body.mensaje || $json.body.text || '') }} }\n  ]\n}",
+        "options": {}
+      },
+      "id": "node-ia",
+      "name": "IA: parsear mensaje (Novita)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Toma el JSON que devolvio el modelo y lo deja en el item.\nconst content = $input.first().json.choices?.[0]?.message?.content ?? '';\nconst m = content.match(/\\{[\\s\\S]*\\}/);\nconst datos = JSON.parse(m ? m[0] : content);\nreturn [{ json: {\n  origen: datos.origen,\n  destino: datos.destino,\n  pesoKg: Number(datos.pesoKg) || 0,\n  numEscalas: Number(datos.numEscalas) || 0\n} }];"
+      },
+      "id": "node-parse",
+      "name": "Extraer datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FLOTAOS_API_URL }}/bot/cotizacion",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $env.BOT_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"origen\": {{ JSON.stringify($json.origen) }},\n  \"destino\": {{ JSON.stringify($json.destino) }},\n  \"pesoKg\": {{ $json.pesoKg }},\n  \"numEscalas\": {{ $json.numEscalas }}\n}",
+        "options": {}
+      },
+      "id": "node-cotizar",
+      "name": "FlotaOS: cotizar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.resumen }}",
+        "options": {}
+      },
+      "id": "node-responder",
+      "name": "Responder (prueba)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.zavu.dev/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.ZAVU_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"whatsapp\",\n  \"to\": \"{{ $json.to || '' }}\",\n  \"content\": {{ JSON.stringify($json.resumen) }}\n}",
+        "options": {}
+      },
+      "id": "node-zavu",
+      "name": "Zavu: responder (conectar con número)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 480],
+      "notes": "Conecta este nodo después de 'FlotaOS: cotizar' cuando tengas un número de WhatsApp en Zavu. Verifica la URL y el esquema del body contra la doc de Zavu (channel/to/content)."
+    }
+  ],
+  "connections": {
+    "Mensaje entrante": {
+      "main": [[{ "node": "IA: parsear mensaje (Novita)", "type": "main", "index": 0 }]]
+    },
+    "IA: parsear mensaje (Novita)": {
+      "main": [[{ "node": "Extraer datos", "type": "main", "index": 0 }]]
+    },
+    "Extraer datos": {
+      "main": [[{ "node": "FlotaOS: cotizar", "type": "main", "index": 0 }]]
+    },
+    "FlotaOS: cotizar": {
+      "main": [[{ "node": "Responder (prueba)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

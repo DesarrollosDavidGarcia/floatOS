@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -10,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CotizacionesService } from '../../../application/cotizaciones/cotizaciones.service';
+import { CotizacionesQueue } from '../../../infrastructure/queues/cotizaciones.queue';
 import {
   CalcularCotizacionDto,
   CambiarEstadoCotizacionDto,
@@ -18,13 +20,17 @@ import {
 } from './dto/cotizacion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 
+// Las cotizaciones forman parte de la operación del viaje, accesible tanto a
+// admins como a monitoristas. Sin @Roles: cualquier admin (ADMIN o MONITORISTA)
+// puede gestionarlas por completo.
 @Controller()
 @UseGuards(JwtAuthGuard, AdminGuard)
-@Roles('ADMIN')
 export class CotizacionesController {
-  constructor(private readonly cotizaciones: CotizacionesService) {}
+  constructor(
+    private readonly cotizaciones: CotizacionesService,
+    private readonly cola: CotizacionesQueue,
+  ) {}
 
   /** Previsualización del motor de cotización (no persiste). */
   @Post('cotizaciones/calcular')
@@ -77,10 +83,26 @@ export class CotizacionesController {
     return this.cotizaciones.obtener(id);
   }
 
-  /** Envía la cotización por correo con el PDF adjunto (Brevo/SMTP). */
+  /**
+   * Envía la cotización por correo con el PDF adjunto (Brevo/SMTP).
+   *
+   * Intenta encolar el envío en BullMQ (responde 202 `{ encolada: true }` sin
+   * esperar al envío). Si la cola no está disponible (Redis caído), hace
+   * FALLBACK síncrono procesando el envío en el request (para no perderlo nunca)
+   * y responde 202 `{ encolada: false }`.
+   */
   @Post('cotizaciones/:id/enviar')
-  enviar(@Param('id') id: string, @Body() dto: EnviarCotizacionDto) {
-    return this.cotizaciones.enviar(id, dto);
+  @HttpCode(202)
+  async enviar(
+    @Param('id') id: string,
+    @Body() dto: EnviarCotizacionDto,
+  ): Promise<{ encolada: boolean }> {
+    const encolada = await this.cola.encolarEnvio(id, dto);
+    if (!encolada) {
+      // Fallback síncrono: el envío nunca se pierde aunque Redis esté caído.
+      await this.cotizaciones.procesarEnvio(id, dto);
+    }
+    return { encolada };
   }
 
   /** Descarga el PDF de la cotización. */

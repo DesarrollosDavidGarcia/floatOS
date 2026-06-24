@@ -3,8 +3,11 @@ import { Job, Worker } from 'bullmq';
 import { EscaneoVencimientosService } from '../../application/alertas/escaneo-vencimientos.service';
 import { AlertaVencimiento } from '../../application/alertas/alertas.types';
 import { EmailService } from '../email/email.service';
+import { PrismaService } from '../database/prisma.service';
 import {
   COLA_ALERTAS,
+  DIAS_RETENCION_UBICACIONES,
+  JOB_PURGA_UBICACIONES,
   UMBRALES_DIAS,
   crearConexionRedis,
 } from './redis.connection';
@@ -26,6 +29,7 @@ export class AlertasWorker implements OnModuleDestroy {
   constructor(
     private readonly escaneo: EscaneoVencimientosService,
     private readonly email: EmailService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /** Crea el worker que consume la cola. Captura errores para no tumbar el arranque. */
@@ -60,8 +64,37 @@ export class AlertasWorker implements OnModuleDestroy {
     }
   }
 
-  /** Lógica del job: escanear umbrales y notificar. */
-  private async procesar(job: Job): Promise<{ alertas: number }> {
+  /** Ramifica por tipo de job: escaneo de vencimientos o purga de ubicaciones. */
+  private async procesar(job: Job): Promise<unknown> {
+    if (job.name === JOB_PURGA_UBICACIONES) {
+      return this.purgarUbicaciones(job);
+    }
+    return this.escanearVencimientos(job);
+  }
+
+  /**
+   * Purga las ubicaciones GPS más antiguas que la ventana de retención. Borra por
+   * `capturadoEn` (momento del fix GPS), no por createdAt, para que la retención
+   * sea respecto al instante real del dato.
+   */
+  private async purgarUbicaciones(job: Job): Promise<{ borradas: number }> {
+    const limite = new Date(
+      Date.now() - DIAS_RETENCION_UBICACIONES * 24 * 60 * 60 * 1000,
+    );
+    this.logger.log(
+      `Procesando job '${job.name}' (${job.id}): purga de ubicaciones anteriores a ${limite.toISOString()} (retención ${DIAS_RETENCION_UBICACIONES} días).`,
+    );
+
+    const { count } = await this.prisma.ubicacionConductor.deleteMany({
+      where: { capturadoEn: { lt: limite } },
+    });
+
+    this.logger.log(`Purga completada: ${count} ubicación(es) borrada(s).`);
+    return { borradas: count };
+  }
+
+  /** Lógica del job de alertas: escanear umbrales y notificar. */
+  private async escanearVencimientos(job: Job): Promise<{ alertas: number }> {
     this.logger.log(
       `Procesando job '${job.name}' (${job.id}): escaneo de vencimientos.`,
     );

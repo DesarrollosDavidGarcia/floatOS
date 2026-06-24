@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Conductor, ConductorFormPayload } from '@/components/conductores/types';
+import { isoADate } from '@/lib/fecha';
 
 const opcional = z.string().trim().optional().or(z.literal(''));
 const tel10 = z
@@ -118,8 +119,6 @@ export function defaultsCrear(): ConductorFormValues {
     _esEdicion: false,
   };
 }
-
-const isoADate = (iso?: string | null) => (iso ? iso.slice(0, 10) : '');
 
 export function defaultsDeConductor(c: Conductor): ConductorFormValues {
   return {

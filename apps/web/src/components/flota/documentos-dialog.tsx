@@ -1,5 +1,6 @@
 'use client';
 
+import { api } from '@/lib/api';
 import { DocumentosDialogBase } from '@/components/documentos/documentos-dialog-base';
 import type { DocumentoUnidad, Unidad } from './types';
 
@@ -24,6 +25,21 @@ export function DocumentosDialog({
       invalidarAdicional={[['unidad-documentos-por-vencer']]}
       catalogoGrupo="TIPO_DOCUMENTO_UNIDAD"
       campoExtra={{ name: 'descripcion', label: 'Descripción' }}
+      guardarArchivoIa={
+        unidad
+          ? async (file) => {
+              // La unidad no tiene adjuntos por documento: se guarda en su área
+              // general de archivos (categoría GENERAL).
+              const fd = new FormData();
+              fd.append('archivos', file);
+              await api.post(
+                `/unidades/${unidad.id}/archivos?categoria=GENERAL`,
+                fd,
+                { headers: { 'Content-Type': undefined } },
+              );
+            }
+          : undefined
+      }
     />
   );
 }

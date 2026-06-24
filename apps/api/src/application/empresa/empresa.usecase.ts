@@ -44,6 +44,8 @@ export type ActualizarEmpresaInput = Partial<
   pacToken?: string;
   pacPassword?: string;
   csdPassword?: string;
+  /** Tarifas por defecto del bot (forma de ParamsCotizacion, parcial). */
+  tarifasCotizacion?: object;
 };
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -114,6 +116,11 @@ export class EmpresaUseCase {
     if (input.pacToken?.trim()) data.pacToken = this.crypto.cifrar(input.pacToken.trim());
     if (input.pacPassword?.trim()) data.pacPassword = this.crypto.cifrar(input.pacPassword.trim());
     if (input.csdPassword?.trim()) data.csdPassword = this.crypto.cifrar(input.csdPassword.trim());
+
+    // Tarifas por defecto del bot (JSON). Se guardan tal cual (no son texto).
+    if (input.tarifasCotizacion !== undefined) {
+      data.tarifasCotizacion = input.tarifasCotizacion as Prisma.InputJsonValue;
+    }
 
     const upd = await this.prisma.empresa.update({
       where: { id: actual.id },

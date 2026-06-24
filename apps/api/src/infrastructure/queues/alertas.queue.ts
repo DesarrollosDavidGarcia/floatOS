@@ -3,7 +3,9 @@ import { Queue } from 'bullmq';
 import {
   COLA_ALERTAS,
   CRON_ESCANEO_DIARIO,
+  CRON_PURGA_UBICACIONES,
   JOB_ESCANEO_DIARIO,
+  JOB_PURGA_UBICACIONES,
   crearConexionRedis,
 } from './redis.connection';
 
@@ -50,8 +52,16 @@ export class AlertasQueue implements OnModuleDestroy {
         { name: JOB_ESCANEO_DIARIO, data: {} },
       );
 
+      // Segundo job repetible en la MISMA cola: purga diaria de ubicaciones
+      // antiguas (retención). El worker ramifica por job.name.
+      await this.queue.upsertJobScheduler(
+        JOB_PURGA_UBICACIONES,
+        { pattern: CRON_PURGA_UBICACIONES, tz: 'America/Mexico_City' },
+        { name: JOB_PURGA_UBICACIONES, data: {} },
+      );
+
       this.logger.log(
-        `Cola '${COLA_ALERTAS}' lista. Job diario programado (${CRON_ESCANEO_DIARIO}).`,
+        `Cola '${COLA_ALERTAS}' lista. Jobs diarios programados: escaneo (${CRON_ESCANEO_DIARIO}), purga ubicaciones (${CRON_PURGA_UBICACIONES}).`,
       );
     } catch (error) {
       this.logger.error(

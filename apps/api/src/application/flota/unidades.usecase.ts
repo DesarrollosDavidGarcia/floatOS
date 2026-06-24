@@ -2,13 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { Prisma, Unidad } from '@prisma/client';
 import { Paginado } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
 import { paginar } from '../shared/paginar';
+import { obtenerOFallar } from '../shared/obtener-o-fallar';
 import {
   ActualizarUnidadInput,
   CrearUnidadInput,
@@ -94,11 +94,10 @@ export class UnidadesUseCase {
 
   /** Obtiene la fila cruda o lanza NotFoundException (uso interno). */
   private async obtenerFila(id: string): Promise<Unidad> {
-    const unidad = await this.prisma.unidad.findUnique({ where: { id } });
-    if (!unidad) {
-      throw new NotFoundException(`Unidad con id ${id} no encontrada`);
-    }
-    return unidad;
+    return obtenerOFallar(
+      () => this.prisma.unidad.findUnique({ where: { id } }),
+      `Unidad con id ${id} no encontrada`,
+    );
   }
 
   /** Obtiene una unidad por id o lanza NotFoundException. */

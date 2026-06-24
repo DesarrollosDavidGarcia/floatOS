@@ -37,3 +37,19 @@ export function fechaLarga(iso?: string | null): string {
   const d = aDate(iso);
   return d ? format(d, "d 'de' MMMM yyyy, HH:mm", { locale: es }) : '—';
 }
+
+/**
+ * Convierte un ISO a "YYYY-MM-DD" para un `<input type="date">`
+ * (o "" si no hay valor). Toma los primeros 10 caracteres del ISO.
+ */
+export function isoADate(iso?: string | null): string {
+  return iso ? iso.slice(0, 10) : '';
+}
+
+/**
+ * Convierte el valor de un `<input type="date">` ("YYYY-MM-DD") a ISO,
+ * interpretando la fecha como medianoche local.
+ */
+export function dateAIso(date: string): string {
+  return new Date(`${date}T00:00:00`).toISOString();
+}

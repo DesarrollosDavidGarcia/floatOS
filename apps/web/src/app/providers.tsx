@@ -1,10 +1,16 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { APIProvider } from '@vis.gl/react-google-maps';
+import axios from 'axios';
 import { AuthProvider } from '@/lib/auth';
-import { Toaster } from '@/components/ui/sonner';
+import { apiError } from '@/lib/api';
+import { Toaster, toast } from '@/components/ui/sonner';
 import { ConnectivityBanner } from '@/components/pwa/connectivity-banner';
 
 /** Key de Google Maps para el navegador (Maps JS + Geocoding). Restringida por
@@ -15,6 +21,18 @@ export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        // Feedback de error centralizado: un toast estándar ante cualquier
+        // query fallida, en vez de repetir el manejo por página. Los 401 los
+        // gestiona el interceptor de axios (refresh + redirect a /login), así
+        // que se omiten para no spamear al usuario que ya será redirigido.
+        queryCache: new QueryCache({
+          onError: (error) => {
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              return;
+            }
+            toast.error(apiError(error));
+          },
+        }),
         defaultOptions: {
           queries: {
             retry: 1,

@@ -36,6 +36,7 @@ import {
   Vigencia,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import { isoADate } from '@/lib/fecha';
 
 const schema = z
   .object({
@@ -50,11 +51,6 @@ const schema = z
   });
 
 type FormValues = z.infer<typeof schema>;
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
-}
 
 function DocumentoForm({
   conductorId,

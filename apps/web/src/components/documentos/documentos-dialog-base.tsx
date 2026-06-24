@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ import {
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
 import { vencimientoInfo } from '@/lib/vencimiento';
-import { fechaCorta } from '@/lib/fecha';
+import { fechaCorta, isoADate, dateAIso } from '@/lib/fecha';
 
 /** Forma mínima común de un documento (conductor o unidad). */
 export interface DocumentoBase {
@@ -54,9 +54,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const isoADate = (iso?: string | null) => (iso ? iso.slice(0, 10) : '');
-const dateAIso = (date: string) => new Date(`${date}T00:00:00`).toISOString();
-
 export interface DocumentosDialogBaseProps<T extends DocumentoBase> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -75,6 +72,13 @@ export interface DocumentosDialogBaseProps<T extends DocumentoBase> {
   catalogoGrupo: string;
   /** Campo de texto libre extra (nombre real en el API + etiqueta visible). */
   campoExtra: { name: string; label: string };
+  /**
+   * Si se define, el archivo subido para "Autollenar con IA" se guarda tras
+   * crear/actualizar el documento (best-effort). Cada recurso decide DÓNDE:
+   * conductor lo adjunta al documento; unidad lo guarda en su área general.
+   * Si se omite, el archivo de IA solo se usa para leer y no se almacena.
+   */
+  guardarArchivoIa?: (file: File, docId: string) => Promise<void>;
 }
 
 /**
@@ -93,10 +97,14 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
   invalidarAdicional = [],
   catalogoGrupo,
   campoExtra,
+  guardarArchivoIa,
 }: DocumentosDialogBaseProps<T>) {
   const queryClient = useQueryClient();
   const [editando, setEditando] = useState<T | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const archivoIaRef = useRef<HTMLInputElement>(null);
+  // Archivo subido para "Autollenar con IA"; se adjunta al guardar (si aplica).
+  const [archivoIa, setArchivoIa] = useState<File | null>(null);
 
   const {
     register,
@@ -116,6 +124,7 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
     if (!open) {
       setEditando(null);
       setMostrarForm(false);
+      setArchivoIa(null);
     }
   }, [open]);
 
@@ -139,12 +148,14 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
 
   function abrirNuevo() {
     setEditando(null);
+    setArchivoIa(null);
     reset({ tipo: '', extra: '', fechaEmision: '', fechaVencimiento: '' });
     setMostrarForm(true);
   }
 
   function abrirEdicion(doc: T) {
     setEditando(doc);
+    setArchivoIa(null);
     reset({
       tipo: doc.tipo,
       extra: ((doc as Record<string, unknown>)[campoExtra.name] as string) ?? '',
@@ -157,6 +168,7 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
   function cerrarForm() {
     setMostrarForm(false);
     setEditando(null);
+    setArchivoIa(null);
   }
 
   const guardar = useMutation({
@@ -169,8 +181,27 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
       if (values.fechaEmision) payload.fechaEmision = dateAIso(values.fechaEmision);
 
       const base = basePath(entidadId as string);
-      if (editando) await api.patch(`${base}/${editando.id}`, payload);
-      else await api.post(base, payload);
+      let docId: string;
+      if (editando) {
+        await api.patch(`${base}/${editando.id}`, payload);
+        docId = editando.id;
+      } else {
+        const { data } = await api.post<{ id: string }>(base, payload);
+        docId = data.id;
+      }
+
+      // Guarda el archivo leído por la IA (best-effort: si falla, el documento
+      // ya quedó guardado, así que no rompemos el flujo). El DÓNDE lo decide el
+      // consumidor vía `guardarArchivoIa` (adjunto del doc / área de la unidad).
+      if (guardarArchivoIa && archivoIa) {
+        try {
+          await guardarArchivoIa(archivoIa, docId);
+        } catch (err) {
+          toast.warning(
+            `Documento guardado, pero no se pudo guardar el archivo: ${apiError(err)}`,
+          );
+        }
+      }
     },
     onSuccess: () => {
       invalidar();
@@ -190,6 +221,63 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
     },
     onError: (err) => toast.error(apiError(err)),
   });
+
+  /**
+   * Extracción con IA: sube una foto del documento al backend, que devuelve
+   * número y fechas para prellenar el formulario. El humano siempre revisa.
+   */
+  const extraerIa = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('archivo', file);
+      if (tipo) fd.append('tipo', tipo);
+      const { data } = await api.post<{
+        numero: string | null;
+        fechaEmision: string | null;
+        fechaVencimiento: string | null;
+        confianza: 'alta' | 'media' | 'baja';
+        advertencias: string[];
+      }>('/ai/documentos/extraer', fd, {
+        headers: { 'Content-Type': undefined },
+      });
+      return data;
+    },
+    onSuccess: (d) => {
+      let aplico = false;
+      if (d.fechaVencimiento) {
+        setValue('fechaVencimiento', d.fechaVencimiento, { shouldValidate: true });
+        aplico = true;
+      }
+      if (d.fechaEmision) {
+        setValue('fechaEmision', d.fechaEmision);
+        aplico = true;
+      }
+      if (d.numero && !watch('extra')?.trim()) {
+        setValue('extra', d.numero);
+        aplico = true;
+      }
+      if (aplico) {
+        toast.success(
+          `Datos extraídos (confianza ${d.confianza}). Revísalos antes de guardar.`,
+        );
+      } else {
+        toast.info('No se pudieron leer datos. Captura los campos a mano.');
+      }
+      if (d.advertencias?.length) {
+        toast.warning(d.advertencias.join(' · '));
+      }
+    },
+    onError: (err) => toast.error(apiError(err)),
+  });
+
+  function onArchivoIa(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite volver a elegir el mismo archivo
+    if (file) {
+      setArchivoIa(file); // se adjuntará al guardar (si el recurso lo soporta)
+      extraerIa.mutate(file);
+    }
+  }
 
   function handleOpenChange(value: boolean) {
     if (!value) cerrarForm();
@@ -229,6 +317,36 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
                 <X className="h-4 w-4" />
               </Button>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/40 p-3">
+              <input
+                ref={archivoIaRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                className="hidden"
+                onChange={onArchivoIa}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => archivoIaRef.current?.click()}
+                disabled={extraerIa.isPending}
+              >
+                <Sparkles className="mr-1.5 h-4 w-4" />
+                {extraerIa.isPending ? 'Leyendo documento…' : 'Autollenar con IA'}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Sube una foto (JPG/PNG/WEBP) o un PDF y la IA prellenará número y fechas. Revísalos.
+                {guardarArchivoIa ? ' El archivo se guardará.' : ''}
+              </span>
+              {guardarArchivoIa && archivoIa ? (
+                <span className="w-full text-xs text-muted-foreground">
+                  Se adjuntará: <span className="font-medium">{archivoIa.name}</span>
+                </span>
+              ) : null}
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Tipo *</Label>

@@ -45,3 +45,22 @@ export const CRON_ESCANEO_DIARIO = '0 8 * * *';
 
 /** Umbrales (en días) que disparan alerta por email. */
 export const UMBRALES_DIAS = [7, 3, 1];
+
+/**
+ * Job repetible de purga de la tabla `ubicaciones_conductor`. Se registra en la
+ * MISMA cola de alertas (segundo tipo de job) para minimizar plumbing; el worker
+ * ramifica por `job.name`.
+ */
+export const JOB_PURGA_UBICACIONES = 'purga-ubicaciones';
+
+/** Cron de la purga diaria (3:00 AM). */
+export const CRON_PURGA_UBICACIONES = '0 3 * * *';
+
+/** Retención (en días) de los puntos GPS antes de purgarse. */
+export const DIAS_RETENCION_UBICACIONES = 90;
+
+/** Nombre canónico de la cola de envío de cotizaciones (on-demand). */
+export const COLA_COTIZACIONES = 'cotizaciones';
+
+/** Nombre del job de envío de una cotización por correo. */
+export const JOB_ENVIAR_COTIZACION = 'enviar-cotizacion';

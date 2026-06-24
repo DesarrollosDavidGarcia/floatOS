@@ -1,9 +1,6 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { obtenerOFallar } from '../shared/obtener-o-fallar';
 
 /** Caso de uso: eliminar un cliente que no tenga viajes asociados. */
 @Injectable()
@@ -11,10 +8,10 @@ export class EliminarClienteUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
   async execute(id: string): Promise<void> {
-    const cliente = await this.prisma.cliente.findUnique({ where: { id } });
-    if (!cliente) {
-      throw new NotFoundException(`Cliente con id ${id} no encontrado`);
-    }
+    await obtenerOFallar(
+      () => this.prisma.cliente.findUnique({ where: { id } }),
+      `Cliente con id ${id} no encontrado`,
+    );
 
     const viajesAsociados = await this.prisma.viaje.count({
       where: { clienteId: id },

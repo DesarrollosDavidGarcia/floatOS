@@ -1,18 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   textoRequerido,
   seleccionRequerida,
   fechaRequerida,
 } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,12 +14,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { CatalogoTexto } from '@/components/catalogos/catalogo-badge';
-import { fechaCorta } from '@/lib/fecha';
+import { fechaCorta, isoADate } from '@/lib/fecha';
 import {
   ExpedienteFormDialog,
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -39,13 +34,6 @@ interface EventoLaboral {
   fecha: string;
   registradoPor?: string | null;
   creadoEn: string;
-}
-
-// ── Utils ──────────────────────────────────────────────────────────────────────
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
@@ -64,78 +52,21 @@ type FormValues = z.infer<typeof schema>;
 // ── Tab ────────────────────────────────────────────────────────────────────────
 
 export function ProgresoTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<EventoLaboral | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-eventos-laborales', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<EventoLaboral[]>(
-        `/conductores/${conductorId}/eventos-laborales`,
-      );
-      return data;
-    },
+  const seccion = useSeccionExpediente<EventoLaboral, FormValues>({
+    conductorId,
+    queryKey: 'eventos-laborales',
+    endpoint: 'eventos-laborales',
+    schema,
     enabled: Boolean(conductorId),
-  });
-
-  const eliminar = useMutation({
-    mutationFn: async (eventoId: string) => {
-      await api.delete(`/conductores/${conductorId}/eventos-laborales/${eventoId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-eventos-laborales', conductorId],
-      });
-      toast.success('Evento eliminado');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
-
-  // ── form interno (react-hook-form + mutación) ────────────────────────────────
-
-  const esEdicion = Boolean(editando);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      tipo: '',
-      titulo: '',
-      fecha: '',
-      descripcion: '',
-      puestoNuevo: '',
-      registradoPor: '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: editando?.tipo ?? '',
-      titulo: editando?.titulo ?? '',
-      fecha: isoADate(editando?.fecha),
-      descripcion: editando?.descripcion ?? '',
-      puestoNuevo: editando?.puestoNuevo ?? '',
-      registradoPor: editando?.registradoPor ?? '',
-    });
-  }, [editando, mostrarForm, reset]);
-
-  const tipo = watch('tipo');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+    toDefaults: (evento) => ({
+      tipo: evento?.tipo ?? '',
+      titulo: evento?.titulo ?? '',
+      fecha: isoADate(evento?.fecha),
+      descripcion: evento?.descripcion ?? '',
+      puestoNuevo: evento?.puestoNuevo ?? '',
+      registradoPor: evento?.registradoPor ?? '',
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipo: values.tipo,
         titulo: values.titulo,
@@ -144,43 +75,36 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
       if (values.descripcion?.trim()) payload.descripcion = values.descripcion.trim();
       if (values.puestoNuevo?.trim()) payload.puestoNuevo = values.puestoNuevo.trim();
       if (values.registradoPor?.trim()) payload.registradoPor = values.registradoPor.trim();
-
-      if (esEdicion && editando) {
-        await api.patch(
-          `/conductores/${conductorId}/eventos-laborales/${editando.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/eventos-laborales`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-eventos-laborales', conductorId],
-      });
-      toast.success(esEdicion ? 'Evento actualizado' : 'Evento agregado');
-      cerrarForm();
+    mensajes: {
+      creado: 'Evento agregado',
+      actualizado: 'Evento actualizado',
+      eliminado: 'Evento eliminado',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
+
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const tipo = watch('tipo');
 
   return (
     <div className="space-y-4">
       {/* Botón Agregar siempre visible arriba a la derecha */}
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar evento
         </Button>
       </div>
 
       {/* Modal compacto (crear y editar) */}
       <ExpedienteFormDialog
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        title={esEdicion ? 'Editar evento laboral' : 'Nuevo evento laboral'}
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        saving={mutation.isPending}
-        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar evento laboral' : 'Nuevo evento laboral'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
         size="md"
       >
         <CamposGrid cols={2}>
@@ -269,10 +193,7 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => {
-                        setEditando(evento);
-                        setMostrarForm(false);
-                      }}
+                      onClick={() => seccion.abrirEditar(evento)}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -285,7 +206,7 @@ export function ProgresoTab({ conductorId }: { conductorId: string }) {
                       title="Eliminar evento laboral"
                       description="Esta acción no se puede deshacer."
                       confirmLabel="Eliminar"
-                      onConfirm={() => eliminar.mutateAsync(evento.id)}
+                      onConfirm={() => seccion.eliminar(evento.id)}
                     />
                   </div>
                 </div>

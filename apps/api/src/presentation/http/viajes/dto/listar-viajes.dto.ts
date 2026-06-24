@@ -1,17 +1,9 @@
-import { Type } from 'class-transformer';
-import {
-  IsDateString,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { EstadoViaje } from '@flotaos/shared-types';
+import { PaginacionDto } from '../../shared/paginacion.dto';
 
 /** Filtros y paginación para el listado de viajes. */
-export class ListarViajesDto {
+export class ListarViajesDto extends PaginacionDto {
   @IsOptional()
   @IsEnum(EstadoViaje, { message: 'estado no es un EstadoViaje válido' })
   estado?: EstadoViaje;
@@ -40,17 +32,4 @@ export class ListarViajesDto {
   @IsOptional()
   @IsString()
   q?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'page debe ser un entero' })
-  @Min(1, { message: 'page debe ser >= 1' })
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'pageSize debe ser un entero' })
-  @Min(1, { message: 'pageSize debe ser >= 1' })
-  @Max(100, { message: 'pageSize no puede exceder 100' })
-  pageSize?: number;
 }

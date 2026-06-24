@@ -15,6 +15,7 @@ out/
 .env.*.local
 .env.docker
 .env.smoke
+.env.n8n
 !.env.example
 
 # Prisma

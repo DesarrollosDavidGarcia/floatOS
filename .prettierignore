@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+.next
+out
+*.lock
+package-lock.json
+# Generado por Prisma
+apps/api/prisma/migrations
+# Artefactos móviles (Flutter) — no se formatean con Prettier
+apps/mobile

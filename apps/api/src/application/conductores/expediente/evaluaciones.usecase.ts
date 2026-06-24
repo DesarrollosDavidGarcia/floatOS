@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { EvaluacionDesempenoConductor, Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { EvaluacionDesempenoConductor } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { asegurarConductorExiste } from './asegurar-conductor';
 import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
+import { ExpedienteSubrecursoService } from './expediente-subrecurso.service';
 
 export interface CrearEvaluacionInput {
   periodoInicio: string;
@@ -35,93 +32,34 @@ export interface ActualizarEvaluacionInput {
 
 /** Casos de uso para las evaluaciones de desempeño de un conductor. */
 @Injectable()
-export class EvaluacionesUseCase {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly archivos: ArchivosExpedienteUseCase,
-  ) {}
-
-  private asegurarConductor(conductorId: string): Promise<void> {
-    return asegurarConductorExiste(this.prisma, conductorId);
-  }
-
-  async crear(
-    conductorId: string,
-    input: CrearEvaluacionInput,
-  ): Promise<EvaluacionDesempenoConductor> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.evaluacionDesempenoConductor.create({
-      data: {
-        conductorId,
-        periodoInicio: new Date(input.periodoInicio),
-        periodoFin: new Date(input.periodoFin),
-        puntuacionGeneral: input.puntuacionGeneral ?? null,
-        puntualidad: input.puntualidad ?? null,
-        consumoCombustible: input.consumoCombustible ?? null,
-        cumplimientoRutas: input.cumplimientoRutas ?? null,
-        incidenciasPeriodo: input.incidenciasPeriodo ?? null,
-        viajesCompletados: input.viajesCompletados ?? null,
-        comentarios: input.comentarios ?? null,
-        evaluadoPor: input.evaluadoPor ?? null,
+export class EvaluacionesUseCase extends ExpedienteSubrecursoService<
+  EvaluacionDesempenoConductor,
+  CrearEvaluacionInput,
+  ActualizarEvaluacionInput
+> {
+  constructor(prisma: PrismaService, archivos: ArchivosExpedienteUseCase) {
+    super(
+      prisma,
+      {
+        delegate: (p) => p.evaluacionDesempenoConductor,
+        etiqueta: 'Evaluación',
+        noEncontrado: 'no encontrada',
+        orderBy: { periodoFin: 'desc' },
+        seccionArchivo: 'EVALUACION',
+        campos: [
+          { nombre: 'periodoInicio', tipo: 'fechaRequerida' },
+          { nombre: 'periodoFin', tipo: 'fechaRequerida' },
+          { nombre: 'puntuacionGeneral', tipo: 'opcionalNull' },
+          { nombre: 'puntualidad', tipo: 'opcionalNull' },
+          { nombre: 'consumoCombustible', tipo: 'opcionalNull' },
+          { nombre: 'cumplimientoRutas', tipo: 'opcionalNull' },
+          { nombre: 'incidenciasPeriodo', tipo: 'opcionalNull' },
+          { nombre: 'viajesCompletados', tipo: 'opcionalNull' },
+          { nombre: 'comentarios', tipo: 'opcionalNull' },
+          { nombre: 'evaluadoPor', tipo: 'opcionalNull' },
+        ],
       },
-    });
-  }
-
-  async listar(conductorId: string): Promise<EvaluacionDesempenoConductor[]> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.evaluacionDesempenoConductor.findMany({
-      where: { conductorId },
-      orderBy: { periodoFin: 'desc' },
-    });
-  }
-
-  async obtener(
-    conductorId: string,
-    evaluacionId: string,
-  ): Promise<EvaluacionDesempenoConductor> {
-    const evaluacion = await this.prisma.evaluacionDesempenoConductor.findUnique({
-      where: { id: evaluacionId },
-    });
-    if (!evaluacion || evaluacion.conductorId !== conductorId) {
-      throw new NotFoundException(`Evaluación con id ${evaluacionId} no encontrada`);
-    }
-    return evaluacion;
-  }
-
-  async actualizar(
-    conductorId: string,
-    evaluacionId: string,
-    input: ActualizarEvaluacionInput,
-  ): Promise<EvaluacionDesempenoConductor> {
-    await this.obtener(conductorId, evaluacionId);
-
-    const data: Prisma.EvaluacionDesempenoConductorUpdateInput = {};
-    if (input.periodoInicio !== undefined) {
-      data.periodoInicio = new Date(input.periodoInicio);
-    }
-    if (input.periodoFin !== undefined) {
-      data.periodoFin = new Date(input.periodoFin);
-    }
-    if (input.puntuacionGeneral !== undefined) data.puntuacionGeneral = input.puntuacionGeneral;
-    if (input.puntualidad !== undefined) data.puntualidad = input.puntualidad;
-    if (input.consumoCombustible !== undefined) data.consumoCombustible = input.consumoCombustible;
-    if (input.cumplimientoRutas !== undefined) data.cumplimientoRutas = input.cumplimientoRutas;
-    if (input.incidenciasPeriodo !== undefined) data.incidenciasPeriodo = input.incidenciasPeriodo;
-    if (input.viajesCompletados !== undefined) data.viajesCompletados = input.viajesCompletados;
-    if (input.comentarios !== undefined) data.comentarios = input.comentarios;
-    if (input.evaluadoPor !== undefined) data.evaluadoPor = input.evaluadoPor;
-
-    return this.prisma.evaluacionDesempenoConductor.update({
-      where: { id: evaluacionId },
-      data,
-    });
-  }
-
-  async eliminar(conductorId: string, evaluacionId: string): Promise<void> {
-    await this.obtener(conductorId, evaluacionId);
-    await this.archivos.eliminarDeRegistro('EVALUACION', evaluacionId);
-    await this.prisma.evaluacionDesempenoConductor.delete({ where: { id: evaluacionId } });
+      archivos,
+    );
   }
 }

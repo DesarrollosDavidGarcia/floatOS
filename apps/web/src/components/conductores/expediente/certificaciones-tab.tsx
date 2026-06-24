@@ -1,14 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { textoRequerido, seleccionRequerida, finNoAntesDeInicio } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +31,8 @@ import {
   ArchivosExpedienteButton,
   useConteosArchivosExpediente,
 } from '@/components/conductores/expediente/archivos-expediente-button';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
+import { isoADate } from '@/lib/fecha';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -52,13 +48,6 @@ interface CertificacionConductor {
   archivoKey: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-// ── helpers ────────────────────────────────────────────────────────────────────
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── schema ─────────────────────────────────────────────────────────────────────
@@ -83,81 +72,21 @@ type FormValues = z.infer<typeof schema>;
 // ── tab principal ──────────────────────────────────────────────────────────────
 
 export function CertificacionesTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<CertificacionConductor | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-certificaciones', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<CertificacionConductor[]>(
-        `/conductores/${conductorId}/certificaciones`,
-      );
-      return data;
-    },
-  });
-
-  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'certificaciones');
-
-  const eliminar = useMutation({
-    mutationFn: async (certId: string) => {
-      await api.delete(`/conductores/${conductorId}/certificaciones/${certId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-certificaciones', conductorId],
-      });
-      toast.success('Certificación eliminada');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
-
-  // ── form interno (react-hook-form + mutación) ────────────────────────────────
-
-  const esEdicion = Boolean(editando);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      tipo: '',
-      nombre: '',
-      emisor: '',
-      folio: '',
-      archivoKey: '',
-      fechaEmision: '',
-      fechaVencimiento: '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: editando?.tipo ?? '',
-      nombre: editando?.nombre ?? '',
-      emisor: editando?.emisor ?? '',
-      folio: editando?.folio ?? '',
-      archivoKey: editando?.archivoKey ?? '',
-      fechaEmision: isoADate(editando?.fechaEmision),
-      fechaVencimiento: isoADate(editando?.fechaVencimiento),
-    });
-  }, [editando, mostrarForm, reset]);
-
-  const tipo = watch('tipo');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+  const seccion = useSeccionExpediente<CertificacionConductor, FormValues>({
+    conductorId,
+    queryKey: 'certificaciones',
+    endpoint: 'certificaciones',
+    schema,
+    toDefaults: (cert) => ({
+      tipo: cert?.tipo ?? '',
+      nombre: cert?.nombre ?? '',
+      emisor: cert?.emisor ?? '',
+      folio: cert?.folio ?? '',
+      archivoKey: cert?.archivoKey ?? '',
+      fechaEmision: isoADate(cert?.fechaEmision),
+      fechaVencimiento: isoADate(cert?.fechaVencimiento),
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipo: values.tipo,
         nombre: values.nombre,
@@ -170,44 +99,39 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
       if (values.fechaVencimiento) {
         payload.fechaVencimiento = new Date(values.fechaVencimiento).toISOString();
       }
-
-      if (esEdicion && editando) {
-        await api.patch(
-          `/conductores/${conductorId}/certificaciones/${editando.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/certificaciones`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-certificaciones', conductorId],
-      });
-      toast.success(esEdicion ? 'Certificación actualizada' : 'Certificación agregada');
-      cerrarForm();
+    mensajes: {
+      creado: 'Certificación agregada',
+      actualizado: 'Certificación actualizada',
+      eliminado: 'Certificación eliminada',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
+
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const tipo = watch('tipo');
+
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'certificaciones');
 
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar certificación
         </Button>
       </div>
 
       {/* Modal compacto (crear y editar) */}
       <ExpedienteFormDialog
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        title={esEdicion ? 'Editar certificación' : 'Nueva certificación'}
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        saving={mutation.isPending}
-        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar certificación' : 'Nueva certificación'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
         size="md"
       >
         <CamposGrid cols={2}>
@@ -297,10 +221,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(cert);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => seccion.abrirEditar(cert)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -313,7 +234,7 @@ export function CertificacionesTab({ conductorId }: { conductorId: string }) {
                         title="Eliminar certificación"
                         description="Esta acción no se puede deshacer."
                         confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(cert.id)}
+                        onConfirm={() => seccion.eliminar(cert.id)}
                       />
                     </div>
                   </TableCell>

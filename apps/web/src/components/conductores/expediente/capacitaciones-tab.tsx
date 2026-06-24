@@ -1,13 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,11 +36,13 @@ import {
   ArchivosExpedienteButton,
   useConteosArchivosExpediente,
 } from '@/components/conductores/expediente/archivos-expediente-button';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
 import {
   textoRequerido,
   numeroOpcional,
   finNoAntesDeInicio,
 } from '@/lib/validacion';
+import { isoADate } from '@/lib/fecha';
 
 interface CapacitacionConductor {
   id: string;
@@ -63,24 +59,6 @@ interface CapacitacionConductor {
   notas?: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-interface CapacitacionFormPayload {
-  nombre: string;
-  instructor?: string;
-  institucion?: string;
-  horas?: number;
-  fechaInicio?: string;
-  fechaFin?: string;
-  aprobado?: boolean;
-  calificacion?: number;
-  constanciaKey?: string;
-  notas?: string;
-}
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── Schema ──────────────────────────────────────────────────────────────────────
@@ -105,78 +83,31 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Formulario modal ─────────────────────────────────────────────────────────────
-
-function CapacitacionForm({
-  conductorId,
-  capacitacion,
-  open,
-  onOpenChange,
-  onDone,
-}: {
-  conductorId: string;
-  capacitacion?: CapacitacionConductor;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onDone: () => void;
-}) {
-  const esEdicion = Boolean(capacitacion);
-  const queryClient = useQueryClient();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      nombre: capacitacion?.nombre ?? '',
-      instructor: capacitacion?.instructor ?? '',
-      institucion: capacitacion?.institucion ?? '',
-      horas: capacitacion?.horas?.toString() ?? '',
-      calificacion: capacitacion?.calificacion?.toString() ?? '',
-      fechaInicio: isoADate(capacitacion?.fechaInicio),
-      fechaFin: isoADate(capacitacion?.fechaFin),
+export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
+  const seccion = useSeccionExpediente<CapacitacionConductor, FormValues>({
+    conductorId,
+    queryKey: 'capacitaciones',
+    endpoint: 'capacitaciones',
+    schema,
+    toDefaults: (cap) => ({
+      nombre: cap?.nombre ?? '',
+      instructor: cap?.instructor ?? '',
+      institucion: cap?.institucion ?? '',
+      horas: cap?.horas?.toString() ?? '',
+      calificacion: cap?.calificacion?.toString() ?? '',
+      fechaInicio: isoADate(cap?.fechaInicio),
+      fechaFin: isoADate(cap?.fechaFin),
       aprobado:
-        capacitacion?.aprobado === true
+        cap?.aprobado === true
           ? 'true'
-          : capacitacion?.aprobado === false
+          : cap?.aprobado === false
             ? 'false'
             : '',
-      constanciaKey: capacitacion?.constanciaKey ?? '',
-      notas: capacitacion?.notas ?? '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      nombre: capacitacion?.nombre ?? '',
-      instructor: capacitacion?.instructor ?? '',
-      institucion: capacitacion?.institucion ?? '',
-      horas: capacitacion?.horas?.toString() ?? '',
-      calificacion: capacitacion?.calificacion?.toString() ?? '',
-      fechaInicio: isoADate(capacitacion?.fechaInicio),
-      fechaFin: isoADate(capacitacion?.fechaFin),
-      aprobado:
-        capacitacion?.aprobado === true
-          ? 'true'
-          : capacitacion?.aprobado === false
-            ? 'false'
-            : '',
-      constanciaKey: capacitacion?.constanciaKey ?? '',
-      notas: capacitacion?.notas ?? '',
-    });
-  }, [capacitacion, reset]);
-
-  const aprobado = watch('aprobado');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
-      const payload: CapacitacionFormPayload = { nombre: values.nombre.trim() };
+      constanciaKey: cap?.constanciaKey ?? '',
+      notas: cap?.notas ?? '',
+    }),
+    toPayload: (values) => {
+      const payload: Record<string, unknown> = { nombre: values.nombre.trim() };
       if (values.instructor?.trim()) payload.instructor = values.instructor.trim();
       if (values.institucion?.trim()) payload.institucion = values.institucion.trim();
       if (values.horas?.trim()) payload.horas = Number(values.horas);
@@ -187,184 +118,133 @@ function CapacitacionForm({
       if (values.calificacion?.trim()) payload.calificacion = Number(values.calificacion);
       if (values.constanciaKey?.trim()) payload.constanciaKey = values.constanciaKey.trim();
       if (values.notas?.trim()) payload.notas = values.notas.trim();
-
-      if (esEdicion && capacitacion) {
-        await api.patch(
-          `/conductores/${conductorId}/capacitaciones/${capacitacion.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/capacitaciones`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-capacitaciones', conductorId],
-      });
-      toast.success(esEdicion ? 'Capacitación actualizada' : 'Capacitación agregada');
-      onDone();
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  return (
-    <ExpedienteFormDialog
-      open={open}
-      onOpenChange={(o) => { if (!o) onDone(); onOpenChange(o); }}
-      title={esEdicion ? 'Editar capacitación' : 'Nueva capacitación'}
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      saving={mutation.isPending}
-      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
-      size="md"
-    >
-      <CamposGrid cols={2}>
-        <Campo
-          label="Nombre"
-          htmlFor="cap-nombre"
-          full
-          required
-          error={errors.nombre?.message}
-        >
-          <Input
-            id="cap-nombre"
-            placeholder="Nombre del curso"
-            {...register('nombre')}
-          />
-        </Campo>
-
-        <Campo label="Instructor" htmlFor="cap-instructor">
-          <Input id="cap-instructor" {...register('instructor')} />
-        </Campo>
-
-        <Campo label="Institución" htmlFor="cap-institucion">
-          <Input id="cap-institucion" {...register('institucion')} />
-        </Campo>
-
-        <Campo label="Horas" htmlFor="cap-horas" error={errors.horas?.message}>
-          <Input
-            id="cap-horas"
-            type="number"
-            min={0}
-            {...register('horas')}
-          />
-        </Campo>
-
-        <Campo
-          label="Calificación"
-          htmlFor="cap-calificacion"
-          error={errors.calificacion?.message}
-        >
-          <Input
-            id="cap-calificacion"
-            type="number"
-            step="0.01"
-            min={0}
-            {...register('calificacion')}
-          />
-        </Campo>
-
-        <Campo label="Fecha inicio" htmlFor="cap-fechaInicio">
-          <Input
-            id="cap-fechaInicio"
-            type="date"
-            {...register('fechaInicio')}
-          />
-        </Campo>
-
-        <Campo
-          label="Fecha fin"
-          htmlFor="cap-fechaFin"
-          error={errors.fechaFin?.message}
-        >
-          <Input
-            id="cap-fechaFin"
-            type="date"
-            {...register('fechaFin')}
-          />
-        </Campo>
-
-        <Campo label="Aprobado">
-          <Select
-            value={aprobado ?? ''}
-            onValueChange={(c) => setValue('aprobado', c, { shouldValidate: true })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sin definir" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="true">Sí</SelectItem>
-              <SelectItem value="false">No</SelectItem>
-            </SelectContent>
-          </Select>
-        </Campo>
-
-        <Campo label="Clave constancia" htmlFor="cap-constanciaKey">
-          <Input id="cap-constanciaKey" {...register('constanciaKey')} />
-        </Campo>
-
-        <Campo label="Notas" htmlFor="cap-notas" full>
-          <textarea
-            id="cap-notas"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            {...register('notas')}
-          />
-        </Campo>
-      </CamposGrid>
-    </ExpedienteFormDialog>
-  );
-}
-
-export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<CapacitacionConductor | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-capacitaciones', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<CapacitacionConductor[]>(
-        `/conductores/${conductorId}/capacitaciones`,
-      );
-      return data;
+    mensajes: {
+      creado: 'Capacitación agregada',
+      actualizado: 'Capacitación actualizada',
+      eliminado: 'Capacitación eliminada',
     },
   });
+
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const aprobado = watch('aprobado');
 
   const { data: conteos } = useConteosArchivosExpediente(conductorId, 'capacitaciones');
-
-  const eliminar = useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/conductores/${conductorId}/capacitaciones/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-capacitaciones', conductorId],
-      });
-      toast.success('Capacitación eliminada');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Conteo n={data?.length ?? 0} />
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar capacitación
         </Button>
       </div>
 
-      <CapacitacionForm
-        conductorId={conductorId}
-        capacitacion={editando ?? undefined}
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        onDone={cerrarForm}
-      />
+      <ExpedienteFormDialog
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar capacitación' : 'Nueva capacitación'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
+        size="md"
+      >
+        <CamposGrid cols={2}>
+          <Campo
+            label="Nombre"
+            htmlFor="cap-nombre"
+            full
+            required
+            error={errors.nombre?.message}
+          >
+            <Input
+              id="cap-nombre"
+              placeholder="Nombre del curso"
+              {...register('nombre')}
+            />
+          </Campo>
+
+          <Campo label="Instructor" htmlFor="cap-instructor">
+            <Input id="cap-instructor" {...register('instructor')} />
+          </Campo>
+
+          <Campo label="Institución" htmlFor="cap-institucion">
+            <Input id="cap-institucion" {...register('institucion')} />
+          </Campo>
+
+          <Campo label="Horas" htmlFor="cap-horas" error={errors.horas?.message}>
+            <Input
+              id="cap-horas"
+              type="number"
+              min={0}
+              {...register('horas')}
+            />
+          </Campo>
+
+          <Campo
+            label="Calificación"
+            htmlFor="cap-calificacion"
+            error={errors.calificacion?.message}
+          >
+            <Input
+              id="cap-calificacion"
+              type="number"
+              step="0.01"
+              min={0}
+              {...register('calificacion')}
+            />
+          </Campo>
+
+          <Campo label="Fecha inicio" htmlFor="cap-fechaInicio">
+            <Input
+              id="cap-fechaInicio"
+              type="date"
+              {...register('fechaInicio')}
+            />
+          </Campo>
+
+          <Campo
+            label="Fecha fin"
+            htmlFor="cap-fechaFin"
+            error={errors.fechaFin?.message}
+          >
+            <Input
+              id="cap-fechaFin"
+              type="date"
+              {...register('fechaFin')}
+            />
+          </Campo>
+
+          <Campo label="Aprobado">
+            <Select
+              value={aprobado ?? ''}
+              onValueChange={(c) => setValue('aprobado', c, { shouldValidate: true })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sin definir" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Sí</SelectItem>
+                <SelectItem value="false">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </Campo>
+
+          <Campo label="Clave constancia" htmlFor="cap-constanciaKey">
+            <Input id="cap-constanciaKey" {...register('constanciaKey')} />
+          </Campo>
+
+          <Campo label="Notas" htmlFor="cap-notas" full>
+            <textarea
+              id="cap-notas"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...register('notas')}
+            />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
       <div className="overflow-auto">
         {isLoading ? (
@@ -424,10 +304,7 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(cap);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => seccion.abrirEditar(cap)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -440,7 +317,7 @@ export function CapacitacionesTab({ conductorId }: { conductorId: string }) {
                         title="Eliminar capacitación"
                         description="Esta acción no se puede deshacer."
                         confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(cap.id)}
+                        onConfirm={() => seccion.eliminar(cap.id)}
                       />
                     </div>
                   </TableCell>

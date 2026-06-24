@@ -128,10 +128,23 @@ export function EnviarCotizacionDialog({
           mensaje: mensaje.trim() || undefined,
         })
       ).data,
-    onSuccess: () => {
-      toast.success('Cotización enviada');
+    onSuccess: (data: { encolada?: boolean }) => {
+      // El endpoint responde 202: el envío se procesa en segundo plano (cola) o,
+      // si Redis está caído, ya se hizo síncrono en el request (encolada: false).
+      toast.success(
+        data?.encolada === false
+          ? 'Cotización enviada'
+          : 'Cotización encolada, se enviará en breve',
+      );
+      // Invalida ya (cubre el caso síncrono) y de nuevo tras un pequeño retardo
+      // por si el envío en cola tarda un poco, además del refresco por WS
+      // (cotizacion:actualizada) que escucha la tarjeta de cotizaciones.
       qc.invalidateQueries({ queryKey: ['cotizaciones', viajeId] });
       invalidarViajes(qc, viajeId);
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['cotizaciones', viajeId] });
+        invalidarViajes(qc, viajeId);
+      }, 4000);
       setOpen(false);
     },
     onError: (err) => toast.error(apiError(err)),

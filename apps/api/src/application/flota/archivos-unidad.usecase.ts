@@ -6,6 +6,7 @@ import {
 import { CategoriaArchivoUnidad } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { StorageService } from '../../infrastructure/storage/storage.service';
+import { validarFirmaArchivo } from '../shared/validar-archivo';
 
 /** Archivo recibido por multipart (subconjunto de Express.Multer.File). */
 export interface ArchivoSubido {
@@ -69,6 +70,9 @@ export class ArchivosUnidadUseCase {
           `Tipo no permitido en "${a.originalname}". Se aceptan PDF, JPG, PNG y WEBP.`,
         );
       }
+      // Defensa en capas: verifica la firma real de bytes, no solo el mimetype
+      // declarado (falsificable por el cliente).
+      validarFirmaArchivo(a.buffer, a.mimetype);
       if (a.size > TAMANO_MAX_BYTES) {
         throw new BadRequestException(
           `"${a.originalname}" supera el tamaño máximo de 10 MB.`,

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/providers.dart';
+import '../../chat/ui/chat_screen.dart';
 import '../domain/estado_viaje.dart';
 import '../domain/viaje.dart';
 import 'mapa_pantalla_completa.dart';
@@ -28,6 +29,7 @@ class ViajeDetailScreen extends ConsumerStatefulWidget {
 class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
   bool _cambiandoEstado = false;
   StreamSubscription<Map<String, dynamic>>? _subEstados;
+  StreamSubscription<Map<String, dynamic>>? _subChat;
 
   @override
   void initState() {
@@ -42,11 +44,19 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
         ref.invalidate(viajeDetalleProvider(widget.viajeId));
       }
     });
+    // Un mensaje nuevo del panel actualiza el badge del botón de chat.
+    _subChat = ref.read(socketServiceProvider).chatMensajes.listen((data) {
+      if (!mounted) return;
+      if (data['viajeId'] == widget.viajeId) {
+        ref.invalidate(chatNoLeidosProvider(widget.viajeId));
+      }
+    });
   }
 
   @override
   void dispose() {
     _subEstados?.cancel();
+    _subChat?.cancel();
     super.dispose();
   }
 
@@ -60,6 +70,15 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
           data: (v) => Text(v.folioTexto),
           orElse: () => const Text('Viaje'),
         ),
+        actions: [
+          _ChatBoton(
+            viajeId: widget.viajeId,
+            folioTexto: viajeAsync.maybeWhen(
+              data: (v) => v.folioTexto,
+              orElse: () => null,
+            ),
+          ),
+        ],
       ),
       body: viajeAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -307,6 +326,58 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
 /// Confirmación de cambio de estado con nota opcional. Es StatefulWidget
 /// para que el TextEditingController viva y muera con el sheet (sin tocar
 /// un controller disposed durante la animación de salida).
+/// Botón de chat con badge de mensajes sin leer (mensajes del panel).
+class _ChatBoton extends ConsumerWidget {
+  const _ChatBoton({required this.viajeId, this.folioTexto});
+
+  final String viajeId;
+  final String? folioTexto;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final noLeidos =
+        ref.watch(chatNoLeidosProvider(viajeId)).asData?.value ?? 0;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chat_bubble_outline),
+          tooltip: 'Chat',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  ChatScreen(viajeId: viajeId, folioTexto: folioTexto),
+            ),
+          ),
+        ),
+        if (noLeidos > 0)
+          Positioned(
+            right: 6,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                noLeidos > 9 ? '9+' : '$noLeidos',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _SheetConfirmarCambio extends StatefulWidget {
   const _SheetConfirmarCambio({required this.accion, required this.siguiente});
 

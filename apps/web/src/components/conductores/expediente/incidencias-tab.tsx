@@ -1,12 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { z } from 'zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
 import {
   textoRequerido,
   seleccionRequerida,
@@ -25,7 +21,6 @@ import {
   ArchivosExpedienteButton,
   useConteosArchivosExpediente,
 } from '@/components/conductores/expediente/archivos-expediente-button';
-import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +52,8 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
+import { isoADate } from '@/lib/fecha';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -76,11 +73,6 @@ interface Incidencia {
   registradoPor: string | null;
   creadoEn: string;
   actualizadoEn: string;
-}
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── Schema ───────────────────────────────────────────────────────────────────
@@ -103,85 +95,26 @@ type FormValues = z.infer<typeof schema>;
 // ── Tab principal ────────────────────────────────────────────────────────────
 
 export function IncidenciasTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<Incidencia | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
   const [eliminarTarget, setEliminarTarget] = useState<Incidencia | null>(null);
 
-  const esEdicion = Boolean(editando);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      tipo: '',
-      titulo: '',
-      fecha: '',
-      gravedad: '',
-      descripcion: '',
-      lugar: '',
-      costoEstimado: '',
-      resuelta: 'false',
-      evidenciaKey: '',
-      registradoPor: '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: editando?.tipo ?? '',
-      titulo: editando?.titulo ?? '',
-      fecha: isoADate(editando?.fecha),
-      gravedad: editando?.gravedad ?? '',
-      descripcion: editando?.descripcion ?? '',
-      lugar: editando?.lugar ?? '',
-      costoEstimado: editando?.costoEstimado ?? '',
-      resuelta: editando ? String(editando.resuelta) : 'false',
-      evidenciaKey: editando?.evidenciaKey ?? '',
-      registradoPor: editando?.registradoPor ?? '',
-    });
-  }, [editando, mostrarForm, reset]);
-
-  const tipo = watch('tipo');
-  const gravedad = watch('gravedad');
-  const resuelta = watch('resuelta');
-
-  function abrirNuevo() {
-    setEditando(null);
-    setMostrarForm(true);
-  }
-
-  function abrirEdicion(inc: Incidencia) {
-    setEditando(inc);
-    setMostrarForm(false);
-  }
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-incidencias', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<Incidencia[]>(
-        `/conductores/${conductorId}/incidencias`,
-      );
-      return data;
-    },
-  });
-
-  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'incidencias');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+  const seccion = useSeccionExpediente<Incidencia, FormValues>({
+    conductorId,
+    queryKey: 'incidencias',
+    endpoint: 'incidencias',
+    schema,
+    toDefaults: (inc) => ({
+      tipo: inc?.tipo ?? '',
+      titulo: inc?.titulo ?? '',
+      fecha: isoADate(inc?.fecha),
+      gravedad: inc?.gravedad ?? '',
+      descripcion: inc?.descripcion ?? '',
+      lugar: inc?.lugar ?? '',
+      costoEstimado: inc?.costoEstimado ?? '',
+      resuelta: inc ? String(inc.resuelta) : 'false',
+      evidenciaKey: inc?.evidenciaKey ?? '',
+      registradoPor: inc?.registradoPor ?? '',
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipo: values.tipo,
         titulo: values.titulo.trim(),
@@ -196,58 +129,41 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
       if (values.evidenciaKey?.trim()) payload.evidenciaKey = values.evidenciaKey.trim();
       if (values.registradoPor?.trim())
         payload.registradoPor = values.registradoPor.trim();
-
-      if (esEdicion && editando) {
-        await api.patch(
-          `/conductores/${conductorId}/incidencias/${editando.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/incidencias`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-incidencias', conductorId],
-      });
-      toast.success(esEdicion ? 'Incidencia actualizada' : 'Incidencia registrada');
-      cerrarForm();
+    mensajes: {
+      creado: 'Incidencia registrada',
+      actualizado: 'Incidencia actualizada',
+      eliminado: 'Incidencia eliminada',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
 
-  const eliminar = useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/conductores/${conductorId}/incidencias/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-incidencias', conductorId],
-      });
-      toast.success('Incidencia eliminada');
-      setEliminarTarget(null);
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const tipo = watch('tipo');
+  const gravedad = watch('gravedad');
+  const resuelta = watch('resuelta');
+
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'incidencias');
 
   return (
     <div className="space-y-4">
       {/* Contador + Botón Agregar */}
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
-        <Button size="sm" onClick={abrirNuevo}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar incidencia
         </Button>
       </div>
 
       {/* Modal crear / editar */}
       <ExpedienteFormDialog
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        title={esEdicion ? 'Editar incidencia' : 'Nueva incidencia'}
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        saving={mutation.isPending}
-        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar incidencia' : 'Nueva incidencia'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
         size="lg"
       >
         <CamposGrid cols={2}>
@@ -413,7 +329,7 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => abrirEdicion(inc)}
+                        onClick={() => seccion.abrirEditar(inc)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -456,12 +372,16 @@ export function IncidenciasTab({ conductorId }: { conductorId: string }) {
             </Button>
             <Button
               variant="destructive"
-              disabled={eliminar.isPending}
-              onClick={() =>
-                eliminarTarget && eliminar.mutate(eliminarTarget.id)
-              }
+              disabled={seccion.eliminando}
+              onClick={() => {
+                if (eliminarTarget)
+                  seccion
+                    .eliminar(eliminarTarget.id)
+                    .then(() => setEliminarTarget(null))
+                    .catch(() => {});
+              }}
             >
-              {eliminar.isPending ? 'Eliminando…' : 'Eliminar'}
+              {seccion.eliminando ? 'Eliminando…' : 'Eliminar'}
             </Button>
           </DialogFooter>
         </DialogContent>

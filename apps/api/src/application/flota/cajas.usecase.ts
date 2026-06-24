@@ -1,12 +1,9 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Caja, Prisma } from '@prisma/client';
 import { Paginado } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { paginar } from '../shared/paginar';
+import { obtenerOFallar } from '../shared/obtener-o-fallar';
 import {
   ActualizarCajaInput,
   CrearCajaInput,
@@ -64,11 +61,10 @@ export class CajasUseCase {
 
   /** Obtiene una caja por id o lanza NotFoundException. */
   async obtener(id: string): Promise<Caja> {
-    const caja = await this.prisma.caja.findUnique({ where: { id } });
-    if (!caja) {
-      throw new NotFoundException(`Caja con id ${id} no encontrada`);
-    }
-    return caja;
+    return obtenerOFallar(
+      () => this.prisma.caja.findUnique({ where: { id } }),
+      `Caja con id ${id} no encontrada`,
+    );
   }
 
   /** Actualiza una caja. Valida unicidad de placas si cambian. */

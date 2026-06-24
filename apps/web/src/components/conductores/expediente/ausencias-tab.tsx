@@ -1,8 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   seleccionRequerida,
@@ -10,10 +7,7 @@ import {
   numeroOpcional,
   finNoAntesDeInicio,
 } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,6 +33,8 @@ import {
   CamposGrid,
   Campo,
 } from '@/components/conductores/expediente/form-ui';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
+import { isoADate } from '@/lib/fecha';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -55,13 +51,6 @@ interface AusenciaConductor {
   documentoKey?: string | null;
   creadoEn: string;
   actualizadoEn: string;
-}
-
-// ── Utils ──────────────────────────────────────────────────────────────────────
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
@@ -87,82 +76,23 @@ type FormValues = z.infer<typeof schema>;
 // ── Tab ────────────────────────────────────────────────────────────────────────
 
 export function AusenciasTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<AusenciaConductor | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-ausencias', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<AusenciaConductor[]>(
-        `/conductores/${conductorId}/ausencias`,
-      );
-      return data;
-    },
+  const seccion = useSeccionExpediente<AusenciaConductor, FormValues>({
+    conductorId,
+    queryKey: 'ausencias',
+    endpoint: 'ausencias',
+    schema,
     enabled: Boolean(conductorId),
-  });
-
-  const eliminar = useMutation({
-    mutationFn: async (ausenciaId: string) => {
-      await api.delete(`/conductores/${conductorId}/ausencias/${ausenciaId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-ausencias', conductorId],
-      });
-      toast.success('Ausencia eliminada');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
-
-  // ── form interno (react-hook-form + mutación) ────────────────────────────────
-
-  const esEdicion = Boolean(editando);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      tipo: '',
-      fechaInicio: '',
-      fechaFin: '',
-      dias: '',
-      motivo: '',
-      folioIncapacidad: '',
-      autorizadoPor: '',
-      documentoKey: '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: editando?.tipo ?? '',
-      fechaInicio: isoADate(editando?.fechaInicio),
-      fechaFin: isoADate(editando?.fechaFin),
-      dias: editando?.dias != null ? String(editando.dias) : '',
-      motivo: editando?.motivo ?? '',
-      folioIncapacidad: editando?.folioIncapacidad ?? '',
-      autorizadoPor: editando?.autorizadoPor ?? '',
-      documentoKey: editando?.documentoKey ?? '',
-    });
-  }, [editando, mostrarForm, reset]);
-
-  const tipo = watch('tipo');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+    toDefaults: (ausencia) => ({
+      tipo: ausencia?.tipo ?? '',
+      fechaInicio: isoADate(ausencia?.fechaInicio),
+      fechaFin: isoADate(ausencia?.fechaFin),
+      dias: ausencia?.dias != null ? String(ausencia.dias) : '',
+      motivo: ausencia?.motivo ?? '',
+      folioIncapacidad: ausencia?.folioIncapacidad ?? '',
+      autorizadoPor: ausencia?.autorizadoPor ?? '',
+      documentoKey: ausencia?.documentoKey ?? '',
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipo: values.tipo,
         fechaInicio: new Date(values.fechaInicio).toISOString(),
@@ -177,44 +107,37 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
       if (values.folioIncapacidad?.trim()) payload.folioIncapacidad = values.folioIncapacidad.trim();
       if (values.autorizadoPor?.trim()) payload.autorizadoPor = values.autorizadoPor.trim();
       if (values.documentoKey?.trim()) payload.documentoKey = values.documentoKey.trim();
-
-      if (esEdicion && editando) {
-        await api.patch(
-          `/conductores/${conductorId}/ausencias/${editando.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/ausencias`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-ausencias', conductorId],
-      });
-      toast.success(esEdicion ? 'Ausencia actualizada' : 'Ausencia registrada');
-      cerrarForm();
+    mensajes: {
+      creado: 'Ausencia registrada',
+      actualizado: 'Ausencia actualizada',
+      eliminado: 'Ausencia eliminada',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
+
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const tipo = watch('tipo');
 
   return (
     <div className="space-y-4">
       {/* Contador + Botón Agregar */}
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar ausencia
         </Button>
       </div>
 
       {/* Modal compacto (crear y editar) */}
       <ExpedienteFormDialog
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        title={esEdicion ? 'Editar ausencia' : 'Nueva ausencia'}
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
-        saving={mutation.isPending}
-        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar ausencia' : 'Nueva ausencia'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
         size="md"
       >
         <CamposGrid cols={2}>
@@ -299,10 +222,7 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(ausencia);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => seccion.abrirEditar(ausencia)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -315,7 +235,7 @@ export function AusenciasTab({ conductorId }: { conductorId: string }) {
                         title="Eliminar ausencia"
                         description="Esta acción no se puede deshacer."
                         confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(ausencia.id)}
+                        onConfirm={() => seccion.eliminar(ausencia.id)}
                       />
                     </div>
                   </TableCell>

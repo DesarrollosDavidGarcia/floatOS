@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
+import { RolUsuario } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { toast } from '@/components/ui/sonner';
@@ -44,7 +45,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-type Rol = 'ADMIN' | 'MONITORISTA';
+type Rol = RolUsuario;
 
 interface Usuario {
   id: string;

@@ -1,20 +1,8 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
+import { PaginacionDto } from '../../shared/paginacion.dto';
 
-export class ListarConductoresDto {
+export class ListarConductoresDto extends PaginacionDto {
   @IsOptional()
   @IsString()
   q?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  pageSize?: number;
 }

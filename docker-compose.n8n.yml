@@ -1,0 +1,38 @@
+# n8n — automatizaciones (bot de cotización con Zavu + IA).
+# Aislado del stack principal; se levanta/baja por separado:
+#   docker compose -f docker-compose.n8n.yml up -d
+#   docker compose -f docker-compose.n8n.yml down
+# UI: http://localhost:5678  (al primer acceso crea la cuenta de "owner").
+#
+# Para llamar a la API de FlotaOS (que corre en el host durante desarrollo),
+# desde un nodo HTTP de n8n usa la URL:  http://host.docker.internal:3000/api
+name: flotaos-n8n
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=America/Mexico_City
+      - TZ=America/Mexico_City
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      # http en localhost: permite el login sin cookie segura.
+      - N8N_SECURE_COOKIE=false
+      # Ejecución en proceso (no runners): permite leer secretos con {{$env.X}}
+      # en las expresiones del workflow. Hay un aviso de deprecación inofensivo.
+      - N8N_RUNNERS_ENABLED=false
+    # Secretos del workflow (Zavu/Novita/bot). Archivo gitignored.
+    env_file:
+      - .env.n8n
+    extra_hosts:
+      # Permite alcanzar la API del host (FlotaOS) en Windows/Mac/Linux.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  n8n_data:

@@ -1,5 +1,6 @@
 import { Logger, Module } from '@nestjs/common';
 import { RouteService } from './route.service';
+import { GeocodingService } from './geocoding.service';
 import { TomTomRouteProvider } from './tomtom.provider';
 import { GoogleRouteProvider } from './google.provider';
 import { GeodesicaRouteProvider } from './geodesica.provider';
@@ -16,6 +17,7 @@ import { CARRETERA_PROVIDER, type CarreteraProvider } from './route-provider';
 @Module({
   providers: [
     RouteService,
+    GeocodingService,
     TomTomRouteProvider,
     GoogleRouteProvider,
     GeodesicaRouteProvider,
@@ -35,6 +37,6 @@ import { CARRETERA_PROVIDER, type CarreteraProvider } from './route-provider';
       },
     },
   ],
-  exports: [RouteService],
+  exports: [RouteService, GeocodingService],
 })
 export class RoutingModule {}

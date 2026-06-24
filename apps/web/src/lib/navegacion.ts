@@ -12,7 +12,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-export type Rol = 'ADMIN' | 'MONITORISTA';
+import { RolUsuario } from '@flotaos/shared-types';
+
+export { RolUsuario };
+/** @deprecated Usar `RolUsuario` de `@flotaos/shared-types`. */
+export type Rol = RolUsuario;
 
 export interface NavItem {
   href: string;

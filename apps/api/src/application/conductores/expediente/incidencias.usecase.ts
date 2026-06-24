@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { IncidenciaConductor, Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { IncidenciaConductor } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { asegurarConductorExiste } from './asegurar-conductor';
 import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
+import { ExpedienteSubrecursoService } from './expediente-subrecurso.service';
 
 export interface CrearIncidenciaInput {
   tipo: string;
@@ -33,102 +33,36 @@ export interface ActualizarIncidenciaInput {
 }
 
 @Injectable()
-export class IncidenciasUseCase {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly archivos: ArchivosExpedienteUseCase,
-  ) {}
-
-  private asegurarConductor(conductorId: string): Promise<void> {
-    return asegurarConductorExiste(this.prisma, conductorId);
-  }
-
-  async crear(
-    conductorId: string,
-    input: CrearIncidenciaInput,
-  ): Promise<IncidenciaConductor> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.incidenciaConductor.create({
-      data: {
-        conductorId,
-        tipo: input.tipo,
-        // Sin valor explícito se aplica el @default("MEDIA") del schema (única fuente).
-        gravedad: input.gravedad ?? undefined,
-        titulo: input.titulo,
-        descripcion: input.descripcion ?? null,
-        fecha: new Date(input.fecha),
-        lugar: input.lugar ?? null,
-        costoEstimado:
-          input.costoEstimado !== undefined
-            ? new Prisma.Decimal(input.costoEstimado)
-            : null,
-        resuelta: input.resuelta ?? false,
-        evidenciaKey: input.evidenciaKey ?? null,
-        registradoPor: input.registradoPor ?? null,
-        viajeId: input.viajeId ?? null,
+export class IncidenciasUseCase extends ExpedienteSubrecursoService<
+  IncidenciaConductor,
+  CrearIncidenciaInput,
+  ActualizarIncidenciaInput
+> {
+  constructor(prisma: PrismaService, archivos: ArchivosExpedienteUseCase) {
+    super(
+      prisma,
+      {
+        delegate: (p) => p.incidenciaConductor,
+        etiqueta: 'Incidencia',
+        noEncontrado: 'no encontrada',
+        orderBy: { fecha: 'desc' },
+        seccionArchivo: 'INCIDENCIA',
+        campos: [
+          { nombre: 'tipo', tipo: 'requerido' },
+          // Sin valor explícito se aplica el @default("MEDIA") del schema.
+          { nombre: 'gravedad', tipo: 'opcionalUndefined' },
+          { nombre: 'titulo', tipo: 'requerido' },
+          { nombre: 'descripcion', tipo: 'opcionalNull' },
+          { nombre: 'fecha', tipo: 'fechaRequerida' },
+          { nombre: 'lugar', tipo: 'opcionalNull' },
+          { nombre: 'costoEstimado', tipo: 'decimalOpcional' },
+          { nombre: 'resuelta', tipo: 'boolDefault', valorDefault: false },
+          { nombre: 'evidenciaKey', tipo: 'opcionalNull' },
+          { nombre: 'registradoPor', tipo: 'opcionalNull' },
+          { nombre: 'viajeId', tipo: 'opcionalNull' },
+        ],
       },
-    });
-  }
-
-  async listar(conductorId: string): Promise<IncidenciaConductor[]> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.incidenciaConductor.findMany({
-      where: { conductorId },
-      orderBy: { fecha: 'desc' },
-    });
-  }
-
-  async obtener(
-    conductorId: string,
-    incidenciaId: string,
-  ): Promise<IncidenciaConductor> {
-    const incidencia = await this.prisma.incidenciaConductor.findUnique({
-      where: { id: incidenciaId },
-    });
-    if (!incidencia || incidencia.conductorId !== conductorId) {
-      throw new NotFoundException(
-        `Incidencia con id ${incidenciaId} no encontrada`,
-      );
-    }
-    return incidencia;
-  }
-
-  async actualizar(
-    conductorId: string,
-    incidenciaId: string,
-    input: ActualizarIncidenciaInput,
-  ): Promise<IncidenciaConductor> {
-    await this.obtener(conductorId, incidenciaId);
-
-    const data: Prisma.IncidenciaConductorUncheckedUpdateInput = {};
-    if (input.tipo !== undefined) data.tipo = input.tipo;
-    if (input.gravedad !== undefined) data.gravedad = input.gravedad;
-    if (input.titulo !== undefined) data.titulo = input.titulo;
-    if (input.descripcion !== undefined) data.descripcion = input.descripcion;
-    if (input.fecha !== undefined) data.fecha = new Date(input.fecha);
-    if (input.lugar !== undefined) data.lugar = input.lugar;
-    if (input.costoEstimado !== undefined) {
-      data.costoEstimado = new Prisma.Decimal(input.costoEstimado);
-    }
-    if (input.resuelta !== undefined) data.resuelta = input.resuelta;
-    if (input.evidenciaKey !== undefined) data.evidenciaKey = input.evidenciaKey;
-    if (input.registradoPor !== undefined)
-      data.registradoPor = input.registradoPor;
-    if (input.viajeId !== undefined) data.viajeId = input.viajeId;
-
-    return this.prisma.incidenciaConductor.update({
-      where: { id: incidenciaId },
-      data,
-    });
-  }
-
-  async eliminar(conductorId: string, incidenciaId: string): Promise<void> {
-    await this.obtener(conductorId, incidenciaId);
-    await this.archivos.eliminarDeRegistro('INCIDENCIA', incidenciaId);
-    await this.prisma.incidenciaConductor.delete({
-      where: { id: incidenciaId },
-    });
+      archivos,
+    );
   }
 }
