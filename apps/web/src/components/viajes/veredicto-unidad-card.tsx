@@ -47,7 +47,14 @@ function escalasEval(viaje: Viaje) {
  * Re-ejecuta el motor de cálculo para la unidad asignada al viaje y muestra si
  * es adecuada. Solo se renderiza cuando hay unidad asignada y cargas.
  */
-export function VeredictoUnidadCard({ viaje }: { viaje: Viaje }) {
+export function VeredictoUnidadCard({
+  viaje,
+  plano = false,
+}: {
+  viaje: Viaje;
+  /** Sin la Card externa (para anidar en una sección colapsable). */
+  plano?: boolean;
+}) {
   const unidadId = viaje.unidad?.id ?? viaje.unidadId ?? null;
   const escalas = escalasEval(viaje);
   const hayCargas = escalas.some((e) => e.cargas.length > 0);
@@ -68,18 +75,10 @@ export function VeredictoUnidadCard({ viaje }: { viaje: Viaje }) {
 
   const v = data?.veredictos?.[0];
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Idoneidad de la unidad</CardTitle>
-        <CardDescription>
-          Evaluación del motor para la unidad asignada.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        {isLoading || !v ? (
-          <p className="text-muted-foreground">Evaluando…</p>
-        ) : (
+  const cuerpo =
+    isLoading || !v ? (
+      <p className="text-muted-foreground">Evaluando…</p>
+    ) : (
           <>
             <div className="flex items-center gap-2">
               {v.apta ? (
@@ -111,8 +110,19 @@ export function VeredictoUnidadCard({ viaje }: { viaje: Viaje }) {
               </div>
             )}
           </>
-        )}
-      </CardContent>
+    );
+
+  if (plano) return <div className="space-y-2 text-sm">{cuerpo}</div>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Idoneidad de la unidad</CardTitle>
+        <CardDescription>
+          Evaluación del motor para la unidad asignada.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">{cuerpo}</CardContent>
     </Card>
   );
 }

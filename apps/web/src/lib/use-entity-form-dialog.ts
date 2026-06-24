@@ -29,6 +29,13 @@ export interface UseEntityFormDialogOptions<TValues extends FieldValues, TEntity
   /** Claves de query a invalidar tras guardar. */
   invalidateKeys: unknown[][];
   mensajes: { creado: string; actualizado: string };
+  /**
+   * Paso opcional tras crear/actualizar (con la entidad ya guardada que devuelve
+   * el API), antes de invalidar/cerrar. Útil para subir archivos que necesitan
+   * el id recién creado (p. ej. la foto de una unidad nueva). Se espera (await);
+   * debe gestionar sus propios errores para no abortar el cierre del diálogo.
+   */
+  afterSave?: (saved: TEntity, values: TValues) => Promise<void> | void;
 }
 
 export interface UseEntityFormDialogResult<TValues extends FieldValues> {
@@ -58,6 +65,7 @@ export function useEntityFormDialog<TValues extends FieldValues, TEntity>(
     getId,
     invalidateKeys,
     mensajes,
+    afterSave,
   } = opts;
 
   const [internalOpen, setInternalOpen] = useState(false);
@@ -84,12 +92,16 @@ export function useEntityFormDialog<TValues extends FieldValues, TEntity>(
       const payload = toPayload(values);
       if (entity != null) {
         const id = getId ? getId(entity) : (entity as unknown as { id: string }).id;
-        await api.patch(`${endpoint}/${id}`, payload);
-      } else {
-        await api.post(endpoint, payload);
+        const { data } = await api.patch<TEntity>(`${endpoint}/${id}`, payload);
+        return data;
       }
+      const { data } = await api.post<TEntity>(endpoint, payload);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: async (saved, values) => {
+      // Paso posterior opcional (p. ej. subir la foto a la unidad recién creada).
+      // Gestiona su propio error; aquí solo se espera a que termine.
+      if (afterSave) await afterSave(saved, values);
       for (const key of invalidateKeys) {
         queryClient.invalidateQueries({ queryKey: key });
       }

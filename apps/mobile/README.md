@@ -12,7 +12,7 @@ y tracking GPS en tiempo real hacia el panel del monitorista.
 | Navegación | `go_router` |
 | Tokens | `flutter_secure_storage` (Keystore / Keychain) |
 | Tiempo real | `socket_io_client` (namespace `/tracking`) |
-| Mapas | `flutter_map` + OpenStreetMap (sin API key) |
+| Mapas | `google_maps_flutter` (Google Maps; key en `AndroidManifest.xml` / `AppDelegate.swift`) |
 | GPS | `geolocator` — foreground service nativo en Android, background mode `location` en iOS (sin `flutter_background_service`) |
 | UI | Material 3 + `google_fonts` (Manrope) |
 

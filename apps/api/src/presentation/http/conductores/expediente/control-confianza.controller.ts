@@ -13,12 +13,14 @@ import {
 import { ControlConfianzaConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { ControlConfianzaUseCase } from '../../../../application/conductores/expediente/control-confianza.usecase';
 import { CrearControlConfianzaDto } from './dto/crear-control-confianza.dto';
 import { ActualizarControlConfianzaDto } from './dto/actualizar-control-confianza.dto';
 
 @Controller('conductores/:conductorId/control-confianza')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class ControlConfianzaController {
   constructor(private readonly controlConfianza: ControlConfianzaUseCase) {}
 

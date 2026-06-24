@@ -1,5 +1,6 @@
 'use client';
 
+import { api } from '@/lib/api';
 import { DocumentosDialogBase } from '@/components/documentos/documentos-dialog-base';
 import type { Conductor, DocumentoConductor } from './types';
 
@@ -26,6 +27,20 @@ export function DocumentosDialog({
       queryKey={(id) => ['conductor-documentos', id]}
       catalogoGrupo="TIPO_DOCUMENTO_CONDUCTOR"
       campoExtra={{ name: 'numero', label: 'Número' }}
+      guardarArchivoIa={
+        conductor
+          ? async (file, docId) => {
+              // Se adjunta al documento del conductor.
+              const fd = new FormData();
+              fd.append('archivos', file);
+              await api.post(
+                `/conductores/${conductor.id}/documentos/${docId}/archivos`,
+                fd,
+                { headers: { 'Content-Type': undefined } },
+              );
+            }
+          : undefined
+      }
     />
   );
 }

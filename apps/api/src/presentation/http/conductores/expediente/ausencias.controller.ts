@@ -13,12 +13,14 @@ import {
 import { AusenciaConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { AusenciasUseCase } from '../../../../application/conductores/expediente/ausencias.usecase';
 import { CrearAusenciaDto } from './dto/crear-ausencia.dto';
 import { ActualizarAusenciaDto } from './dto/actualizar-ausencia.dto';
 
 @Controller('conductores/:conductorId/ausencias')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class AusenciasController {
   constructor(private readonly ausencias: AusenciasUseCase) {}
 

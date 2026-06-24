@@ -203,6 +203,35 @@ export enum EstadoFactura {
   CANCELADA = 'CANCELADA',
 }
 
+// Declarados como objeto `as const` + union (no `enum` TS) porque estos tres
+// interoperan con los valores que devuelve Prisma (`$Enums.X`, que son uniones
+// de string) y con literales sueltos en el panel. El `as const` permite tanto
+// el acceso por miembro (`RolUsuario.MONITORISTA`) como la asignación desde un
+// literal o desde el tipo de Prisma, cosa que un `enum` nominal impediría.
+
+/** Rol del usuario del panel web (ADMIN dueño de la flotilla, MONITORISTA solo lectura). */
+export const RolUsuario = {
+  ADMIN: 'ADMIN',
+  MONITORISTA: 'MONITORISTA',
+} as const;
+export type RolUsuario = (typeof RolUsuario)[keyof typeof RolUsuario];
+
+export const EstadoCotizacion = {
+  BORRADOR: 'BORRADOR',
+  ENVIADA: 'ENVIADA',
+  ACEPTADA: 'ACEPTADA',
+  RECHAZADA: 'RECHAZADA',
+} as const;
+export type EstadoCotizacion =
+  (typeof EstadoCotizacion)[keyof typeof EstadoCotizacion];
+
+/** Quién envió un mensaje del chat del viaje (monitorista↔conductor). */
+export const AutorMensaje = {
+  MONITORISTA: 'MONITORISTA',
+  CONDUCTOR: 'CONDUCTOR',
+} as const;
+export type AutorMensaje = (typeof AutorMensaje)[keyof typeof AutorMensaje];
+
 // ── Catálogos (autoadministrables) ──
 // Los campos de tipo/categoría guardan el `codigo` de un item del catálogo.
 // Los estados con lógica (EstadoViaje/CartaPorte/Factura) NO son catálogo.
@@ -265,7 +294,44 @@ export const WS_EVENTS = {
   ALERTA: 'alerta',
   VIAJE_REASIGNADO: 'viaje:reasignado',
   INCIDENCIA_REPORTADA: 'incidencia:reportada',
+  CHAT_MENSAJE: 'chat:mensaje',
+  COTIZACION_ACTUALIZADA: 'cotizacion:actualizada',
 } as const;
+
+/**
+ * Payload del evento WS 'cotizacion:actualizada'. Se emite a la sala admin tras
+ * procesar el envío asíncrono de una cotización (estado → ENVIADA) para que el
+ * panel refresque el listado del viaje sin esperar al refetch perezoso.
+ */
+export interface CotizacionActualizadaPayload {
+  cotizacionId: string;
+  viajeId: string;
+  estado: EstadoCotizacion;
+}
+
+/**
+ * Alias de compatibilidad del enum Prisma `AutorMensaje` (declarado arriba).
+ * @deprecated Usar `AutorMensaje`.
+ */
+export type AutorMensajeChat = AutorMensaje;
+
+/**
+ * Mensaje del chat de un viaje. Contrato SERIALIZADO (createdAt en ISO string)
+ * compartido por el evento WS 'chat:mensaje' y el historial REST.
+ */
+export interface MensajeChatPayload {
+  id: string;
+  viajeId: string;
+  autorTipo: AutorMensajeChat;
+  autorNombre: string;
+  texto: string | null;
+  /** Adjunto opcional (imagen/PDF). `archivoUrl` es una URL temporal de visualización. */
+  archivoUrl: string | null;
+  archivoNombre: string | null;
+  archivoTipo: string | null;
+  archivoBytes: number | null;
+  createdAt: string;
+}
 
 /** Payload del evento WS 'incidencia:reportada' (el conductor reporta un problema). */
 export interface IncidenciaReportadaPayload {

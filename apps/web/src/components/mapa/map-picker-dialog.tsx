@@ -20,7 +20,7 @@ import {
   type LugarGeocodificado,
 } from '@/lib/geocoding';
 
-const MapPickerLeaflet = dynamic(() => import('./map-picker-leaflet'), {
+const MapPickerGoogle = dynamic(() => import('./map-picker-google'), {
   ssr: false,
   loading: () => (
     <div className="grid h-full place-items-center text-sm text-muted-foreground">
@@ -80,8 +80,8 @@ export function MapPickerDialog({
   const setCampo = (k: keyof DireccionEstructurada, v: string) =>
     setCampos((c) => ({ ...c, [k]: v }));
 
-  // Búsqueda estructurada por botón / Enter (no en cada tecla → respeta la
-  // política de uso de Nominatim). Requiere al menos un campo además de país.
+  // Búsqueda estructurada por botón / Enter (no en cada tecla → menos llamadas
+  // al Geocoder de Google). Requiere al menos un campo además de país.
   async function buscar() {
     const camposBusqueda: (keyof DireccionEstructurada)[] = [
       'calle',
@@ -259,7 +259,7 @@ export function MapPickerDialog({
           </div>
 
           <div className="h-[300px] w-full overflow-hidden rounded-md border">
-            <MapPickerLeaflet value={pos} recenter={recenter} onPick={alColocar} />
+            <MapPickerGoogle value={pos} recenter={recenter} onPick={alColocar} />
           </div>
 
           <div className="space-y-1">

@@ -13,12 +13,14 @@ import {
 import { CertificacionConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { CertificacionesUseCase } from '../../../../application/conductores/expediente/certificaciones.usecase';
 import { CrearCertificacionDto } from './dto/crear-certificacion.dto';
 import { ActualizarCertificacionDto } from './dto/actualizar-certificacion.dto';
 
 @Controller('conductores/:conductorId/certificaciones')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class CertificacionesController {
   constructor(private readonly certificaciones: CertificacionesUseCase) {}
 

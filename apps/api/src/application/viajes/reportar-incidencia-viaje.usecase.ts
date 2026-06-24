@@ -30,6 +30,7 @@ const TIPO_LABEL: Record<string, string> = {
   AVERIA: 'Avería',
   ACCIDENTE: 'Accidente',
   PONCHADURA: 'Ponchadura',
+  PANICO: 'Pánico / SOS',
   OTRO: 'Problema',
 };
 

@@ -34,7 +34,10 @@ export const RELACIONES_DETALLE = {
     orderBy: { orden: 'asc' },
     include: { cargas: true, contactos: { orderBy: { createdAt: 'asc' } } },
   },
-  historialAsignaciones: { orderBy: { createdAt: 'desc' } },
+  // Acotado a las reasignaciones recientes (no hay endpoint paginado aparte, por
+  // eso un take algo más alto). En la práctica un viaje rara vez supera unas
+  // pocas reasignaciones; 100 cubre cualquier caso real sin inflar el payload.
+  historialAsignaciones: { orderBy: { createdAt: 'desc' }, take: 100 },
   incidencias: {
     orderBy: { fecha: 'desc' },
     select: {

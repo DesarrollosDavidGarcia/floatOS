@@ -58,6 +58,7 @@ describe('RouteService', () => {
   }) {
     geodesica.calcular.mockClear();
     const tomtom = {
+      proveedor: 'TOMTOM',
       disponible: () => opts.disponible,
       calcular: jest.fn(opts.tomtom ?? (() => Promise.resolve(ruta))),
     };

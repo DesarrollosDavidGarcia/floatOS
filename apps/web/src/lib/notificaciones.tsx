@@ -194,6 +194,9 @@ export function NotificacionesProvider({ children }: { children: React.ReactNode
 
     const onIncidencia = (p: IncidenciaReportadaPayload) => {
       if (!p || !p.viajeId) return;
+      // Pánico/SOS o gravedad CRÍTICA = emergencia: resalta en rojo y usa toast
+      // de error (más persistente) en vez del warning ámbar de un aviso normal.
+      const critica = p.tipo === 'PANICO' || p.gravedad?.toUpperCase() === 'CRITICA';
       const notif: NotificacionLlegada = {
         id: `inc-${p.viajeId}-${p.reportadoEn}`,
         kind: 'incidencia',
@@ -203,6 +206,8 @@ export function NotificacionesProvider({ children }: { children: React.ReactNode
         escalaDireccion: p.descripcion ?? p.conductorNombre ?? null,
         esDestino: false,
         titulo: p.titulo,
+        gravedad: p.gravedad,
+        critica,
         recibidaEn: new Date().toISOString(),
         leida: false,
       };
@@ -211,9 +216,13 @@ export function NotificacionesProvider({ children }: { children: React.ReactNode
           ? prev
           : [notif, ...prev].slice(0, MAX_NOTIFS),
       );
-      toast.warning(p.titulo, {
-        description: p.descripcion ?? (p.varado ? 'El viaje quedó varado' : undefined),
-      });
+      const descripcion =
+        p.descripcion ?? (p.varado ? 'El viaje quedó varado' : undefined);
+      if (critica) {
+        toast.error(p.titulo, { description: descripcion, duration: 15_000 });
+      } else {
+        toast.warning(p.titulo, { description: descripcion });
+      }
       if (
         permisoRef.current === 'granted' &&
         typeof window !== 'undefined' &&

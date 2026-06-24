@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import axios from 'axios';
 import {
   FileText,
@@ -15,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { Paginado } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
+import { useSoloLectura } from '@/lib/auth';
 import { toast } from '@/components/ui/sonner';
 import { useDebounce } from '@/lib/hooks';
 import { PageHeader } from '@/components/page-header';
@@ -65,6 +71,7 @@ function Avatar({ conductor }: { conductor: Conductor }) {
 
 export default function ConductoresPage() {
   const queryClient = useQueryClient();
+  const soloLectura = useSoloLectura();
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
   const q = useDebounce(busqueda);
@@ -81,6 +88,7 @@ export default function ConductoresPage() {
       });
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 
   const eliminar = useMutation({
@@ -122,11 +130,13 @@ export default function ConductoresPage() {
               }}
               placeholder="Buscar por nombre, usuario…"
             />
-            <Button asChild className="shrink-0">
-              <Link href="/conductores/crear">
-                <Plus /> Nuevo conductor
-              </Link>
-            </Button>
+            {!soloLectura && (
+              <Button asChild className="shrink-0">
+                <Link href="/conductores/crear">
+                  <Plus /> Nuevo conductor
+                </Link>
+              </Button>
+            )}
           </div>
         }
       />
@@ -248,18 +258,22 @@ export default function ConductoresPage() {
                         <DropdownMenuItem onSelect={() => setViajesConductor(c)}>
                           <Route className="h-4 w-4" /> Historial de viajes
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/conductores/${c.id}`}>
-                            <Pencil className="h-4 w-4" /> Editar datos
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => setEliminarConductor(c)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Eliminar
-                        </DropdownMenuItem>
+                        {!soloLectura && (
+                          <>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/conductores/${c.id}`}>
+                                <Pencil className="h-4 w-4" /> Editar datos
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => setEliminarConductor(c)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Eliminar
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

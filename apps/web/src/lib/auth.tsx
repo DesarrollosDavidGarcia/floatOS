@@ -1,7 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useRouter } from 'next/navigation';
+import { RolUsuario } from '@flotaos/shared-types';
 import { api } from './api';
 import { closeSocket } from './socket';
 
@@ -11,6 +20,8 @@ export interface AuthUser {
   nombre: string;
   email?: string;
   type: string;
+  /** Rol del panel. Solo presente para admins (type === 'admin'). */
+  rol?: RolUsuario;
 }
 
 interface AuthContextValue {
@@ -37,15 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(email: string, password: string) {
+  const login = useCallback(async (email: string, password: string) => {
     const { data } = await api.post<{ user: AuthUser }>('/auth/login', {
       email,
       password,
     });
     setUser(data.user);
-  }
+  }, []);
 
-  async function logout() {
+  const logout = useCallback(async () => {
     await api.post('/auth/logout').catch(() => undefined);
     // Cierra el socket de tracking: con la cookie ya invalidada, el singleton
     // global reintentaría conectar en bucle (el gateway lo rechaza). Forzar un
@@ -53,17 +64,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     closeSocket();
     setUser(null);
     router.push('/login');
-  }
+  }, [router]);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, loading, login, logout }),
+    [user, loading, login, logout],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
   return ctx;
+}
+
+/** True si el usuario actual es monitorista (acceso de solo lectura a gestión). */
+export function useSoloLectura() {
+  const { user } = useAuth();
+  return user?.rol === RolUsuario.MONITORISTA;
 }

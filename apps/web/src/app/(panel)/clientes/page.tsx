@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
+import { useSoloLectura } from '@/lib/auth';
 import { useDebounce } from '@/lib/hooks';
 import { toast } from '@/components/ui/sonner';
 import { PageHeader } from '@/components/page-header';
@@ -36,6 +37,7 @@ const PAGE_SIZE = 10;
 
 export default function ClientesPage() {
   const queryClient = useQueryClient();
+  const soloLectura = useSoloLectura();
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
   const debouncedQ = useDebounce(busqueda, 350);
@@ -97,11 +99,13 @@ export default function ClientesPage() {
               }}
               placeholder="Buscar por razón social, RFC…"
             />
-            <Button asChild className="shrink-0">
-              <Link href="/clientes/crear">
-                <Plus /> Nuevo cliente
-              </Link>
-            </Button>
+            {!soloLectura && (
+              <Button asChild className="shrink-0">
+                <Link href="/clientes/crear">
+                  <Plus /> Nuevo cliente
+                </Link>
+              </Button>
+            )}
           </div>
         }
       />
@@ -144,9 +148,13 @@ export default function ClientesPage() {
                     <TableCell>
                       <CeldaPrincipal
                         titulo={
-                          <Link href={`/clientes/${cliente.id}/editar`} className="hover:underline">
-                            {cliente.razonSocial}
-                          </Link>
+                          soloLectura ? (
+                            cliente.razonSocial
+                          ) : (
+                            <Link href={`/clientes/${cliente.id}/editar`} className="hover:underline">
+                              {cliente.razonSocial}
+                            </Link>
+                          )
                         }
                         subtitulo={cliente.rfc || undefined}
                       />
@@ -171,27 +179,29 @@ export default function ClientesPage() {
 
                     {/* Acciones */}
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Acciones">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/clientes/${cliente.id}/editar`}>
-                              <Pencil className="h-4 w-4" /> Editar
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onSelect={() => setEliminarCliente(cliente)}
-                          >
-                            <Trash2 className="h-4 w-4" /> Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {!soloLectura && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label="Acciones">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/clientes/${cliente.id}/editar`}>
+                                <Pencil className="h-4 w-4" /> Editar
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() => setEliminarCliente(cliente)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

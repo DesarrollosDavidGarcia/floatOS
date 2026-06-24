@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DocumentoUnidad } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { obtenerOFallar } from '../shared/obtener-o-fallar';
 import {
   finDelDiaUTC,
   inicioDelDiaUTC,
@@ -18,13 +19,14 @@ export class DocumentosUnidadUseCase {
 
   /** Verifica que la unidad exista o lanza NotFoundException. */
   private async asegurarUnidad(unidadId: string): Promise<void> {
-    const unidad = await this.prisma.unidad.findUnique({
-      where: { id: unidadId },
-      select: { id: true },
-    });
-    if (!unidad) {
-      throw new NotFoundException(`Unidad con id ${unidadId} no encontrada`);
-    }
+    await obtenerOFallar(
+      () =>
+        this.prisma.unidad.findUnique({
+          where: { id: unidadId },
+          select: { id: true },
+        }),
+      `Unidad con id ${unidadId} no encontrada`,
+    );
   }
 
   /** Registra un documento para una unidad. */

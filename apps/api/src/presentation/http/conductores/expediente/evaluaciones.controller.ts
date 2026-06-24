@@ -13,12 +13,14 @@ import {
 import { EvaluacionDesempenoConductor } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { EvaluacionesUseCase } from '../../../../application/conductores/expediente/evaluaciones.usecase';
 import { CrearEvaluacionDto } from './dto/crear-evaluacion.dto';
 import { ActualizarEvaluacionDto } from './dto/actualizar-evaluacion.dto';
 
 @Controller('conductores/:conductorId/evaluaciones')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@Roles('ADMIN')
 export class EvaluacionesController {
   constructor(private readonly evaluaciones: EvaluacionesUseCase) {}
 

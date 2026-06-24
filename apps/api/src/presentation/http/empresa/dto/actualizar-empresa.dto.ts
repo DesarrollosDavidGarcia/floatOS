@@ -1,4 +1,28 @@
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEmail,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+
+/** Tarifas por defecto para la cotización del bot (forma de ParamsCotizacion). */
+export class TarifasCotizacionDto {
+  @IsOptional() @IsNumber() @Min(0) tarifaBase?: number;
+  @IsOptional() @IsNumber() @Min(0) precioPorKm?: number;
+  @IsOptional() @IsNumber() @Min(0) precioPorKg?: number;
+  @IsOptional() @IsNumber() @Min(0) precioDiesel?: number;
+  @IsOptional() @IsNumber() @Min(0) rendimientoKmL?: number;
+  @IsOptional() @IsNumber() @Min(0) casetas?: number;
+  @IsOptional() @IsNumber() @Min(0) maniobrasPorEscala?: number;
+  @IsOptional() @IsNumber() @Min(0) margenPct?: number;
+  @IsOptional() @IsBoolean() aplicaIva?: boolean;
+  @IsOptional() @IsBoolean() aplicaRetencion?: boolean;
+}
 
 /** Actualización de la configuración de empresa. Todo opcional (PATCH parcial). */
 export class ActualizarEmpresaDto {
@@ -34,4 +58,10 @@ export class ActualizarEmpresaDto {
   // CSD
   @IsOptional() @IsString() csdNumero?: string;
   @IsOptional() @IsString() csdPassword?: string;
+
+  // Tarifas por defecto del bot de cotización (n8n)
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TarifasCotizacionDto)
+  tarifasCotizacion?: TarifasCotizacionDto;
 }

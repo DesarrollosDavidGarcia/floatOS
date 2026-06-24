@@ -61,6 +61,16 @@ export class StorageService {
     });
   }
 
+  /**
+   * URL temporal para *mostrar* el objeto en el navegador (sin forzar descarga).
+   * Pensada para imágenes embebidas (<img src>): por defecto vive 1 hora para
+   * que la miniatura no caduque mientras se navega la tabla.
+   */
+  async urlVisualizacion(key: string, expiraSegundos = 3600): Promise<string> {
+    await this.asegurarBucket();
+    return this.client.presignedGetObject(this.bucket, key, expiraSegundos);
+  }
+
   async eliminar(key: string): Promise<void> {
     try {
       await this.client.removeObject(this.bucket, key);

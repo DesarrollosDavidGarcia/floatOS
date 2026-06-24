@@ -18,7 +18,12 @@
     "prisma:generate": "npm run prisma:generate --workspace @flotaos/api",
     "prisma:migrate": "npm run prisma:migrate --workspace @flotaos/api",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
   },
   "engines": {
     "node": ">=20"

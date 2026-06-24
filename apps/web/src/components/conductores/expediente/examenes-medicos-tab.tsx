@@ -1,18 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   seleccionRequerida,
   fechaRequerida,
   finNoAntesDeInicio,
 } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +38,8 @@ import {
   ArchivosExpedienteButton,
   useConteosArchivosExpediente,
 } from '@/components/conductores/expediente/archivos-expediente-button';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
+import { isoADate } from '@/lib/fecha';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -60,13 +56,6 @@ interface ExamenMedico {
   archivoKey?: string | null;
   creadoEn: string;
   actualizadoEn: string;
-}
-
-// ── Utils ──────────────────────────────────────────────────────────────────────
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
@@ -89,33 +78,16 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Form Modal ─────────────────────────────────────────────────────────────────
+// ── Tab ────────────────────────────────────────────────────────────────────────
 
-function ExamenMedicoForm({
-  conductorId,
-  examen,
-  open,
-  onClose,
-}: {
-  conductorId: string;
-  examen?: ExamenMedico;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const esEdicion = Boolean(examen);
-  const queryClient = useQueryClient();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
+export function MedicoTab({ conductorId }: { conductorId: string }) {
+  const seccion = useSeccionExpediente<ExamenMedico, FormValues>({
+    conductorId,
+    queryKey: 'examenes-medicos',
+    endpoint: 'examenes-medicos',
+    schema,
+    enabled: Boolean(conductorId),
+    toDefaults: (examen) => ({
       tipo: examen?.tipo ?? '',
       resultado: examen?.resultado ?? '',
       fechaExamen: isoADate(examen?.fechaExamen),
@@ -124,24 +96,8 @@ function ExamenMedicoForm({
       medico: examen?.medico ?? '',
       observaciones: examen?.observaciones ?? '',
       archivoKey: examen?.archivoKey ?? '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: examen?.tipo ?? '',
-      resultado: examen?.resultado ?? '',
-      fechaExamen: isoADate(examen?.fechaExamen),
-      fechaVencimiento: isoADate(examen?.fechaVencimiento),
-      institucion: examen?.institucion ?? '',
-      medico: examen?.medico ?? '',
-      observaciones: examen?.observaciones ?? '',
-      archivoKey: examen?.archivoKey ?? '',
-    });
-  }, [examen, reset]);
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipo: values.tipo,
         fechaExamen: new Date(values.fechaExamen).toISOString(),
@@ -154,145 +110,91 @@ function ExamenMedicoForm({
       if (values.medico?.trim()) payload.medico = values.medico.trim();
       if (values.observaciones?.trim()) payload.observaciones = values.observaciones.trim();
       if (values.archivoKey?.trim()) payload.archivoKey = values.archivoKey.trim();
-
-      if (esEdicion && examen) {
-        await api.patch(
-          `/conductores/${conductorId}/examenes-medicos/${examen.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/examenes-medicos`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-examenes-medicos', conductorId],
-      });
-      toast.success(esEdicion ? 'Examen actualizado' : 'Examen agregado');
-      onClose();
+    mensajes: {
+      creado: 'Examen agregado',
+      actualizado: 'Examen actualizado',
+      eliminado: 'Examen eliminado',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
 
-  return (
-    <ExpedienteFormDialog
-      open={open}
-      onOpenChange={(o) => { if (!o) onClose(); }}
-      title={esEdicion ? 'Editar examen médico' : 'Nuevo examen médico'}
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      saving={mutation.isPending}
-      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
-      size="md"
-    >
-      <CamposGrid cols={2}>
-        <Campo label="Tipo" required error={errors.tipo?.message}>
-          <CatalogoSelect
-            grupo="TIPO_EXAMEN_MEDICO"
-            value={watch('tipo')}
-            onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
-            placeholder="Selecciona un tipo"
-          />
-        </Campo>
-
-        <Campo label="Resultado">
-          <CatalogoSelect
-            grupo="RESULTADO_EXAMEN"
-            value={watch('resultado') ?? ''}
-            onChange={(c) => setValue('resultado', c)}
-            placeholder="Selecciona un resultado"
-          />
-        </Campo>
-
-        <Campo
-          label="Fecha del examen"
-          htmlFor="fechaExamen"
-          required
-          error={errors.fechaExamen?.message}
-        >
-          <Input id="fechaExamen" type="date" {...register('fechaExamen')} />
-        </Campo>
-
-        <Campo
-          label="Fecha de vencimiento"
-          htmlFor="fechaVencimiento"
-          error={errors.fechaVencimiento?.message}
-        >
-          <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
-        </Campo>
-
-        <Campo label="Institución" htmlFor="institucion">
-          <Input id="institucion" {...register('institucion')} />
-        </Campo>
-
-        <Campo label="Médico" htmlFor="medico">
-          <Input id="medico" {...register('medico')} />
-        </Campo>
-
-        <Campo label="Observaciones" htmlFor="observaciones" full>
-          <textarea
-            id="observaciones"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            {...register('observaciones')}
-          />
-        </Campo>
-      </CamposGrid>
-    </ExpedienteFormDialog>
-  );
-}
-
-// ── Tab ────────────────────────────────────────────────────────────────────────
-
-export function MedicoTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<ExamenMedico | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-examenes-medicos', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<ExamenMedico[]>(
-        `/conductores/${conductorId}/examenes-medicos`,
-      );
-      return data;
-    },
-    enabled: Boolean(conductorId),
-  });
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
 
   const { data: conteos } = useConteosArchivosExpediente(conductorId, 'examenes-medicos');
-
-  const eliminar = useMutation({
-    mutationFn: async (examenId: string) => {
-      await api.delete(`/conductores/${conductorId}/examenes-medicos/${examenId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-examenes-medicos', conductorId],
-      });
-      toast.success('Examen eliminado');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
 
   return (
     <div className="space-y-4">
       <SeccionHeader>
         {data && <Conteo n={data.length} />}
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar examen
         </Button>
       </SeccionHeader>
 
-      <ExamenMedicoForm
-        conductorId={conductorId}
-        examen={editando ?? undefined}
-        open={mostrarForm || Boolean(editando)}
-        onClose={cerrarForm}
-      />
+      <ExpedienteFormDialog
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar examen médico' : 'Nuevo examen médico'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
+        size="md"
+      >
+        <CamposGrid cols={2}>
+          <Campo label="Tipo" required error={errors.tipo?.message}>
+            <CatalogoSelect
+              grupo="TIPO_EXAMEN_MEDICO"
+              value={watch('tipo')}
+              onChange={(c) => setValue('tipo', c, { shouldValidate: true })}
+              placeholder="Selecciona un tipo"
+            />
+          </Campo>
+
+          <Campo label="Resultado">
+            <CatalogoSelect
+              grupo="RESULTADO_EXAMEN"
+              value={watch('resultado') ?? ''}
+              onChange={(c) => setValue('resultado', c)}
+              placeholder="Selecciona un resultado"
+            />
+          </Campo>
+
+          <Campo
+            label="Fecha del examen"
+            htmlFor="fechaExamen"
+            required
+            error={errors.fechaExamen?.message}
+          >
+            <Input id="fechaExamen" type="date" {...register('fechaExamen')} />
+          </Campo>
+
+          <Campo
+            label="Fecha de vencimiento"
+            htmlFor="fechaVencimiento"
+            error={errors.fechaVencimiento?.message}
+          >
+            <Input id="fechaVencimiento" type="date" {...register('fechaVencimiento')} />
+          </Campo>
+
+          <Campo label="Institución" htmlFor="institucion">
+            <Input id="institucion" {...register('institucion')} />
+          </Campo>
+
+          <Campo label="Médico" htmlFor="medico">
+            <Input id="medico" {...register('medico')} />
+          </Campo>
+
+          <Campo label="Observaciones" htmlFor="observaciones" full>
+            <textarea
+              id="observaciones"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...register('observaciones')}
+            />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
       <div className="overflow-auto">
         {isLoading ? (
@@ -350,10 +252,7 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(examen);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => seccion.abrirEditar(examen)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -366,7 +265,7 @@ export function MedicoTab({ conductorId }: { conductorId: string }) {
                         title="Eliminar examen médico"
                         description="Esta acción no se puede deshacer."
                         confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(examen.id)}
+                        onConfirm={() => seccion.eliminar(examen.id)}
                       />
                     </div>
                   </TableCell>

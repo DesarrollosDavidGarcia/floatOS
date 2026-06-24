@@ -1,4 +1,5 @@
-export type EstadoCotizacion = 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA';
+export { EstadoCotizacion } from '@flotaos/shared-types';
+import type { EstadoCotizacion } from '@flotaos/shared-types';
 
 /** Tarifas/parámetros que captura el monitorista (modelo mixto configurable). */
 export interface ParamsCotizacion {

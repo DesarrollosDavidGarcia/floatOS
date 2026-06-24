@@ -1,6 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { z } from 'zod';
+import { api, apiError } from '@/lib/api';
+import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { UnidadFotoUploader } from '@/components/flota/unidad-foto';
 import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
 import { textoRequerido, seleccionRequerida, numeroOpcional } from '@/lib/validacion';
 import { useEntityFormDialog } from '@/lib/use-entity-form-dialog';
@@ -65,6 +69,9 @@ export function UnidadFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  // Foto elegida al crear una unidad nueva: se sube tras crearla (afterSave).
+  const [fotoNueva, setFotoNueva] = useState<File | null>(null);
+
   const { open, setOpen, form, editando, submit, isPending } = useEntityFormDialog<
     FormValues,
     Unidad
@@ -78,7 +85,26 @@ export function UnidadFormDialog({
     endpoint: '/unidades',
     invalidateKeys: [['unidades']],
     mensajes: { creado: 'Unidad creada', actualizado: 'Unidad actualizada' },
+    // Solo al crear: sube la foto pendiente a la unidad recién creada. Si falla,
+    // la unidad ya quedó creada — se avisa pero no se aborta el cierre.
+    afterSave: async (creada) => {
+      if (editando || !fotoNueva) return;
+      try {
+        const fd = new FormData();
+        fd.append('foto', fotoNueva);
+        await api.post(`/unidades/${creada.id}/foto`, fd, {
+          headers: { 'Content-Type': undefined },
+        });
+      } catch (err) {
+        toast.error(`Unidad creada, pero la foto no se subió: ${apiError(err)}`);
+      }
+    },
   });
+
+  // Limpia la foto pendiente cuando el diálogo se cierra (o se reabre).
+  useEffect(() => {
+    if (!open) setFotoNueva(null);
+  }, [open]);
   const {
     register,
     watch,
@@ -98,6 +124,16 @@ export function UnidadFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
+          {editando && unidad ? (
+            <UnidadFotoUploader unidad={unidad} />
+          ) : (
+            <UnidadFotoUploader
+              pendingFile={fotoNueva}
+              onPick={setFotoNueva}
+              placas={watch('placas') || 'nueva'}
+            />
+          )}
+
           <CamposGrid cols={2}>
             <Campo
               label="Placas"

@@ -1,18 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   seleccionRequerida,
   fechaRequerida,
   finNoAntesDeInicio,
 } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,6 +37,8 @@ import {
   ArchivosExpedienteButton,
   useConteosArchivosExpediente,
 } from '@/components/conductores/expediente/archivos-expediente-button';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
+import { isoADate } from '@/lib/fecha';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -59,13 +55,6 @@ interface ControlConfianza {
   archivoKey?: string | null;
   creadoEn: string;
   actualizadoEn: string;
-}
-
-// ── Utils ──────────────────────────────────────────────────────────────────────
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
 }
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
@@ -91,90 +80,23 @@ type FormValues = z.infer<typeof schema>;
 // ── Tab ────────────────────────────────────────────────────────────────────────
 
 export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<ControlConfianza | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const esEdicion = Boolean(editando);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      tipo: '',
-      resultado: '',
-      institucion: '',
-      folio: '',
-      fechaEvaluacion: '',
-      fechaVencimiento: '',
-      observaciones: '',
-      archivoKey: '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipo: editando?.tipo ?? '',
-      resultado: editando?.resultado ?? '',
-      institucion: editando?.institucion ?? '',
-      folio: editando?.folio ?? '',
-      fechaEvaluacion: isoADate(editando?.fechaEvaluacion),
-      fechaVencimiento: isoADate(editando?.fechaVencimiento),
-      observaciones: editando?.observaciones ?? '',
-      archivoKey: editando?.archivoKey ?? '',
-    });
-  }, [editando, reset]);
-
-  const tipo = watch('tipo');
-  const resultado = watch('resultado');
-
-  function abrirNuevo() {
-    setEditando(null);
-    reset({
-      tipo: '',
-      resultado: '',
-      institucion: '',
-      folio: '',
-      fechaEvaluacion: '',
-      fechaVencimiento: '',
-      observaciones: '',
-      archivoKey: '',
-    });
-    setMostrarForm(true);
-  }
-
-  function abrirEdicion(registro: ControlConfianza) {
-    setMostrarForm(false);
-    setEditando(registro);
-  }
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-control-confianza', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<ControlConfianza[]>(
-        `/conductores/${conductorId}/control-confianza`,
-      );
-      return data;
-    },
+  const seccion = useSeccionExpediente<ControlConfianza, FormValues>({
+    conductorId,
+    queryKey: 'control-confianza',
+    endpoint: 'control-confianza',
+    schema,
     enabled: Boolean(conductorId),
-  });
-
-  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'control-confianza');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+    toDefaults: (registro) => ({
+      tipo: registro?.tipo ?? '',
+      resultado: registro?.resultado ?? '',
+      institucion: registro?.institucion ?? '',
+      folio: registro?.folio ?? '',
+      fechaEvaluacion: isoADate(registro?.fechaEvaluacion),
+      fechaVencimiento: isoADate(registro?.fechaVencimiento),
+      observaciones: registro?.observaciones ?? '',
+      archivoKey: registro?.archivoKey ?? '',
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipo: values.tipo,
         fechaEvaluacion: new Date(values.fechaEvaluacion).toISOString(),
@@ -187,57 +109,40 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
       if (values.folio?.trim()) payload.folio = values.folio.trim();
       if (values.observaciones?.trim()) payload.observaciones = values.observaciones.trim();
       if (values.archivoKey?.trim()) payload.archivoKey = values.archivoKey.trim();
-
-      if (esEdicion && editando) {
-        await api.patch(
-          `/conductores/${conductorId}/control-confianza/${editando.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/control-confianza`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-control-confianza', conductorId],
-      });
-      toast.success(esEdicion ? 'Registro actualizado' : 'Registro agregado');
-      cerrarForm();
+    mensajes: {
+      creado: 'Registro agregado',
+      actualizado: 'Registro actualizado',
+      eliminado: 'Registro eliminado',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
 
-  const eliminar = useMutation({
-    mutationFn: async (registroId: string) => {
-      await api.delete(`/conductores/${conductorId}/control-confianza/${registroId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-control-confianza', conductorId],
-      });
-      toast.success('Registro eliminado');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const tipo = watch('tipo');
+  const resultado = watch('resultado');
+
+  const { data: conteos } = useConteosArchivosExpediente(conductorId, 'control-confianza');
 
   return (
     <div className="space-y-4">
       {/* Botón Agregar siempre visible arriba a la derecha */}
       <div className="flex items-center justify-end gap-3">
         {data && <Conteo n={data.length} />}
-        <Button size="sm" onClick={abrirNuevo}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar registro
         </Button>
       </div>
 
       {/* Modal crear / editar */}
       <ExpedienteFormDialog
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        title={esEdicion ? 'Editar control de confianza' : 'Nuevo control de confianza'}
-        onSubmit={handleSubmit((values) => mutation.mutate(values))}
-        saving={mutation.isPending}
-        submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar control de confianza' : 'Nuevo control de confianza'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
         size="md"
       >
         <CamposGrid cols={2}>
@@ -363,7 +268,7 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => abrirEdicion(registro)}
+                        onClick={() => seccion.abrirEditar(registro)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -376,7 +281,7 @@ export function ControlConfianzaTab({ conductorId }: { conductorId: string }) {
                         title="Eliminar registro"
                         description="Esta acción no se puede deshacer."
                         confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(registro.id)}
+                        onConfirm={() => seccion.eliminar(registro.id)}
                       />
                     </div>
                   </TableCell>

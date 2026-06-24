@@ -1,14 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { seleccionRequerida, numeroOpcional } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +26,7 @@ import {
   CeldaPrincipal,
   Conteo,
 } from '@/components/conductores/expediente/tabla-ui';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
 
 // ── tipos ──────────────────────────────────────────────────────────────────────
 
@@ -57,33 +52,15 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-// ── formulario modal ───────────────────────────────────────────────────────────
+// ── tab principal ──────────────────────────────────────────────────────────────
 
-function AptitudForm({
-  conductorId,
-  aptitud,
-  open,
-  onOpenChange,
-}: {
-  conductorId: string;
-  aptitud?: AptitudUnidadConductor;
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-}) {
-  const esEdicion = Boolean(aptitud);
-  const queryClient = useQueryClient();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
+export function AptitudesTab({ conductorId }: { conductorId: string }) {
+  const seccion = useSeccionExpediente<AptitudUnidadConductor, FormValues>({
+    conductorId,
+    queryKey: 'aptitudes-unidad',
+    endpoint: 'aptitudes-unidad',
+    schema,
+    toDefaults: (aptitud) => ({
       tipoUnidad: aptitud?.tipoUnidad ?? '',
       nivel: aptitud?.nivel ?? '',
       aniosExperiencia:
@@ -91,26 +68,8 @@ function AptitudForm({
           ? String(aptitud.aniosExperiencia)
           : '',
       notas: aptitud?.notas ?? '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      tipoUnidad: aptitud?.tipoUnidad ?? '',
-      nivel: aptitud?.nivel ?? '',
-      aniosExperiencia:
-        aptitud?.aniosExperiencia != null
-          ? String(aptitud.aniosExperiencia)
-          : '',
-      notas: aptitud?.notas ?? '',
-    });
-  }, [aptitud, reset]);
-
-  const tipoUnidad = watch('tipoUnidad');
-  const nivel = watch('nivel');
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         tipoUnidad: values.tipoUnidad,
       };
@@ -119,127 +78,76 @@ function AptitudForm({
         payload.aniosExperiencia = Number(values.aniosExperiencia);
       }
       if (values.notas?.trim()) payload.notas = values.notas.trim();
-
-      if (esEdicion && aptitud) {
-        await api.patch(
-          `/conductores/${conductorId}/aptitudes-unidad/${aptitud.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/aptitudes-unidad`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-aptitudes-unidad', conductorId],
-      });
-      toast.success(esEdicion ? 'Aptitud actualizada' : 'Aptitud agregada');
-      onOpenChange(false);
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  return (
-    <ExpedienteFormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={esEdicion ? 'Editar aptitud' : 'Nueva aptitud'}
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      saving={mutation.isPending}
-      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
-      size="md"
-    >
-      <CamposGrid cols={2}>
-        <Campo label="Tipo de unidad" required error={errors.tipoUnidad?.message}>
-          <CatalogoSelect
-            grupo="TIPO_UNIDAD_MANEJO"
-            value={tipoUnidad}
-            onChange={(c) => setValue('tipoUnidad', c, { shouldValidate: true })}
-            placeholder="Selecciona un tipo"
-          />
-        </Campo>
-        <Campo label="Nivel">
-          <CatalogoSelect
-            grupo="NIVEL_APTITUD"
-            value={nivel ?? ''}
-            onChange={(c) => setValue('nivel', c, { shouldValidate: true })}
-            placeholder="Selecciona un nivel"
-          />
-        </Campo>
-        <Campo
-          label="Años de experiencia"
-          htmlFor="aniosExperiencia"
-          error={errors.aniosExperiencia?.message}
-        >
-          <Input
-            id="aniosExperiencia"
-            type="number"
-            min={0}
-            {...register('aniosExperiencia')}
-          />
-        </Campo>
-        <Campo label="Notas" htmlFor="notas" full>
-          <textarea
-            id="notas"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            {...register('notas')}
-          />
-        </Campo>
-      </CamposGrid>
-    </ExpedienteFormDialog>
-  );
-}
-
-// ── tab principal ──────────────────────────────────────────────────────────────
-
-export function AptitudesTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<AptitudUnidadConductor | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-aptitudes-unidad', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<AptitudUnidadConductor[]>(
-        `/conductores/${conductorId}/aptitudes-unidad`,
-      );
-      return data;
+    mensajes: {
+      creado: 'Aptitud agregada',
+      actualizado: 'Aptitud actualizada',
+      eliminado: 'Aptitud eliminada',
     },
   });
 
-  const eliminar = useMutation({
-    mutationFn: async (aptitudId: string) => {
-      await api.delete(`/conductores/${conductorId}/aptitudes-unidad/${aptitudId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-aptitudes-unidad', conductorId],
-      });
-      toast.success('Aptitud eliminada');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
+  const { items: data, isLoading, isError } = seccion;
+  const { register, setValue, watch, formState: { errors } } = seccion.form;
+  const tipoUnidad = watch('tipoUnidad');
+  const nivel = watch('nivel');
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Conteo n={data?.length ?? 0} />
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar aptitud
         </Button>
       </div>
 
-      <AptitudForm
-        conductorId={conductorId}
-        aptitud={editando ?? undefined}
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-      />
+      <ExpedienteFormDialog
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar aptitud' : 'Nueva aptitud'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
+        size="md"
+      >
+        <CamposGrid cols={2}>
+          <Campo label="Tipo de unidad" required error={errors.tipoUnidad?.message}>
+            <CatalogoSelect
+              grupo="TIPO_UNIDAD_MANEJO"
+              value={tipoUnidad}
+              onChange={(c) => setValue('tipoUnidad', c, { shouldValidate: true })}
+              placeholder="Selecciona un tipo"
+            />
+          </Campo>
+          <Campo label="Nivel">
+            <CatalogoSelect
+              grupo="NIVEL_APTITUD"
+              value={nivel ?? ''}
+              onChange={(c) => setValue('nivel', c, { shouldValidate: true })}
+              placeholder="Selecciona un nivel"
+            />
+          </Campo>
+          <Campo
+            label="Años de experiencia"
+            htmlFor="aniosExperiencia"
+            error={errors.aniosExperiencia?.message}
+          >
+            <Input
+              id="aniosExperiencia"
+              type="number"
+              min={0}
+              {...register('aniosExperiencia')}
+            />
+          </Campo>
+          <Campo label="Notas" htmlFor="notas" full>
+            <textarea
+              id="notas"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...register('notas')}
+            />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
       <div className="overflow-auto">
         {isLoading ? (
@@ -288,10 +196,7 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setEditando(aptitud);
-                          setMostrarForm(false);
-                        }}
+                        onClick={() => seccion.abrirEditar(aptitud)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -304,7 +209,7 @@ export function AptitudesTab({ conductorId }: { conductorId: string }) {
                         title="Eliminar aptitud"
                         description="Esta acción no se puede deshacer."
                         confirmLabel="Eliminar"
-                        onConfirm={() => eliminar.mutateAsync(aptitud.id)}
+                        onConfirm={() => seccion.eliminar(aptitud.id)}
                       />
                     </div>
                   </TableCell>

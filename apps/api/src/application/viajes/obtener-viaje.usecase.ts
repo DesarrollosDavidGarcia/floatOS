@@ -19,8 +19,11 @@ export class ObtenerViajeUseCase {
       where: { id },
       include: {
         ...RELACIONES_DETALLE,
+        // Acotado: el detalle solo muestra los movimientos recientes. El histórico
+        // completo de estados sigue disponible en GET /viajes/:id/historial.
         historial: {
           orderBy: { createdAt: 'desc' },
+          take: 50,
         },
       },
     });

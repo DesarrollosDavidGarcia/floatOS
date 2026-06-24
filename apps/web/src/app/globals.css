@@ -57,10 +57,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-/* Leaflet: asegurar altura del contenedor del mapa */
-.leaflet-container {
-  height: 100%;
-  width: 100%;
-  z-index: 0;
-}

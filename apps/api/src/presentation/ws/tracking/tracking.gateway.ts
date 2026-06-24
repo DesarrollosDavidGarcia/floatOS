@@ -13,7 +13,9 @@ import {
   WS_EVENTS,
   type AlertaLlegadaPayload,
   type CambioEstadoViajePayload,
+  type CotizacionActualizadaPayload,
   type IncidenciaReportadaPayload,
+  type MensajeChatPayload,
   type ReasignacionViajePayload,
 } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
@@ -269,5 +271,32 @@ export class TrackingGateway implements OnGatewayConnection {
       .to(salaViaje(payload.viajeId))
       .to(SALA_ADMIN)
       .emit(WS_EVENTS.INCIDENCIA_REPORTADA, payload);
+  }
+
+  /**
+   * Reemite un mensaje de chat a la sala del viaje (donde está el otro lado del
+   * chat), a la sala de admin (para el contador/campana del panel) y a la sala
+   * personal del conductor del viaje (para que reciba el aviso y actualice su
+   * badge aunque no tenga el chat abierto). Socket.io deduplica.
+   */
+  emitirMensajeChat(
+    viajeId: string,
+    conductorId: string | null,
+    payload: MensajeChatPayload,
+  ): void {
+    let emisor = this.server.to(salaViaje(viajeId)).to(SALA_ADMIN);
+    if (conductorId) {
+      emisor = emisor.to(salaConductor(conductorId));
+    }
+    emisor.emit(WS_EVENTS.CHAT_MENSAJE, payload);
+  }
+
+  /**
+   * Avisa al panel (sala admin) que una cotización cambió de estado tras el
+   * envío asíncrono (→ ENVIADA). Lo consume el listado de cotizaciones del viaje
+   * para refrescar sin esperar al refetch perezoso.
+   */
+  emitirCotizacionActualizada(payload: CotizacionActualizadaPayload): void {
+    this.server.to(SALA_ADMIN).emit(WS_EVENTS.COTIZACION_ACTUALIZADA, payload);
   }
 }

@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AllExceptionsFilter } from './presentation/http/shared/all-exceptions.filter';
 import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SharedModule } from './infrastructure/shared/shared.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { CryptoModule } from './infrastructure/crypto/crypto.module';
 import { HealthController } from './presentation/http/health.controller';
+import { validarEnv } from './infrastructure/config/env.validation';
 
 // Módulos de funcionalidad (Fase 1)
 import { AuthModule } from './presentation/http/auth/auth.module';
@@ -20,10 +22,14 @@ import { CotizacionesModule } from './presentation/http/cotizaciones/cotizacione
 import { EmpresaModule } from './presentation/http/empresa/empresa.module';
 import { TrackingModule } from './presentation/ws/tracking/tracking.module';
 import { AlertasModule } from './presentation/http/alertas/alertas.module';
+import { UsuariosModule } from './presentation/http/usuarios/usuarios.module';
+import { ChatModule } from './presentation/http/chat/chat.module';
+import { AiHttpModule } from './presentation/http/ai/ai.module';
+import { BotModule } from './presentation/http/bot/bot.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validarEnv }),
     // Rate limiting. Baseline laxo global (defensa en profundidad); los
     // endpoints sensibles (login, link público) lo aprietan con @Throttle y
     // la ingesta de GPS lo omite con @SkipThrottle.
@@ -43,8 +49,15 @@ import { AlertasModule } from './presentation/http/alertas/alertas.module';
     EmpresaModule,
     TrackingModule,
     AlertasModule,
+    UsuariosModule,
+    ChatModule,
+    AiHttpModule,
+    BotModule,
   ],
   controllers: [HealthController],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
 })
 export class AppModule {}

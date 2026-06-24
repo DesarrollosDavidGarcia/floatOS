@@ -1,10 +1,7 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { AusenciaConductor, Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { AusenciaConductor } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { asegurarConductorExiste } from './asegurar-conductor';
+import { ExpedienteSubrecursoService } from './expediente-subrecurso.service';
 
 export interface CrearAusenciaInput {
   tipo: string;
@@ -30,85 +27,27 @@ export interface ActualizarAusenciaInput {
 
 /** Casos de uso para las ausencias de un conductor. */
 @Injectable()
-export class AusenciasUseCase {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private asegurarConductor(conductorId: string): Promise<void> {
-    return asegurarConductorExiste(this.prisma, conductorId);
-  }
-
-  async crear(
-    conductorId: string,
-    input: CrearAusenciaInput,
-  ): Promise<AusenciaConductor> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.ausenciaConductor.create({
-      data: {
-        conductorId,
-        tipo: input.tipo,
-        fechaInicio: new Date(input.fechaInicio),
-        fechaFin: input.fechaFin ? new Date(input.fechaFin) : null,
-        dias: input.dias ?? null,
-        motivo: input.motivo ?? null,
-        folioIncapacidad: input.folioIncapacidad ?? null,
-        autorizadoPor: input.autorizadoPor ?? null,
-        documentoKey: input.documentoKey ?? null,
-      },
-    });
-  }
-
-  async listar(conductorId: string): Promise<AusenciaConductor[]> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.ausenciaConductor.findMany({
-      where: { conductorId },
+export class AusenciasUseCase extends ExpedienteSubrecursoService<
+  AusenciaConductor,
+  CrearAusenciaInput,
+  ActualizarAusenciaInput
+> {
+  constructor(prisma: PrismaService) {
+    super(prisma, {
+      delegate: (p) => p.ausenciaConductor,
+      etiqueta: 'Ausencia',
+      noEncontrado: 'no encontrada',
       orderBy: { fechaInicio: 'desc' },
+      campos: [
+        { nombre: 'tipo', tipo: 'requerido' },
+        { nombre: 'fechaInicio', tipo: 'fechaRequerida' },
+        { nombre: 'fechaFin', tipo: 'fechaOpcional' },
+        { nombre: 'dias', tipo: 'opcionalNull' },
+        { nombre: 'motivo', tipo: 'opcionalNull' },
+        { nombre: 'folioIncapacidad', tipo: 'opcionalNull' },
+        { nombre: 'autorizadoPor', tipo: 'opcionalNull' },
+        { nombre: 'documentoKey', tipo: 'opcionalNull' },
+      ],
     });
-  }
-
-  async obtener(
-    conductorId: string,
-    ausenciaId: string,
-  ): Promise<AusenciaConductor> {
-    const ausencia = await this.prisma.ausenciaConductor.findUnique({
-      where: { id: ausenciaId },
-    });
-    if (!ausencia || ausencia.conductorId !== conductorId) {
-      throw new NotFoundException(`Ausencia con id ${ausenciaId} no encontrada`);
-    }
-    return ausencia;
-  }
-
-  async actualizar(
-    conductorId: string,
-    ausenciaId: string,
-    input: ActualizarAusenciaInput,
-  ): Promise<AusenciaConductor> {
-    await this.obtener(conductorId, ausenciaId);
-
-    const data: Prisma.AusenciaConductorUpdateInput = {};
-    if (input.tipo !== undefined) data.tipo = input.tipo;
-    if (input.fechaInicio !== undefined) {
-      data.fechaInicio = new Date(input.fechaInicio);
-    }
-    if (input.fechaFin !== undefined) {
-      data.fechaFin = new Date(input.fechaFin);
-    }
-    if (input.dias !== undefined) data.dias = input.dias;
-    if (input.motivo !== undefined) data.motivo = input.motivo;
-    if (input.folioIncapacidad !== undefined) data.folioIncapacidad = input.folioIncapacidad;
-    if (input.autorizadoPor !== undefined) data.autorizadoPor = input.autorizadoPor;
-    if (input.documentoKey !== undefined) data.documentoKey = input.documentoKey;
-
-    return this.prisma.ausenciaConductor.update({
-      where: { id: ausenciaId },
-      data,
-    });
-  }
-
-  async eliminar(conductorId: string, ausenciaId: string): Promise<void> {
-    await this.obtener(conductorId, ausenciaId);
-    await this.prisma.ausenciaConductor.delete({ where: { id: ausenciaId } });
   }
 }

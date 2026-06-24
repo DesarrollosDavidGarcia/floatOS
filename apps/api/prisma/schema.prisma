@@ -210,16 +210,25 @@ model CatalogoItem {
 
 // ──────────────────────────── Usuarios ───────────────────────────
 
-/// Admin del panel web (dueño de la flotilla). Una instancia = un admin (MVP).
+/// Rol de un usuario del panel. ADMIN tiene acceso total; MONITORISTA solo
+/// opera viajes (crear/editar/asignar), monitoreo en vivo y lectura de
+/// clientes/flota.
+enum RolUsuario {
+  ADMIN
+  MONITORISTA
+}
+
+/// Usuario del panel web. ADMIN (dueño de la flotilla) o MONITORISTA.
 model Usuario {
-  id               String   @id @default(cuid())
-  email            String   @unique
+  id               String     @id @default(cuid())
+  email            String     @unique
   passwordHash     String
   nombre           String
-  activo           Boolean  @default(true)
+  rol              RolUsuario @default(ADMIN)
+  activo           Boolean    @default(true)
   refreshTokenHash String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   @@map("usuarios")
 }
@@ -263,6 +272,12 @@ model Empresa {
   csdCerKey   String? // .cer en MinIO
   csdKeyKey   String? // .key en MinIO
   csdPassword String? // secreto — no se expone
+
+  // Tarifas por defecto para la cotización del bot (n8n). JSON con la forma de
+  // ParamsCotizacion (tarifaBase, precioPorKm, precioPorKg, precioDiesel,
+  // rendimientoKmL, casetas, maniobrasPorEscala, margenPct, aplicaIva,
+  // aplicaRetencion). Si es null, el bot usa valores por defecto del código.
+  tarifasCotizacion Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -350,6 +365,7 @@ model Unidad {
   capacidadTanqueL Decimal? @db.Decimal(8, 2)  // litros de tanque (autonomía = rendimiento * tanque)
   aseguradora   String?
   numeroPoliza  String?
+  fotoKey       String?  // foto de referencia del vehículo (objeto en MinIO)
   activo        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -694,6 +710,9 @@ model ArchivoExpediente {
 // ──────────────────────── Clientes finales ───────────────────────
 
 /// Cliente del transportista (a quien se le presta el servicio de viaje).
+// razonSocial se busca con ILIKE '%x%' desde el listado de viajes (join cliente):
+// índice GIN trigram (pg_trgm) creado por SQL crudo en la migración
+// 20260624130000_busqueda_trigram_viajes (no como @@index; ver modelo Viaje).
 model Cliente {
   id               String   @id @default(cuid())
   razonSocial      String
@@ -767,6 +786,10 @@ model ContactoCliente {
 // ───────────────────────────── Viajes ────────────────────────────
 
 /// Aggregate root del dominio.
+// Búsqueda del listado (ILIKE '%x%' sobre origenDireccion, destinoDireccion,
+// tipoCarga, descripcionCarga): acelerada por índices GIN trigram (pg_trgm) que
+// se crean por SQL crudo (migración 20260624130000_busqueda_trigram_viajes), NO
+// como @@index aquí — Prisma generaría un btree, inútil para patrones no anclados.
 model Viaje {
   id            String      @id @default(cuid())
   folio         Int         @unique @default(autoincrement())
@@ -832,6 +855,7 @@ model Viaje {
   cartaPorte   CartaPorte?
   factura      Factura?
   cotizaciones Cotizacion[]
+  mensajesChat MensajeChat[]
 
   @@index([clienteId])
   @@index([unidadId])
@@ -843,6 +867,49 @@ model Viaje {
   @@index([fechaProgramada])
   @@index([createdAt])
   @@map("viajes")
+}
+
+/// Quién envió un mensaje de chat: un usuario del panel (monitorista/admin) o el
+/// conductor del viaje.
+enum AutorMensaje {
+  MONITORISTA
+  CONDUCTOR
+}
+
+/// Mensaje del chat de un viaje (comunicación bidireccional monitorista↔conductor).
+/// Texto y/o un adjunto (imagen o PDF en MinIO). Los flags de lectura son por
+/// "lado" (no por usuario): se marca leído cuando el panel o el conductor abren
+/// el chat del viaje.
+model MensajeChat {
+  id          String       @id @default(cuid())
+  viajeId     String
+  autorTipo   AutorMensaje
+  // Emisor concreto: usuarioId si autorTipo=MONITORISTA, conductorId si CONDUCTOR.
+  usuarioId   String?
+  conductorId String?
+  autorNombre String // nombre mostrado (snapshot al enviar)
+  texto       String? // puede ser null si el mensaje es solo un adjunto
+
+  // Adjunto opcional (imagen/PDF en MinIO).
+  archivoKey    String?
+  archivoNombre String?
+  archivoTipo   String? // mimetype
+  archivoBytes  Int?
+
+  // Lectura por lado (no por usuario): el panel marca leídos los del conductor y
+  // viceversa. Sirve para el contador de no leídos.
+  leidoMonitorista Boolean @default(false)
+  leidoConductor   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  @@index([viajeId, createdAt])
+  // Aceleran el conteo de no leídos por lado (panel vs conductor).
+  @@index([autorTipo, leidoMonitorista])
+  @@index([autorTipo, leidoConductor])
+  @@map("mensajes_chat")
 }
 
 model HistorialEstadoViaje {

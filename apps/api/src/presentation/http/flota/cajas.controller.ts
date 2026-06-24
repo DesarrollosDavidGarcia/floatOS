@@ -17,6 +17,7 @@ import { ActualizarCajaDto } from './dto/actualizar-caja.dto';
 import { ListarCajasDto } from './dto/listar-cajas.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 /** CRUD de cajas / remolques (solo admin). */
 @Controller('cajas')
@@ -25,6 +26,7 @@ export class CajasController {
   constructor(private readonly cajas: CajasUseCase) {}
 
   @Post()
+  @Roles('ADMIN')
   crear(@Body() dto: CrearCajaDto) {
     return this.cajas.crear(dto);
   }
@@ -40,11 +42,13 @@ export class CajasController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   actualizar(@Param('id') id: string, @Body() dto: ActualizarCajaDto) {
     return this.cajas.actualizar(id, dto);
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async eliminar(@Param('id') id: string) {
     await this.cajas.eliminar(id);

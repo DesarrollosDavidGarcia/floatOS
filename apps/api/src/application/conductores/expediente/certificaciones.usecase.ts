@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { CertificacionConductor, Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { CertificacionConductor } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { asegurarConductorExiste } from './asegurar-conductor';
 import { ArchivosExpedienteUseCase } from '../archivos-expediente.usecase';
+import { ExpedienteSubrecursoService } from './expediente-subrecurso.service';
 
 export interface CrearCertificacionInput {
   tipo: string;
@@ -28,89 +25,31 @@ export interface ActualizarCertificacionInput {
 }
 
 @Injectable()
-export class CertificacionesUseCase {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly archivos: ArchivosExpedienteUseCase,
-  ) {}
-
-  private asegurarConductor(conductorId: string): Promise<void> {
-    return asegurarConductorExiste(this.prisma, conductorId);
-  }
-
-  async crear(
-    conductorId: string,
-    input: CrearCertificacionInput,
-  ): Promise<CertificacionConductor> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.certificacionConductor.create({
-      data: {
-        conductorId,
-        tipo: input.tipo,
-        nombre: input.nombre,
-        emisor: input.emisor ?? null,
-        folio: input.folio ?? null,
-        fechaEmision: input.fechaEmision ? new Date(input.fechaEmision) : null,
-        fechaVencimiento: input.fechaVencimiento
-          ? new Date(input.fechaVencimiento)
-          : null,
-        archivoKey: input.archivoKey ?? null,
+export class CertificacionesUseCase extends ExpedienteSubrecursoService<
+  CertificacionConductor,
+  CrearCertificacionInput,
+  ActualizarCertificacionInput
+> {
+  constructor(prisma: PrismaService, archivos: ArchivosExpedienteUseCase) {
+    super(
+      prisma,
+      {
+        delegate: (p) => p.certificacionConductor,
+        etiqueta: 'Certificación',
+        noEncontrado: 'no encontrada',
+        orderBy: { createdAt: 'desc' },
+        seccionArchivo: 'CERTIFICACION',
+        campos: [
+          { nombre: 'tipo', tipo: 'requerido' },
+          { nombre: 'nombre', tipo: 'requerido' },
+          { nombre: 'emisor', tipo: 'opcionalNull' },
+          { nombre: 'folio', tipo: 'opcionalNull' },
+          { nombre: 'fechaEmision', tipo: 'fechaOpcional' },
+          { nombre: 'fechaVencimiento', tipo: 'fechaOpcional' },
+          { nombre: 'archivoKey', tipo: 'opcionalNull' },
+        ],
       },
-    });
-  }
-
-  async listar(conductorId: string): Promise<CertificacionConductor[]> {
-    await this.asegurarConductor(conductorId);
-
-    return this.prisma.certificacionConductor.findMany({
-      where: { conductorId },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async obtener(
-    conductorId: string,
-    certId: string,
-  ): Promise<CertificacionConductor> {
-    const cert = await this.prisma.certificacionConductor.findUnique({
-      where: { id: certId },
-    });
-    if (!cert || cert.conductorId !== conductorId) {
-      throw new NotFoundException(`Certificación con id ${certId} no encontrada`);
-    }
-    return cert;
-  }
-
-  async actualizar(
-    conductorId: string,
-    certId: string,
-    input: ActualizarCertificacionInput,
-  ): Promise<CertificacionConductor> {
-    await this.obtener(conductorId, certId);
-
-    const data: Prisma.CertificacionConductorUpdateInput = {};
-    if (input.tipo !== undefined) data.tipo = input.tipo;
-    if (input.nombre !== undefined) data.nombre = input.nombre;
-    if (input.emisor !== undefined) data.emisor = input.emisor;
-    if (input.folio !== undefined) data.folio = input.folio;
-    if (input.fechaEmision !== undefined) {
-      data.fechaEmision = new Date(input.fechaEmision);
-    }
-    if (input.fechaVencimiento !== undefined) {
-      data.fechaVencimiento = new Date(input.fechaVencimiento);
-    }
-    if (input.archivoKey !== undefined) data.archivoKey = input.archivoKey;
-
-    return this.prisma.certificacionConductor.update({
-      where: { id: certId },
-      data,
-    });
-  }
-
-  async eliminar(conductorId: string, certId: string): Promise<void> {
-    await this.obtener(conductorId, certId);
-    await this.archivos.eliminarDeRegistro('CERTIFICACION', certId);
-    await this.prisma.certificacionConductor.delete({ where: { id: certId } });
+      archivos,
+    );
   }
 }

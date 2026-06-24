@@ -1,18 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { GeodesicaRouteProvider } from './geodesica.provider';
-import { LimiteDiarioError, TomTomRouteProvider } from './tomtom.provider';
 import {
+  CARRETERA_PROVIDER,
+  LimiteDiarioError,
   claveRuta,
   esGeometria,
+  type CarreteraProvider,
   type PuntoRuta,
   type RutaCalculada,
 } from './route-provider';
 
-const PROVEEDOR = 'TOMTOM';
-/** Antigüedad a partir de la cual se purgan entradas de caché. */
-const RETENCION_DIAS = 180;
+/**
+ * Antigüedad a partir de la cual se purgan entradas de caché. 30 días para
+ * respetar los términos de Google Maps Platform (cacheo limitado de resultados
+ * de rutas); también acota el crecimiento de la tabla.
+ */
+const RETENCION_DIAS = 30;
 
 /** Opciones de cálculo de ruta. */
 export interface OpcionesRuta {
@@ -48,7 +53,8 @@ export class RouteService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tomtom: TomTomRouteProvider,
+    @Inject(CARRETERA_PROVIDER)
+    private readonly carretera: CarreteraProvider,
     private readonly geodesica: GeodesicaRouteProvider,
   ) {}
 
@@ -66,17 +72,19 @@ export class RouteService {
       };
     }
     // La evaluación en vivo (cada cambio del formulario) usa geodésica: no quema
-    // cuota de TomTom ni puebla la caché con rutas efímeras de edición.
-    if (opts?.preferGeodesica || !this.tomtom.disponible()) {
+    // cuota del proveedor ni puebla la caché con rutas efímeras de edición.
+    if (opts?.preferGeodesica || !this.carretera.disponible()) {
       return this.geodesica.calcular(puntos);
     }
 
     void this.purgarSiTocaHoy();
 
     // Tráfico predicho por franja horaria: segmenta la clave por hora de salida
-    // (rutas de horas distintas no colisionan; misma hora comparte caché).
+    // (rutas de horas distintas no colisionan; misma hora comparte caché). El
+    // proveedor también segmenta la clave (TomTom y Google no comparten caché).
+    const proveedor = this.carretera.proveedor;
     const departAt = departAtValido(opts?.departAt);
-    const perfil = departAt ? `${PROVEEDOR}|t=${departAt.slice(0, 13)}` : PROVEEDOR;
+    const perfil = departAt ? `${proveedor}|t=${departAt.slice(0, 13)}` : proveedor;
     const clave = claveRuta(puntos, perfil);
 
     const hit = await this.prisma.rutaCache.findUnique({ where: { clave } }).catch(
@@ -96,7 +104,7 @@ export class RouteService {
     }
 
     try {
-      const ruta = await this.tomtom.calcular(puntos, { departAt });
+      const ruta = await this.carretera.calcular(puntos, { departAt });
       await this.persistir(clave, ruta);
       return ruta;
     } catch (e) {
@@ -119,7 +127,7 @@ export class RouteService {
           distanciaKm: ruta.km,
           tiempoMin: ruta.tiempoMin,
           geometria: ruta.geometria ?? Prisma.JsonNull,
-          proveedor: PROVEEDOR,
+          proveedor: this.carretera.proveedor,
         },
       });
     } catch (e) {

@@ -1,19 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   fechaRequerida,
   numeroOpcional,
   finNoAntesDeInicio,
 } from '@/lib/validacion';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import { api, apiError } from '@/lib/api';
-import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +34,8 @@ import {
   ArchivosExpedienteButton,
   useConteosArchivosExpediente,
 } from '@/components/conductores/expediente/archivos-expediente-button';
+import { useSeccionExpediente } from '@/components/conductores/expediente/use-seccion-expediente';
+import { isoADate } from '@/lib/fecha';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -62,11 +57,6 @@ interface Evaluacion {
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────────
-
-function isoADate(iso?: string | null): string {
-  if (!iso) return '';
-  return iso.slice(0, 10);
-}
 
 function toNum(val?: number | string | null): number | undefined {
   if (val === null || val === undefined || val === '') return undefined;
@@ -106,63 +96,28 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-// ── Form ───────────────────────────────────────────────────────────────────────
+// ── Tab ────────────────────────────────────────────────────────────────────────
 
-function EvaluacionForm({
-  conductorId,
-  evaluacion,
-  open,
-  onOpenChange,
-  onDone,
-}: {
-  conductorId: string;
-  evaluacion?: Evaluacion;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onDone: () => void;
-}) {
-  const esEdicion = Boolean(evaluacion);
-  const queryClient = useQueryClient();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    mode: 'onTouched',
-    defaultValues: {
-      periodoInicio: isoADate(evaluacion?.periodoInicio),
-      periodoFin: isoADate(evaluacion?.periodoFin),
-      puntuacionGeneral: toNum(evaluacion?.puntuacionGeneral)?.toString() ?? '',
-      puntualidad: toNum(evaluacion?.puntualidad)?.toString() ?? '',
-      consumoCombustible: toNum(evaluacion?.consumoCombustible)?.toString() ?? '',
-      cumplimientoRutas: toNum(evaluacion?.cumplimientoRutas)?.toString() ?? '',
-      incidenciasPeriodo: evaluacion?.incidenciasPeriodo?.toString() ?? '',
-      viajesCompletados: evaluacion?.viajesCompletados?.toString() ?? '',
-      comentarios: evaluacion?.comentarios ?? '',
-      evaluadoPor: evaluacion?.evaluadoPor ?? '',
-    },
-  });
-
-  useEffect(() => {
-    reset({
-      periodoInicio: isoADate(evaluacion?.periodoInicio),
-      periodoFin: isoADate(evaluacion?.periodoFin),
-      puntuacionGeneral: toNum(evaluacion?.puntuacionGeneral)?.toString() ?? '',
-      puntualidad: toNum(evaluacion?.puntualidad)?.toString() ?? '',
-      consumoCombustible: toNum(evaluacion?.consumoCombustible)?.toString() ?? '',
-      cumplimientoRutas: toNum(evaluacion?.cumplimientoRutas)?.toString() ?? '',
-      incidenciasPeriodo: evaluacion?.incidenciasPeriodo?.toString() ?? '',
-      viajesCompletados: evaluacion?.viajesCompletados?.toString() ?? '',
-      comentarios: evaluacion?.comentarios ?? '',
-      evaluadoPor: evaluacion?.evaluadoPor ?? '',
-    });
-  }, [evaluacion, reset]);
-
-  const mutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
+  const seccion = useSeccionExpediente<Evaluacion, FormValues>({
+    conductorId,
+    queryKey: 'evaluaciones',
+    endpoint: 'evaluaciones',
+    schema,
+    enabled: Boolean(conductorId),
+    toDefaults: (ev) => ({
+      periodoInicio: isoADate(ev?.periodoInicio),
+      periodoFin: isoADate(ev?.periodoFin),
+      puntuacionGeneral: toNum(ev?.puntuacionGeneral)?.toString() ?? '',
+      puntualidad: toNum(ev?.puntualidad)?.toString() ?? '',
+      consumoCombustible: toNum(ev?.consumoCombustible)?.toString() ?? '',
+      cumplimientoRutas: toNum(ev?.cumplimientoRutas)?.toString() ?? '',
+      incidenciasPeriodo: ev?.incidenciasPeriodo?.toString() ?? '',
+      viajesCompletados: ev?.viajesCompletados?.toString() ?? '',
+      comentarios: ev?.comentarios ?? '',
+      evaluadoPor: ev?.evaluadoPor ?? '',
+    }),
+    toPayload: (values) => {
       const payload: Record<string, unknown> = {
         periodoInicio: new Date(values.periodoInicio).toISOString(),
         periodoFin: new Date(values.periodoFin).toISOString(),
@@ -175,176 +130,121 @@ function EvaluacionForm({
       if (values.viajesCompletados !== '') payload.viajesCompletados = Number(values.viajesCompletados);
       if (values.comentarios?.trim()) payload.comentarios = values.comentarios.trim();
       if (values.evaluadoPor?.trim()) payload.evaluadoPor = values.evaluadoPor.trim();
-
-      if (esEdicion && evaluacion) {
-        await api.patch(
-          `/conductores/${conductorId}/evaluaciones/${evaluacion.id}`,
-          payload,
-        );
-      } else {
-        await api.post(`/conductores/${conductorId}/evaluaciones`, payload);
-      }
+      return payload;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-evaluaciones', conductorId],
-      });
-      toast.success(esEdicion ? 'Evaluación actualizada' : 'Evaluación agregada');
-      onDone();
+    mensajes: {
+      creado: 'Evaluación agregada',
+      actualizado: 'Evaluación actualizada',
+      eliminado: 'Evaluación eliminada',
     },
-    onError: (err) => toast.error(apiError(err)),
   });
 
-  return (
-    <ExpedienteFormDialog
-      open={open}
-      onOpenChange={(o) => { if (!o) onDone(); onOpenChange(o); }}
-      title={esEdicion ? 'Editar evaluación' : 'Nueva evaluación'}
-      onSubmit={handleSubmit((values) => mutation.mutate(values))}
-      saving={mutation.isPending}
-      submitLabel={esEdicion ? 'Guardar' : 'Agregar'}
-      size="lg"
-    >
-      <CamposGrid cols={3}>
-        {/* Periodo */}
-        <Campo label="Periodo inicio" htmlFor="periodoInicio" required error={errors.periodoInicio?.message}>
-          <Input id="periodoInicio" type="date" {...register('periodoInicio')} />
-        </Campo>
-        <Campo label="Periodo fin" htmlFor="periodoFin" required error={errors.periodoFin?.message}>
-          <Input id="periodoFin" type="date" {...register('periodoFin')} />
-        </Campo>
-
-        {/* Evaluado por ocupa la 3ª columna de la primera fila */}
-        <Campo label="Evaluado por" htmlFor="evaluadoPor">
-          <Input id="evaluadoPor" {...register('evaluadoPor')} />
-        </Campo>
-
-        {/* KPIs numéricos */}
-        <Campo label="Puntuación general (0–100)" htmlFor="puntuacionGeneral" error={errors.puntuacionGeneral?.message}>
-          <Input
-            id="puntuacionGeneral"
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            {...register('puntuacionGeneral')}
-          />
-        </Campo>
-        <Campo label="Puntualidad" htmlFor="puntualidad" error={errors.puntualidad?.message}>
-          <Input
-            id="puntualidad"
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            {...register('puntualidad')}
-          />
-        </Campo>
-        <Campo label="Consumo combustible (km/L)" htmlFor="consumoCombustible" error={errors.consumoCombustible?.message}>
-          <Input
-            id="consumoCombustible"
-            type="number"
-            min={0}
-            step="0.01"
-            {...register('consumoCombustible')}
-          />
-        </Campo>
-        <Campo label="Cumplimiento de rutas" htmlFor="cumplimientoRutas" error={errors.cumplimientoRutas?.message}>
-          <Input
-            id="cumplimientoRutas"
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            {...register('cumplimientoRutas')}
-          />
-        </Campo>
-        <Campo label="Incidencias en el periodo" htmlFor="incidenciasPeriodo" error={errors.incidenciasPeriodo?.message}>
-          <Input
-            id="incidenciasPeriodo"
-            type="number"
-            min={0}
-            step={1}
-            {...register('incidenciasPeriodo')}
-          />
-        </Campo>
-        <Campo label="Viajes completados" htmlFor="viajesCompletados" error={errors.viajesCompletados?.message}>
-          <Input
-            id="viajesCompletados"
-            type="number"
-            min={0}
-            step={1}
-            {...register('viajesCompletados')}
-          />
-        </Campo>
-
-        {/* Comentarios: fila completa */}
-        <Campo label="Comentarios" htmlFor="comentarios" full>
-          <textarea
-            id="comentarios"
-            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            {...register('comentarios')}
-          />
-        </Campo>
-      </CamposGrid>
-    </ExpedienteFormDialog>
-  );
-}
-
-// ── Tab ────────────────────────────────────────────────────────────────────────
-
-export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState<Evaluacion | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['conductor-evaluaciones', conductorId],
-    queryFn: async () => {
-      const { data } = await api.get<Evaluacion[]>(
-        `/conductores/${conductorId}/evaluaciones`,
-      );
-      return data;
-    },
-    enabled: Boolean(conductorId),
-  });
+  const { items: data, isLoading, isError } = seccion;
+  const { register, formState: { errors } } = seccion.form;
 
   const { data: conteos } = useConteosArchivosExpediente(conductorId, 'evaluaciones');
-
-  const eliminar = useMutation({
-    mutationFn: async (evaluacionId: string) => {
-      await api.delete(`/conductores/${conductorId}/evaluaciones/${evaluacionId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['conductor-evaluaciones', conductorId],
-      });
-      toast.success('Evaluación eliminada');
-    },
-    onError: (err) => toast.error(apiError(err)),
-  });
-
-  function cerrarForm() {
-    setEditando(null);
-    setMostrarForm(false);
-  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         {data && <Conteo n={data.length} />}
-        <Button size="sm" onClick={() => setMostrarForm(true)}>
+        <Button size="sm" onClick={seccion.abrirCrear}>
           <Plus /> Agregar evaluación
         </Button>
       </div>
 
-      <EvaluacionForm
-        conductorId={conductorId}
-        evaluacion={editando ?? undefined}
-        open={mostrarForm || Boolean(editando)}
-        onOpenChange={(o) => { if (!o) cerrarForm(); }}
-        onDone={cerrarForm}
-      />
+      <ExpedienteFormDialog
+        open={seccion.abierto}
+        onOpenChange={(o) => { if (!o) seccion.cerrarForm(); }}
+        title={seccion.esEdicion ? 'Editar evaluación' : 'Nueva evaluación'}
+        onSubmit={seccion.onSubmit}
+        saving={seccion.guardando}
+        submitLabel={seccion.esEdicion ? 'Guardar' : 'Agregar'}
+        size="lg"
+      >
+        <CamposGrid cols={3}>
+          {/* Periodo */}
+          <Campo label="Periodo inicio" htmlFor="periodoInicio" required error={errors.periodoInicio?.message}>
+            <Input id="periodoInicio" type="date" {...register('periodoInicio')} />
+          </Campo>
+          <Campo label="Periodo fin" htmlFor="periodoFin" required error={errors.periodoFin?.message}>
+            <Input id="periodoFin" type="date" {...register('periodoFin')} />
+          </Campo>
+
+          {/* Evaluado por ocupa la 3ª columna de la primera fila */}
+          <Campo label="Evaluado por" htmlFor="evaluadoPor">
+            <Input id="evaluadoPor" {...register('evaluadoPor')} />
+          </Campo>
+
+          {/* KPIs numéricos */}
+          <Campo label="Puntuación general (0–100)" htmlFor="puntuacionGeneral" error={errors.puntuacionGeneral?.message}>
+            <Input
+              id="puntuacionGeneral"
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              {...register('puntuacionGeneral')}
+            />
+          </Campo>
+          <Campo label="Puntualidad" htmlFor="puntualidad" error={errors.puntualidad?.message}>
+            <Input
+              id="puntualidad"
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              {...register('puntualidad')}
+            />
+          </Campo>
+          <Campo label="Consumo combustible (km/L)" htmlFor="consumoCombustible" error={errors.consumoCombustible?.message}>
+            <Input
+              id="consumoCombustible"
+              type="number"
+              min={0}
+              step="0.01"
+              {...register('consumoCombustible')}
+            />
+          </Campo>
+          <Campo label="Cumplimiento de rutas" htmlFor="cumplimientoRutas" error={errors.cumplimientoRutas?.message}>
+            <Input
+              id="cumplimientoRutas"
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              {...register('cumplimientoRutas')}
+            />
+          </Campo>
+          <Campo label="Incidencias en el periodo" htmlFor="incidenciasPeriodo" error={errors.incidenciasPeriodo?.message}>
+            <Input
+              id="incidenciasPeriodo"
+              type="number"
+              min={0}
+              step={1}
+              {...register('incidenciasPeriodo')}
+            />
+          </Campo>
+          <Campo label="Viajes completados" htmlFor="viajesCompletados" error={errors.viajesCompletados?.message}>
+            <Input
+              id="viajesCompletados"
+              type="number"
+              min={0}
+              step={1}
+              {...register('viajesCompletados')}
+            />
+          </Campo>
+
+          {/* Comentarios: fila completa */}
+          <Campo label="Comentarios" htmlFor="comentarios" full>
+            <textarea
+              id="comentarios"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              {...register('comentarios')}
+            />
+          </Campo>
+        </CamposGrid>
+      </ExpedienteFormDialog>
 
       <div className="overflow-auto">
         {isLoading ? (
@@ -424,10 +324,7 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => {
-                            setEditando(ev);
-                            setMostrarForm(false);
-                          }}
+                          onClick={() => seccion.abrirEditar(ev)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -440,7 +337,7 @@ export function EvaluacionesTab({ conductorId }: { conductorId: string }) {
                           title="Eliminar evaluación"
                           description="Esta acción no se puede deshacer."
                           confirmLabel="Eliminar"
-                          onConfirm={() => eliminar.mutateAsync(ev.id)}
+                          onConfirm={() => seccion.eliminar(ev.id)}
                         />
                       </div>
                     </TableCell>

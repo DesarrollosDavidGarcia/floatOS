@@ -136,6 +136,37 @@ export class RegistrarUbicacionUseCase {
     viajeId: string,
     puntos: UbicacionPublica[],
   ): Promise<void> {
+    // Cortocircuito barato ANTES del PostGIS: el ST_DWithin solo sirve para (a)
+    // emitir el aviso WS de escalas con `llegadaNotificadaEn IS NULL` y (b)
+    // mandar email a contactos con `notificadoEn IS NULL`. Si NO queda ninguna
+    // de las dos cosas pendiente para este viaje, la geocerca no tiene nada que
+    // notificar y el $queryRaw es trabajo puro perdido (caso típico de los pings
+    // tardíos, ya con todas las llegadas selladas). Estos dos counts usan el
+    // índice por `viajeId` y son mucho más baratos que el ST_DWithin sobre GIST.
+    //
+    // No se filtra por `ubicacion IS NOT NULL` (columna Unsupported, no
+    // consultable desde el query API de Prisma): contar de más solo nos hace MÁS
+    // conservadores (no cortocircuitar de más), nunca menos. El propio PostGIS ya
+    // descarta las escalas sin `ubicacion`.
+    //
+    // Seguridad: si HAY alguna escala sin sellar o algún contacto sin notificar,
+    // ese count es > 0 y seguimos al PostGIS exactamente igual que antes, así que
+    // no se pierde ninguna llegada. El cortocircuito no depende de la posición del
+    // conductor, solo del estado de notificación.
+    const [escalasPendientes, contactosPendientes] = await Promise.all([
+      this.prisma.escalaViaje.count({
+        where: { viajeId, llegadaNotificadaEn: null },
+      }),
+      this.prisma.contactoEscala.count({
+        where: {
+          escala: { viajeId },
+          email: { not: null },
+          notificadoEn: null,
+        },
+      }),
+    ]);
+    if (escalasPendientes === 0 && contactosPendientes === 0) return;
+
     const lats = puntos.map((p) => p.lat);
     const lngs = puntos.map((p) => p.lng);
 

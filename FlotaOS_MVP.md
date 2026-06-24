@@ -73,8 +73,8 @@ FlotaOS es un SaaS de gestión operativa y fiscal para transportistas independie
 | UI components | shadcn/ui + Tailwind CSS | MIT |
 | Estado servidor | TanStack Query | MIT |
 | App conductores | Flutter (Android + iOS) | BSD-3 |
-| Mapas (web) | Leaflet.js + OpenStreetMap | BSD-2 / ODbL |
-| Mapas (app) | flutter_map + OpenStreetMap tiles | MIT / ODbL |
+| Mapas (web) | Google Maps (`@vis.gl/react-google-maps`) | API key ⚠️ |
+| Mapas (app) | Google Maps (`google_maps_flutter`) | API key ⚠️ |
 | GPS background | `geolocator` + `flutter_background_service` | MIT |
 | Notificaciones app | Socket.io (mismo canal tiempo real) | MIT |
 | Email | Nodemailer + SMTP propio | MIT |
@@ -92,7 +92,7 @@ FlotaOS es un SaaS de gestión operativa y fiscal para transportistas independie
 
 ### Sustituciones open-source
 
-- **Google Maps** → Leaflet + OpenStreetMap (web) y `flutter_map` (app). Sin API key de pago.
+- ~~**Google Maps** → Leaflet + OpenStreetMap (web) y `flutter_map` (app)~~ *(2026-06-22: migrado a **Google Maps Platform** — tiles, geocoding y routing; requiere API key con billing. Ver changelog).*
 - **Pusher / Ably** → Socket.io self-hosted dentro del mismo contenedor del backend.
 - **AWS S3 / Azure Blob** → MinIO self-hosted en Docker. API compatible con S3.
 - **Twilio / Vonage** → WhatsApp Business API directo (Meta), tier gratuito 1,000 conversaciones/mes.
@@ -479,6 +479,16 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 ## Registro de avances
 
 > Bitácora de implementación. Cada entrada documenta qué se construyó y cómo se verificó.
+
+### 2026-06-22 — Migración de mapas a Google Maps Platform (Fases 1-3) ✅
+
+La capa de mapas pasó de OSM/TomTom a **Google Maps Platform** (tiles + geocoding + routing). Alcance acordado: completo. Requiere API key con billing; los términos de Google piden mostrar sus datos sobre mapa de Google y **limitan el cacheo de rutas** (la retención de `ruta_cache` bajó de 180 → 30 días). ⚠️ **Google Routes API no tiene perfil de camión** (usa `DRIVE`/auto); por eso el routing sigue **conmutable por env** y TomTom queda como fallback.
+
+- **Fase 1 — routing (backend):** interfaz `CarreteraProvider` + token DI `CARRETERA_PROVIDER`; nuevo `GoogleRouteProvider` (Routes API `computeRoutes`, decodificador de polilínea) junto al `TomTomRouteProvider`. Proveedor activo por env **`ROUTING_PROVIDER`** (`tomtom` default | `google`). `RouteService` agnóstico; caché segmentada por proveedor. Verificado **76/76 tests, tsc 0**. Env nuevas: `ROUTING_PROVIDER`, `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_MAX_DIARIO`.
+- **Fase 2 — web:** fuera `leaflet`/`react-leaflet`; dentro `@vis.gl/react-google-maps`. `<APIProvider>` en providers; helpers `google-maps-helpers.tsx` (encuadre/polilínea/marcadores vía `useMap`). Reescritos los 3 mapas (tracking, itinerario, picker). `lib/geocoding.ts`: Nominatim → `google.maps.Geocoder`. Env `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. **Verificado en vivo en el navegador.**
+- **Fase 3 — móvil:** fuera `flutter_map`/`latlong2`; dentro `google_maps_flutter`. Widget `_Mapa` reescrito a `GoogleMap` (markers por hue + InfoWindow, polilínea sólida/punteada, encuadre por bounds). Keys nativas en `AndroidManifest.xml` y `AppDelegate.swift`. Verificado **`flutter analyze` 0 + APK debug compila**.
+
+**Pendiente:** habilitar Maps SDK Android/iOS para ver el mapa en el dispositivo; activar `ROUTING_PROVIDER=google` en vivo (decisión perfil camión); regenerar+restringir las API keys (expuestas). Nota: al quitar `react-leaflet`, desaparece el motivo por el que el dev del web usa webpack en vez de Turbopack (ver 2026-06-06) — se podría reevaluar.
 
 ### 2026-06-03 — Cimientos del monorepo (Fase 1, base) ✅
 

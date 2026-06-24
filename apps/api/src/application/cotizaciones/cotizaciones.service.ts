@@ -18,8 +18,18 @@ import {
   generarCotizacionPdf,
   type DatosCotizacionPdf,
 } from '../../infrastructure/pdf/cotizacion-pdf';
+import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
 
 const dec = (v: Prisma.Decimal | null): number => (v == null ? 0 : Number(v));
+
+/** Opciones de envío de una cotización (destinatarios/asunto/mensaje). */
+export interface OpcionesEnvioCotizacion {
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  mensaje?: string;
+}
 
 /** Escapa el texto del usuario antes de interpolarlo en el HTML del correo. */
 const escaparHtml = (s: string): string =>
@@ -64,6 +74,7 @@ export class CotizacionesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly tracking: TrackingGateway,
   ) {}
 
   /** Previsualización (no persiste): corre el motor con params + datos dados. */
@@ -301,25 +312,26 @@ export class CotizacionesService {
   }
 
   /**
-   * Envía la cotización por correo (PDF adjunto) vía EmailService (Brevo/SMTP).
-   * Destinatarios: la lista `to`, o el correo de contacto del cliente si va vacía.
-   * `subject`/`mensaje` sobreescriben los textos por defecto; `cc`/`bcc` opcionales.
-   * Marca ENVIADA si sale.
+   * Procesa el envío completo de una cotización: genera el PDF, resuelve los
+   * destinatarios, manda el correo (Brevo/SMTP), marca la cotización como ENVIADA
+   * y emite el evento WS `cotizacion:actualizada` para que el panel refresque.
+   *
+   * ÚNICO sitio con la lógica de envío. Se invoca desde el worker BullMQ
+   * (`CotizacionesWorker`) o, como fallback síncrono, desde el flujo HTTP cuando
+   * la cola no está disponible (Redis caído): así el envío NUNCA se pierde.
+   *
+   * Lanza si no hay destinatario (BadRequest) o si el proveedor de correo falla
+   * (ServiceUnavailable); en el worker eso provoca el reintento de BullMQ.
    */
-  async enviar(
+  async procesarEnvio(
     id: string,
-    opts: {
-      to?: string[];
-      cc?: string[];
-      bcc?: string[];
-      subject?: string;
-      mensaje?: string;
-    } = {},
-  ) {
+    opts: OpcionesEnvioCotizacion = {},
+  ): Promise<void> {
     const info = await this.prisma.cotizacion.findUnique({
       where: { id },
       select: {
         folio: true,
+        viajeId: true,
         viaje: {
           select: {
             cliente: {
@@ -395,9 +407,18 @@ export class CotizacionesService {
       );
     }
 
-    return this.prisma.cotizacion.update({
+    const actualizada = await this.prisma.cotizacion.update({
       where: { id },
       data: { estado: 'ENVIADA', enviadaEn: new Date() },
+      select: { id: true, viajeId: true, estado: true },
+    });
+
+    // Avisa al panel (sala admin) para que refresque el listado de cotizaciones
+    // del viaje sin tener que esperar al refetch perezoso.
+    this.tracking.emitirCotizacionActualizada({
+      cotizacionId: actualizada.id,
+      viajeId: actualizada.viajeId,
+      estado: actualizada.estado,
     });
   }
 }

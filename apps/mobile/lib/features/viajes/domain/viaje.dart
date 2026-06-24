@@ -11,8 +11,8 @@ DateTime? _aFecha(dynamic v) =>
     v == null ? null : DateTime.parse(v as String).toLocal();
 
 /// Polilínea de la ruta por carretera: lista de pares `[lat, lng]` tal como
-/// la persiste el API (`viajes.rutaGeometria`, snapshot de TomTom ya
-/// simplificado). Tolerante a entradas malformadas: las descarta.
+/// la persiste el API (`viajes.rutaGeometria`, snapshot del proveedor de ruteo
+/// ya simplificado). Tolerante a entradas malformadas: las descarta.
 List<List<double>> _aGeometria(dynamic v) {
   if (v is! List) return const [];
   final puntos = <List<double>>[];

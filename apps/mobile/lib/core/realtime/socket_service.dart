@@ -11,6 +11,7 @@ abstract final class WsEvents {
   static const viajeEstadoCambiado = 'viaje:estado';
   static const alerta = 'alerta';
   static const viajeReasignado = 'viaje:reasignado';
+  static const chatMensaje = 'chat:mensaje';
 }
 
 /// Conexión Socket.io al namespace /tracking del API.
@@ -26,9 +27,13 @@ class SocketService {
   final _alertas = StreamController<Map<String, dynamic>>.broadcast();
   final _cambiosEstado = StreamController<Map<String, dynamic>>.broadcast();
   final _reasignaciones = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatMensajes = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get alertas => _alertas.stream;
   Stream<Map<String, dynamic>> get cambiosEstado => _cambiosEstado.stream;
+
+  /// Mensajes de chat entrantes (sala `viaje:<id>` / personal del conductor).
+  Stream<Map<String, dynamic>> get chatMensajes => _chatMensajes.stream;
 
   /// Reasignaciones de viaje (sala personal `conductor:<id>`): el conductor
   /// saliente o entrante recibe el aviso aunque no esté en la sala del viaje.
@@ -58,6 +63,9 @@ class SocketService {
       })
       ..on(WsEvents.viajeReasignado, (data) {
         if (data is Map) _reasignaciones.add(Map<String, dynamic>.from(data));
+      })
+      ..on(WsEvents.chatMensaje, (data) {
+        if (data is Map) _chatMensajes.add(Map<String, dynamic>.from(data));
       })
       ..onReconnectAttempt((_) async {
         // El access token dura 15 min y un viaje dura horas: si el payload
@@ -99,5 +107,6 @@ class SocketService {
     _alertas.close();
     _cambiosEstado.close();
     _reasignaciones.close();
+    _chatMensajes.close();
   }
 }

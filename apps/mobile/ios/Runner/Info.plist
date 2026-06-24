@@ -30,6 +30,10 @@
 	<string>FlotaOS usa tu ubicación para que el monitorista siga el viaje en tiempo real.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>FlotaOS necesita tu ubicación en segundo plano para el seguimiento del viaje aunque la pantalla esté apagada.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>FlotaOS usa la cámara para que envíes fotos en el chat con el monitorista.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FlotaOS accede a tus fotos para que adjuntes imágenes en el chat con el monitorista.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

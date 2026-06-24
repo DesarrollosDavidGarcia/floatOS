@@ -4,9 +4,13 @@ import { PasswordService } from '../../infrastructure/shared/password.service';
 
 export type PrincipalType = 'admin' | 'conductor';
 
+export type RolUsuario = 'ADMIN' | 'MONITORISTA';
+
 export interface JwtPayload {
   sub: string;
   type: PrincipalType;
+  /** Solo presente para admins (type === 'admin'). */
+  rol?: RolUsuario;
 }
 
 export interface TokenPair {
