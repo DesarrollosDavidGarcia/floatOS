@@ -11,10 +11,9 @@ const cargaSchema = z.object({
   sentido: z.string().min(1),
   tipoCarga: z.string().min(1, 'Tipo requerido'),
   descripcion: z.string().optional(),
-  pesoKg: z
-    .string()
-    .min(1, 'Peso requerido')
-    .refine((v) => Number(v) > 0, 'Peso > 0'),
+  // El peso se valida condicionalmente en el superRefine (solo para CARGA): en
+  // PERSONAL las paradas no llevan carga y sus campos están ocultos.
+  pesoKg: z.string().optional(),
   volumenM3: z.string().optional(),
   cantidad: z.string().optional(),
 });
@@ -28,15 +27,44 @@ const escalaSchema = z.object({
   cargas: z.array(cargaSchema),
 });
 
-export const viajeFormSchema = z.object({
-  clienteId: z.string().min(1, 'Selecciona un cliente'),
-  fechaProgramada: z.string().optional(),
-  unidadId: z.string(),
-  conductorId: z.string(),
-  escalas: z
-    .array(escalaSchema)
-    .min(2, 'Se requieren al menos origen y destino'),
-});
+export const viajeFormSchema = z
+  .object({
+    tipoServicio: z.enum(['CARGA', 'PERSONAL']),
+    clienteId: z.string().min(1, 'Selecciona un cliente'),
+    fechaProgramada: z.string().optional(),
+    unidadId: z.string(),
+    conductorId: z.string(),
+    // Solo personal; se valida en superRefine según el tipo.
+    numPasajeros: z.string().optional(),
+    escalas: z
+      .array(escalaSchema)
+      .min(2, 'Se requieren al menos origen y destino'),
+  })
+  .superRefine((v, ctx) => {
+    if (v.tipoServicio === 'PERSONAL') {
+      const n = Number(v.numPasajeros);
+      if (!v.numPasajeros || Number.isNaN(n) || n < 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['numPasajeros'],
+          message: 'Indica el número de pasajeros (mínimo 1)',
+        });
+      }
+      return; // En personal no se validan cargas (no aplican).
+    }
+    // CARGA: cada carga capturada exige un peso > 0.
+    v.escalas.forEach((e, i) => {
+      e.cargas.forEach((c, j) => {
+        if (!c.pesoKg || Number(c.pesoKg) <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['escalas', i, 'cargas', j, 'pesoKg'],
+            message: 'Peso requerido (> 0)',
+          });
+        }
+      });
+    });
+  });
 
 export type CargaFormValues = z.infer<typeof cargaSchema>;
 export type EscalaFormValues = z.infer<typeof escalaSchema>;
@@ -62,10 +90,12 @@ export function escalaVacia(
 /** Valores por defecto al crear (origen + destino). */
 export function defaultsCrear(): ViajeFormValues {
   return {
+    tipoServicio: 'CARGA',
     clienteId: '',
     fechaProgramada: '',
     unidadId: NINGUNO,
     conductorId: NINGUNO,
+    numPasajeros: '',
     escalas: [escalaVacia('RECOGER', 'CARGA'), escalaVacia('ENTREGAR', 'DESCARGA')],
   };
 }
@@ -97,10 +127,12 @@ export function defaultsDeViaje(v: Viaje): ViajeFormValues {
     })),
   }));
   return {
+    tipoServicio: v.tipoServicio ?? 'CARGA',
     clienteId: v.clienteId,
     fechaProgramada: v.fechaProgramada ? aInputLocal(v.fechaProgramada) : '',
     unidadId: v.unidadId ?? NINGUNO,
     conductorId: v.conductorId ?? NINGUNO,
+    numPasajeros: v.numPasajeros != null ? String(v.numPasajeros) : '',
     escalas: escalas.length >= 2 ? escalas : defaultsCrear().escalas,
   };
 }
@@ -150,6 +182,18 @@ export function evalEscalasPayload(
   }));
 }
 
+/**
+ * Escalas para enviar al API. En servicio de PERSONAL se omiten las cargas (las
+ * paradas son de subida/bajada de pasajeros, no llevan mercancía).
+ */
+export function escalasParaEnviar(v: ViajeFormValues): EscalaViajePayload[] {
+  const escalas =
+    v.tipoServicio === 'PERSONAL'
+      ? v.escalas.map((e) => ({ ...e, cargas: [] }))
+      : v.escalas;
+  return escalasPayload(escalas);
+}
+
 /** Payload completo de creación. */
 export function toCrearPayload(v: ViajeFormValues): CrearViajePayload {
   return {
@@ -159,6 +203,9 @@ export function toCrearPayload(v: ViajeFormValues): CrearViajePayload {
       : undefined,
     unidadId: v.unidadId !== NINGUNO ? v.unidadId : undefined,
     conductorId: v.conductorId !== NINGUNO ? v.conductorId : undefined,
-    escalas: escalasPayload(v.escalas),
+    tipoServicio: v.tipoServicio,
+    numPasajeros:
+      v.tipoServicio === 'PERSONAL' ? Number(v.numPasajeros) : undefined,
+    escalas: escalasParaEnviar(v),
   };
 }

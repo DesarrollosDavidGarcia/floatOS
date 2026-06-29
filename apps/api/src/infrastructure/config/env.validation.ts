@@ -212,6 +212,21 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   BOT_API_KEY?: string;
+
+  // --- Push (FCM / Firebase) — opcional ---
+  // Credencial de servicio para enviar push. Sin ella, el push queda
+  // deshabilitado (las notificaciones locales siguen funcionando). Usar UNA:
+  //  - FIREBASE_SERVICE_ACCOUNT_PATH: ruta al JSON de la cuenta de servicio.
+  //  - FIREBASE_SERVICE_ACCOUNT: el JSON completo en una sola línea.
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  FIREBASE_SERVICE_ACCOUNT_PATH?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  FIREBASE_SERVICE_ACCOUNT?: string;
 }
 
 /**

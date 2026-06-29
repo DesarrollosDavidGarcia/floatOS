@@ -12,9 +12,31 @@ y tracking GPS en tiempo real hacia el panel del monitorista.
 | Navegación | `go_router` |
 | Tokens | `flutter_secure_storage` (Keystore / Keychain) |
 | Tiempo real | `socket_io_client` (namespace `/tracking`) |
-| Mapas | `google_maps_flutter` (Google Maps; key en `AndroidManifest.xml` / `AppDelegate.swift`) |
+| Mapas | `google_maps_flutter` (Google Maps; key inyectada desde archivos gitignored, ver abajo) |
 | GPS | `geolocator` — foreground service nativo en Android, background mode `location` en iOS (sin `flutter_background_service`) |
 | UI | Material 3 + `google_fonts` (Manrope) |
+
+## Key de Google Maps (no se versiona)
+
+La key del SDK de Google Maps se inyecta desde archivos **gitignored**, nunca se
+commitea. En un clon nuevo hay que crearlos:
+
+- **Android** — añade a `android/local.properties`:
+  ```properties
+  MAPS_API_KEY=TU_KEY_DE_ANDROID
+  ```
+  `build.gradle.kts` la lee y la inyecta en `AndroidManifest.xml` como
+  `${MAPS_API_KEY}`.
+
+- **iOS** — crea `ios/Flutter/Secrets.xcconfig`:
+  ```
+  MAPS_API_KEY = TU_KEY_DE_IOS
+  ```
+  Se incluye en `Debug/Release.xcconfig`, se expone en `Info.plist` (`MapsApiKey`)
+  y `AppDelegate.swift` la lee en runtime.
+
+En Google Cloud, restringe la key de Android por *package + huella SHA-1* y la de
+iOS por *bundle id*. Sin la key, el mapa queda en blanco pero la app arranca.
 
 ## Correr en desarrollo
 

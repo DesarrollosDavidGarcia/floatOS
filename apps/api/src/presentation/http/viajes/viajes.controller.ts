@@ -18,6 +18,7 @@ import { AsignarViajeDto } from './dto/asignar-viaje.dto';
 import { CambiarEstadoViajeDto } from './dto/cambiar-estado-viaje.dto';
 import { PlanRutaDto } from './dto/plan-ruta.dto';
 import { GestionarContactosEscalaDto } from './dto/contactos-escala.dto';
+import { GestionarPasajerosDto } from './dto/pasajeros-viaje.dto';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
@@ -126,6 +127,16 @@ export class ViajesController {
     @Body() dto: GestionarContactosEscalaDto,
   ) {
     return this.viajes.gestionarContactosEscala(id, escalaId, dto.contactos);
+  }
+
+  /** Reemplaza el manifiesto de pasajeros (solo viajes de personal). */
+  @Put(':id/pasajeros')
+  @UseGuards(AdminGuard)
+  gestionarPasajeros(
+    @Param('id') id: string,
+    @Body() dto: GestionarPasajerosDto,
+  ) {
+    return this.viajes.gestionarPasajeros(id, dto.pasajeros);
   }
 
   @Patch(':id/estado')

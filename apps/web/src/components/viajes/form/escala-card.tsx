@@ -31,6 +31,7 @@ export function EscalaCard({
     useFormContext<ViajeFormValues>();
   const [mapOpen, setMapOpen] = useState(false);
 
+  const esPersonal = watch('tipoServicio') === 'PERSONAL';
   const base = `escalas.${index}` as const;
   const accion = watch(`${base}.accion`);
   const direccion = watch(`${base}.direccion`);
@@ -88,7 +89,8 @@ export function EscalaCard({
         </p>
       )}
 
-      {/* Cargas de la escala */}
+      {/* Cargas de la escala (solo servicio de carga; en personal son paradas). */}
+      {!esPersonal && (
       <div className="mt-3 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Cargas en esta parada</span>
@@ -140,6 +142,7 @@ export function EscalaCard({
           );
         })}
       </div>
+      )}
 
       <MapPickerDialog
         open={mapOpen}

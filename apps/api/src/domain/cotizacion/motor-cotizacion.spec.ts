@@ -105,3 +105,50 @@ describe('cotizar', () => {
     expect(r.total).toBe(11400); // 10400 + 1000
   });
 });
+
+describe('cotizar — servicio de personal', () => {
+  const BASE_P: ParamsCotizacion = {
+    tipoServicio: 'PERSONAL',
+    tarifaBase: 5000,
+    precioPorKm: 30,
+    precioPorKg: 0,
+    precioDiesel: 0,
+    rendimientoKmL: 0,
+    casetas: 0,
+    maniobrasPorEscala: 0,
+    precioPorPasajero: 100,
+    margenPct: 0,
+    aplicaIva: false,
+    aplicaRetencion: false,
+  };
+  const DATOS_P = { distanciaKm: 200, pesoKg: 0, numPasajeros: 30, numEscalas: 2 };
+
+  it('POR_VIAJE cobra la tarifa fija (sin peso/combustible/maniobras)', () => {
+    const r = cotizar({ ...BASE_P, modoPrecio: 'POR_VIAJE' }, DATOS_P);
+    expect(r.lineas.map((l) => l.concepto)).toEqual(['Servicio de personal']);
+    expect(r.total).toBe(5000);
+  });
+
+  it('POR_KM cobra distancia × $/km', () => {
+    const r = cotizar({ ...BASE_P, modoPrecio: 'POR_KM' }, DATOS_P);
+    expect(r.lineas.find((l) => l.concepto === 'Distancia')?.monto).toBe(6000);
+    expect(r.total).toBe(6000); // 200 km × $30
+  });
+
+  it('POR_PASAJERO cobra pasajeros × $/pax', () => {
+    const r = cotizar({ ...BASE_P, modoPrecio: 'POR_PASAJERO' }, DATOS_P);
+    expect(r.lineas.find((l) => l.concepto === 'Por pasajero')?.monto).toBe(3000);
+    expect(r.total).toBe(3000); // 30 pax × $100
+  });
+
+  it('aplica margen e IVA sobre el servicio de personal', () => {
+    const r = cotizar(
+      { ...BASE_P, modoPrecio: 'POR_VIAJE', margenPct: 20, aplicaIva: true },
+      DATOS_P,
+    );
+    expect(r.margen).toBe(1000); // 5000 × 20%
+    expect(r.subtotal).toBe(6000);
+    expect(r.iva).toBe(960); // 16%
+    expect(r.total).toBe(6960);
+  });
+});

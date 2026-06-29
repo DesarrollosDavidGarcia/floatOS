@@ -1,8 +1,13 @@
 export { EstadoCotizacion } from '@flotaos/shared-types';
 import type { EstadoCotizacion } from '@flotaos/shared-types';
 
+/** Modo de precio para el servicio de personal. */
+export type ModoPrecioPersonal = 'POR_VIAJE' | 'POR_KM' | 'POR_PASAJERO';
+
 /** Tarifas/parámetros que captura el monitorista (modelo mixto configurable). */
 export interface ParamsCotizacion {
+  /** CARGA (default) o PERSONAL. */
+  tipoServicio?: 'CARGA' | 'PERSONAL';
   tarifaBase: number;
   precioPorKm: number;
   precioPorKg: number;
@@ -10,6 +15,9 @@ export interface ParamsCotizacion {
   rendimientoKmL: number;
   casetas: number;
   maniobrasPorEscala: number;
+  // Personal:
+  modoPrecio?: ModoPrecioPersonal;
+  precioPorPasajero?: number;
   margenPct: number;
   aplicaIva: boolean;
   aplicaRetencion: boolean;

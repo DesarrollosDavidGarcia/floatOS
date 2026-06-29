@@ -8,7 +8,7 @@ import { FileDown } from 'lucide-react';
 import { WS_EVENTS, type CotizacionActualizadaPayload } from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
-import { invalidarViajes } from '@/lib/query-keys';
+import { cotizacionesKey, invalidarCotizaciones } from '@/lib/query-keys';
 import {
   ESTADO_COTIZACION_BADGE,
   ESTADO_COTIZACION_LABEL,
@@ -30,15 +30,20 @@ import { CotizarDialog } from './cotizar-dialog';
 import { EnviarCotizacionDialog } from './enviar-cotizacion-dialog';
 import { CotizacionAcciones } from './cotizacion-acciones';
 
-async function descargarPdf(id: string, folio: number) {
+async function descargarPdf(id: string) {
+  // Abrir la pestaña SÍNCRONAMENTE (dentro del gesto de click) para que el
+  // navegador no la bloquee como popup; se navega al blob cuando llega.
+  const ventana = window.open('', '_blank');
   try {
     const { data } = await api.get(`/cotizaciones/${id}/pdf`, {
       responseType: 'blob',
     });
     const url = URL.createObjectURL(data as Blob);
-    window.open(url, '_blank');
+    if (ventana) ventana.location.href = url;
+    else window.open(url, '_blank'); // fallback si el handle se perdió
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch (err) {
+    ventana?.close();
     toast.error(apiError(err));
   }
 }
@@ -53,7 +58,7 @@ export function CotizacionesCard({
 }) {
   const qc = useQueryClient();
   const { data: cotizaciones } = useQuery<Cotizacion[]>({
-    queryKey: ['cotizaciones', viaje.id],
+    queryKey: cotizacionesKey(viaje.id),
     queryFn: async () =>
       (await api.get<Cotizacion[]>(`/viajes/${viaje.id}/cotizaciones`)).data,
   });
@@ -66,8 +71,7 @@ export function CotizacionesCard({
     const socket = getSocket();
     const refrescar = (payload: CotizacionActualizadaPayload) => {
       if (payload?.viajeId !== viaje.id) return;
-      qc.invalidateQueries({ queryKey: ['cotizaciones', viaje.id] });
-      invalidarViajes(qc, viaje.id);
+      invalidarCotizaciones(qc, viaje.id);
     };
     socket.on(WS_EVENTS.COTIZACION_ACTUALIZADA, refrescar);
     return () => {
@@ -102,7 +106,7 @@ export function CotizacionesCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => descargarPdf(c.id, c.folio)}
+                  onClick={() => descargarPdf(c.id)}
                 >
                   <FileDown />
                   PDF

@@ -190,7 +190,9 @@ export class ChatUseCase {
         archivoNombre,
         archivoTipo,
         archivoBytes,
-        // El emisor ya "leyó" su propio mensaje; el otro lado queda sin leer.
+        // El emisor ya "recibió y leyó" su propio mensaje; el otro lado, no.
+        recibidoMonitorista: esMonitorista,
+        recibidoConductor: !esMonitorista,
         leidoMonitorista: esMonitorista,
         leidoConductor: !esMonitorista,
       },
@@ -204,18 +206,65 @@ export class ChatUseCase {
     return payload;
   }
 
-  /** Marca como leídos los mensajes del OTRO lado para el viaje. */
+  /**
+   * Marca como leídos (y por tanto recibidos) los mensajes del OTRO lado para el
+   * viaje, y avisa al emisor por WS para que actualice sus palomitas a "leído".
+   */
   async marcarLeido(viajeId: string, principal: AuthPrincipal): Promise<void> {
-    await this.autorizarObtenerConductor(viajeId, principal);
-    if (principal.type === 'admin') {
-      await this.prisma.mensajeChat.updateMany({
-        where: { viajeId, autorTipo: 'CONDUCTOR', leidoMonitorista: false },
-        data: { leidoMonitorista: true },
+    const conductorViaje = await this.autorizarObtenerConductor(
+      viajeId,
+      principal,
+    );
+    const esMonitorista = principal.type === 'admin';
+    const { count } = esMonitorista
+      ? await this.prisma.mensajeChat.updateMany({
+          where: { viajeId, autorTipo: 'CONDUCTOR', leidoMonitorista: false },
+          data: { leidoMonitorista: true, recibidoMonitorista: true },
+        })
+      : await this.prisma.mensajeChat.updateMany({
+          where: { viajeId, autorTipo: 'MONITORISTA', leidoConductor: false },
+          data: { leidoConductor: true, recibidoConductor: true },
+        });
+    if (count > 0) {
+      this.tracking.emitirChatLeido(viajeId, conductorViaje, {
+        viajeId,
+        lector: esMonitorista ? 'MONITORISTA' : 'CONDUCTOR',
       });
-    } else {
-      await this.prisma.mensajeChat.updateMany({
-        where: { viajeId, autorTipo: 'MONITORISTA', leidoConductor: false },
-        data: { leidoConductor: true },
+    }
+  }
+
+  /**
+   * Marca como RECIBIDOS (entregados) los mensajes del otro lado: lo llama el
+   * cliente del destinatario al recibir el mensaje por socket, aunque no tenga
+   * el chat abierto. Avisa al emisor por WS para la palomita doble "entregado".
+   */
+  async marcarRecibido(viajeId: string, principal: AuthPrincipal): Promise<void> {
+    const conductorViaje = await this.autorizarObtenerConductor(
+      viajeId,
+      principal,
+    );
+    const esMonitorista = principal.type === 'admin';
+    const { count } = esMonitorista
+      ? await this.prisma.mensajeChat.updateMany({
+          where: {
+            viajeId,
+            autorTipo: 'CONDUCTOR',
+            recibidoMonitorista: false,
+          },
+          data: { recibidoMonitorista: true },
+        })
+      : await this.prisma.mensajeChat.updateMany({
+          where: {
+            viajeId,
+            autorTipo: 'MONITORISTA',
+            recibidoConductor: false,
+          },
+          data: { recibidoConductor: true },
+        });
+    if (count > 0) {
+      this.tracking.emitirChatEntregado(viajeId, conductorViaje, {
+        viajeId,
+        lector: esMonitorista ? 'MONITORISTA' : 'CONDUCTOR',
       });
     }
   }
@@ -295,6 +344,9 @@ export class ChatUseCase {
   }
 
   private async aPayload(m: MensajeChat): Promise<MensajeChatPayload> {
+    // El destinatario es el lado opuesto al autor: para un mensaje del conductor
+    // el estado lo lleva el monitorista, y viceversa.
+    const esConductor = m.autorTipo === 'CONDUCTOR';
     return {
       id: m.id,
       viajeId: m.viajeId,
@@ -308,6 +360,8 @@ export class ChatUseCase {
       archivoTipo: m.archivoTipo,
       archivoBytes: m.archivoBytes,
       createdAt: m.createdAt.toISOString(),
+      entregado: esConductor ? m.recibidoMonitorista : m.recibidoConductor,
+      leido: esConductor ? m.leidoMonitorista : m.leidoConductor,
     };
   }
 }

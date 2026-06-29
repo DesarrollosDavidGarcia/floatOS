@@ -64,3 +64,81 @@ describe('ChatUseCase autorización (scoping conductor↔viaje)', () => {
     expect(res.mensajes).toEqual([]);
   });
 });
+
+describe('ChatUseCase palomitas (entregado/leído)', () => {
+  function crearRico(
+    viaje: { conductorId: string | null } | null,
+    updateCount = 1,
+  ) {
+    const updateMany = jest.fn().mockResolvedValue({ count: updateCount });
+    const prisma = {
+      viaje: { findUnique: jest.fn().mockResolvedValue(viaje) },
+      mensajeChat: { findMany: jest.fn().mockResolvedValue([]), updateMany },
+    } as unknown as PrismaService;
+    const storage = {} as unknown as StorageService;
+    const tracking = {
+      emitirChatEntregado: jest.fn(),
+      emitirChatLeido: jest.fn(),
+    } as unknown as TrackingGateway;
+    const uc = new ChatUseCase(prisma, storage, tracking);
+    return { uc, updateMany, tracking };
+  }
+
+  it('marcarRecibido emite chat:entregado cuando hay mensajes nuevos', async () => {
+    const { uc, tracking } = crearRico({ conductorId: 'c1' });
+    await uc.marcarRecibido('v1', conductor('c1'));
+    expect(tracking.emitirChatEntregado).toHaveBeenCalledWith('v1', 'c1', {
+      viajeId: 'v1',
+      lector: 'CONDUCTOR',
+    });
+  });
+
+  it('marcarRecibido NO emite si no había mensajes por marcar', async () => {
+    const { uc, tracking } = crearRico({ conductorId: 'c1' }, 0);
+    await uc.marcarRecibido('v1', conductor('c1'));
+    expect(tracking.emitirChatEntregado).not.toHaveBeenCalled();
+  });
+
+  it('marcarLeido (monitorista) emite chat:leido con lector MONITORISTA', async () => {
+    const { uc, tracking } = crearRico({ conductorId: 'c1' });
+    await uc.marcarLeido('v1', admin('m1'));
+    expect(tracking.emitirChatLeido).toHaveBeenCalledWith('v1', 'c1', {
+      viajeId: 'v1',
+      lector: 'MONITORISTA',
+    });
+  });
+
+  it('aPayload deriva entregado/leído del lado destinatario (mensaje del conductor)', async () => {
+    const fila = {
+      id: 'm1',
+      viajeId: 'v1',
+      autorTipo: 'CONDUCTOR',
+      autorNombre: 'Juan',
+      usuarioId: null,
+      conductorId: 'c1',
+      texto: 'hola',
+      archivoKey: null,
+      archivoNombre: null,
+      archivoTipo: null,
+      archivoBytes: null,
+      // El destinatario es el monitorista: recibió pero no leyó.
+      recibidoMonitorista: true,
+      recibidoConductor: false,
+      leidoMonitorista: false,
+      leidoConductor: false,
+      createdAt: new Date('2026-06-29T00:00:00Z'),
+    };
+    const prisma = {
+      viaje: { findUnique: jest.fn().mockResolvedValue({ conductorId: 'c1' }) },
+      mensajeChat: { findMany: jest.fn().mockResolvedValue([fila]) },
+    } as unknown as PrismaService;
+    const uc = new ChatUseCase(
+      prisma,
+      {} as unknown as StorageService,
+      {} as unknown as TrackingGateway,
+    );
+
+    const res = await uc.listar('v1', admin('m1'));
+    expect(res.mensajes[0]).toMatchObject({ entregado: true, leido: false });
+  });
+});

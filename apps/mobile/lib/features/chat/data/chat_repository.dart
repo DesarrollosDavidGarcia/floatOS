@@ -67,6 +67,17 @@ class ChatRepository {
     }
   }
 
+  /// Acusa "recibido" (entregado) los mensajes del panel: el dispositivo los
+  /// recibió por socket aunque el chat no esté abierto. Refresca la palomita
+  /// doble del lado del monitorista.
+  Future<void> marcarRecibido(String viajeId) async {
+    try {
+      await _api.dio.post<void>('/viajes/$viajeId/chat/recibido');
+    } on DioException {
+      // No crítico: el estado se corregirá en la próxima carga.
+    }
+  }
+
   /// Nº de mensajes del panel sin leer para este viaje (para el badge).
   Future<int> noLeidos(String viajeId) async {
     try {

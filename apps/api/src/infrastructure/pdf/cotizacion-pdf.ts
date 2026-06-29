@@ -16,6 +16,8 @@ export interface DatosCotizacionPdf {
     destino: string;
     distanciaKm?: number | null;
     pesoKg?: number | null;
+    tipoServicio?: string | null;
+    numPasajeros?: number | null;
     numEscalas: number;
   };
   cotizacion: {
@@ -127,9 +129,16 @@ export function generarCotizacionPdf(d: DatosCotizacionPdf): Promise<Buffer> {
     };
     direccion('Origen  ', d.viaje.origen);
     direccion('Destino  ', d.viaje.destino);
+    const esPersonal = d.viaje.tipoServicio === 'PERSONAL';
     const meta = [
       d.viaje.distanciaKm != null ? `${d.viaje.distanciaKm} km` : null,
-      d.viaje.pesoKg != null ? `${d.viaje.pesoKg} kg` : null,
+      esPersonal
+        ? d.viaje.numPasajeros != null
+          ? `${d.viaje.numPasajeros} pasajero(s)`
+          : null
+        : d.viaje.pesoKg != null
+          ? `${d.viaje.pesoKg} kg`
+          : null,
       `${d.viaje.numEscalas} escala(s)`,
     ]
       .filter(Boolean)

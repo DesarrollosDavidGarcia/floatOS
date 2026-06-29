@@ -7,6 +7,7 @@ import { PrismaModule } from './infrastructure/database/prisma.module';
 import { SharedModule } from './infrastructure/shared/shared.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { CryptoModule } from './infrastructure/crypto/crypto.module';
+import { PushModule } from './infrastructure/push/push.module';
 import { HealthController } from './presentation/http/health.controller';
 import { validarEnv } from './infrastructure/config/env.validation';
 
@@ -26,6 +27,7 @@ import { UsuariosModule } from './presentation/http/usuarios/usuarios.module';
 import { ChatModule } from './presentation/http/chat/chat.module';
 import { AiHttpModule } from './presentation/http/ai/ai.module';
 import { BotModule } from './presentation/http/bot/bot.module';
+import { PushHttpModule } from './presentation/http/push/push.module';
 
 @Module({
   imports: [
@@ -38,6 +40,7 @@ import { BotModule } from './presentation/http/bot/bot.module';
     SharedModule,
     StorageModule,
     CryptoModule,
+    PushModule,
     AuthModule,
     ClientesModule,
     FlotaModule,
@@ -53,6 +56,7 @@ import { BotModule } from './presentation/http/bot/bot.module';
     ChatModule,
     AiHttpModule,
     BotModule,
+    PushHttpModule,
   ],
   controllers: [HealthController],
   providers: [

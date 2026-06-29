@@ -295,6 +295,9 @@ export const WS_EVENTS = {
   VIAJE_REASIGNADO: 'viaje:reasignado',
   INCIDENCIA_REPORTADA: 'incidencia:reportada',
   CHAT_MENSAJE: 'chat:mensaje',
+  // Acuses del chat (palomitas): el destinatario recibió / leyó los mensajes.
+  CHAT_ENTREGADO: 'chat:entregado',
+  CHAT_LEIDO: 'chat:leido',
   COTIZACION_ACTUALIZADA: 'cotizacion:actualizada',
 } as const;
 
@@ -331,6 +334,20 @@ export interface MensajeChatPayload {
   archivoTipo: string | null;
   archivoBytes: number | null;
   createdAt: string;
+  /** El destinatario lo recibió en su dispositivo (palomita doble). */
+  entregado: boolean;
+  /** El destinatario abrió el chat (palomita doble azul). Implica `entregado`. */
+  leido: boolean;
+}
+
+/**
+ * Acuse de recepción/lectura del chat (eventos WS 'chat:entregado' / 'chat:leido').
+ * Avisa al EMISOR que el otro lado recibió o leyó sus mensajes del viaje.
+ */
+export interface ChatRecepcionPayload {
+  viajeId: string;
+  /** Lado que recibió/leyó (el que ejecutó la acción); el emisor es el otro. */
+  lector: AutorMensaje;
 }
 
 /** Payload del evento WS 'incidencia:reportada' (el conductor reporta un problema). */

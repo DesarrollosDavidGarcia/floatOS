@@ -22,6 +22,7 @@ import { EstadoCotizacion } from '@prisma/client';
  * negocio): frenan typos absurdos sin estorbar valores reales de flete.
  */
 export class ParamsCotizacionDto {
+  @IsOptional() @IsIn(['CARGA', 'PERSONAL']) tipoServicio?: 'CARGA' | 'PERSONAL';
   @IsNumber() @Min(0) @Max(10_000_000) tarifaBase!: number;
   @IsNumber() @Min(0) @Max(100_000) precioPorKm!: number;
   @IsNumber() @Min(0) @Max(100_000) precioPorKg!: number;
@@ -29,6 +30,11 @@ export class ParamsCotizacionDto {
   @IsNumber() @Min(0) @Max(100) rendimientoKmL!: number;
   @IsNumber() @Min(0) @Max(1_000_000) casetas!: number;
   @IsNumber() @Min(0) @Max(1_000_000) maniobrasPorEscala!: number;
+  // Personal:
+  @IsOptional()
+  @IsIn(['POR_VIAJE', 'POR_KM', 'POR_PASAJERO'])
+  modoPrecio?: 'POR_VIAJE' | 'POR_KM' | 'POR_PASAJERO';
+  @IsOptional() @IsNumber() @Min(0) @Max(1_000_000) precioPorPasajero?: number;
   @IsNumber() @Min(0) @Max(500) margenPct!: number;
   @IsBoolean() aplicaIva!: boolean;
   @IsBoolean() aplicaRetencion!: boolean;
@@ -38,6 +44,7 @@ export class ParamsCotizacionDto {
 export class DatosCotizacionDto {
   @IsNumber() @Min(0) distanciaKm!: number;
   @IsNumber() @Min(0) pesoKg!: number;
+  @IsOptional() @IsInt() @Min(0) numPasajeros?: number;
   @IsInt() @Min(0) numEscalas!: number;
 }
 

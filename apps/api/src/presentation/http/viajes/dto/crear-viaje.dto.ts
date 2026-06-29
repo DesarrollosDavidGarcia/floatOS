@@ -4,9 +4,12 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
+  IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { EscalaViajeDto } from './escala-viaje.dto';
@@ -38,4 +41,13 @@ export class CrearViajeDto {
   @IsOptional()
   @IsString()
   conductorId?: string;
+
+  @IsOptional()
+  @IsIn(['CARGA', 'PERSONAL'])
+  tipoServicio?: 'CARGA' | 'PERSONAL';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  numPasajeros?: number;
 }

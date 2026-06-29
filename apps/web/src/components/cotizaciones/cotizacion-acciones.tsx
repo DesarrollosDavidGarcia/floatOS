@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { EstadoCotizacion } from '@/components/cotizaciones/types';
 import { api, apiError } from '@/lib/api';
-import { invalidarViajes } from '@/lib/query-keys';
+import { invalidarCotizaciones } from '@/lib/query-keys';
 import {
   ACCION_ESTADO_LABEL,
   ESTADO_COTIZACION_LABEL,
@@ -36,10 +36,7 @@ export function CotizacionAcciones({
   const qc = useQueryClient();
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
 
-  const refrescar = () => {
-    qc.invalidateQueries({ queryKey: ['cotizaciones', viajeId] });
-    invalidarViajes(qc, viajeId);
-  };
+  const refrescar = () => invalidarCotizaciones(qc, viajeId);
 
   const cambiarEstado = useMutation({
     mutationFn: async (nuevo: EstadoCotizacion) =>

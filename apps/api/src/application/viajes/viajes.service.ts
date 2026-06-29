@@ -11,6 +11,10 @@ import {
   ContactoEscalaInput,
   GestionarContactosEscalaUseCase,
 } from './gestionar-contactos-escala.usecase';
+import {
+  GestionarPasajerosUseCase,
+  PasajeroViajeInput,
+} from './gestionar-pasajeros.usecase';
 import { ListarLlegadasRecientesUseCase } from './listar-llegadas-recientes.usecase';
 import {
   ReportarIncidenciaInput,
@@ -43,6 +47,7 @@ export class ViajesService {
     private readonly cambiarEstadoViaje: CambiarEstadoViajeUseCase,
     private readonly actualizarPlanRuta: ActualizarPlanRutaUseCase,
     private readonly gestionarContactos: GestionarContactosEscalaUseCase,
+    private readonly gestionarPasajerosUC: GestionarPasajerosUseCase,
     private readonly listarLlegadas: ListarLlegadasRecientesUseCase,
     private readonly reportarIncidenciaUC: ReportarIncidenciaViajeUseCase,
     private readonly motor: MotorViajeService,
@@ -136,6 +141,13 @@ export class ViajesService {
     contactos: ContactoEscalaInput[],
   ) {
     return this.gestionarContactos.execute(viajeId, escalaId, contactos);
+  }
+
+  /**
+   * Reemplaza el manifiesto de pasajeros de un viaje de personal.
+   */
+  gestionarPasajeros(viajeId: string, pasajeros: PasajeroViajeInput[]) {
+    return this.gestionarPasajerosUC.execute(viajeId, pasajeros);
   }
 
   /** Historial reciente de llegadas (geocercas) para la campana del panel. */

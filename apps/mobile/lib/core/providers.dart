@@ -7,6 +7,8 @@ import '../features/tracking/data/tracking_repository.dart';
 import '../features/tracking/service/tracking_controller.dart';
 import '../features/viajes/data/viajes_repository.dart';
 import 'api/api_client.dart';
+import 'notifications/notification_service.dart';
+import 'notifications/push_messaging_service.dart';
 import 'realtime/socket_service.dart';
 import 'storage/token_storage.dart';
 
@@ -58,3 +60,31 @@ final socketServiceProvider = Provider<SocketService>((ref) {
   ref.onDispose(servicio.dispose);
   return servicio;
 });
+
+/// Servicio de notificaciones locales (singleton de la app).
+final notificationServiceProvider =
+    Provider<NotificationService>((ref) => NotificationService());
+
+/// Servicio de push (FCM): registro de token y taps de notificación remota.
+final pushMessagingServiceProvider = Provider<PushMessagingService>(
+  (ref) => PushMessagingService(ref.watch(apiClientProvider)),
+);
+
+/// viajeId del chat abierto en primer plano (null si ninguno). Lo fija el
+/// ChatScreen para que el coordinador NO notifique mensajes del chat que el
+/// conductor ya está viendo.
+class ChatAbiertoNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void abrir(String viajeId) => state = viajeId;
+
+  /// Cierra solo si seguimos siendo el chat activo (otro chat pudo tomar el
+  /// relevo antes de que este se destruya).
+  void cerrar(String viajeId) {
+    if (state == viajeId) state = null;
+  }
+}
+
+final chatAbiertoProvider =
+    NotifierProvider<ChatAbiertoNotifier, String?>(ChatAbiertoNotifier.new);

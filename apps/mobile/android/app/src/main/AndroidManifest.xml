@@ -15,12 +15,13 @@
         android:label="FlotaOS Conductor"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <!-- Google Maps SDK for Android. La key se restringe por package + huella
-             SHA-1 en Google Cloud (es seguro incluirla en el APK). Requiere
-             habilitar "Maps SDK for Android" en el proyecto. -->
+        <!-- Google Maps SDK for Android. La key se inyecta desde local.properties
+             (MAPS_API_KEY) vía build.gradle.kts, así NO se versiona. Se restringe
+             por package + huella SHA-1 en Google Cloud. Requiere habilitar
+             "Maps SDK for Android" en el proyecto. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBOCaxR_6cu7_TmbEXaWG3nKbWbuaRnmn4"/>
+            android:value="${MAPS_API_KEY}"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -43,6 +44,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- FCM: icono pequeño monocromo y canal por defecto para los push que
+             muestra el sistema (notification messages) con la app cerrada. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

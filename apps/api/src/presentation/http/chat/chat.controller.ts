@@ -105,4 +105,18 @@ export class ChatController {
   ): Promise<void> {
     return this.chat.marcarLeido(viajeId, user);
   }
+
+  /**
+   * Marca como recibidos (entregados) los mensajes del otro lado. Lo llama el
+   * cliente del destinatario al recibir un mensaje por socket, aunque no tenga
+   * el chat abierto (para la palomita doble "entregado").
+   */
+  @Post('viajes/:viajeId/chat/recibido')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  marcarRecibido(
+    @Param('viajeId') viajeId: string,
+    @CurrentUser() user: AuthPrincipal,
+  ): Promise<void> {
+    return this.chat.marcarRecibido(viajeId, user);
+  }
 }

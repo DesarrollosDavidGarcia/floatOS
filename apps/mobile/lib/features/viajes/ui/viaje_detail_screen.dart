@@ -726,7 +726,10 @@ class _ContenidoState extends State<_Contenido> {
               const SizedBox(height: 16),
               _SeccionItinerario(viaje: viaje, onEscalaTap: _enfocarEnMapa),
               const SizedBox(height: 16),
-              _SeccionCarga(viaje: viaje),
+              if (viaje.esPersonal)
+                _SeccionPasajeros(viaje: viaje)
+              else
+                _SeccionCarga(viaje: viaje),
               if (viaje.historial.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _SeccionHistorial(historial: viaje.historial),
@@ -1451,6 +1454,103 @@ class _SeccionCarga extends StatelessWidget {
   static String _formatoPeso(double kg) => kg >= 1000
       ? NumberFormat('#,##0.#').format(kg)
       : kg.toStringAsFixed(0);
+}
+
+/// Sección de pasajeros (servicio de personal): contador + manifiesto.
+class _SeccionPasajeros extends StatelessWidget {
+  const _SeccionPasajeros({required this.viaje});
+
+  final Viaje viaje;
+
+  String? _paradaLabel(String? escalaId) {
+    if (escalaId == null) return null;
+    final idx = viaje.escalas.indexWhere((e) => e.id == escalaId);
+    if (idx < 0) return null;
+    if (idx == 0) return 'Origen';
+    if (idx == viaje.escalas.length - 1) return 'Destino';
+    return 'Parada $idx';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+    final pasajeros = viaje.pasajeros;
+    return _Tarjeta(
+      titulo: 'Pasajeros',
+      icono: Icons.groups_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Pill(
+                icono: Icons.people_outline,
+                texto: viaje.numPasajeros != null
+                    ? '${pasajeros.length} / ${viaje.numPasajeros}'
+                    : '${pasajeros.length}',
+              ),
+              if (viaje.distanciaEstimadaKm > 0)
+                _Pill(
+                  icono: Icons.route_outlined,
+                  texto: '${viaje.distanciaEstimadaKm.toStringAsFixed(0)} km',
+                ),
+            ],
+          ),
+          if (pasajeros.isEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Sin manifiesto de pasajeros.',
+              style: TextStyle(fontSize: 13.5, color: colores.onSurfaceVariant),
+            ),
+          ] else ...[
+            const SizedBox(height: 6),
+            ...pasajeros.map((p) => _fila(context, p)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _fila(BuildContext context, Pasajero p) {
+    final colores = Theme.of(context).colorScheme;
+    final sub = [p.identificacion, p.telefono]
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .join(' · ');
+    final parada = _paradaLabel(p.escalaId);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(Icons.person_outline, size: 18, color: colores.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.nombre,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                if (sub.isNotEmpty)
+                  Text(
+                    sub,
+                    style: TextStyle(fontSize: 12, color: colores.onSurfaceVariant),
+                  ),
+              ],
+            ),
+          ),
+          if (parada != null)
+            Text(
+              parada,
+              style: TextStyle(fontSize: 11, color: colores.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SeccionHistorial extends StatelessWidget {

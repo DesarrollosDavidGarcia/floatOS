@@ -70,6 +70,16 @@ export interface EscalaViaje {
   contactos?: ContactoEscala[];
 }
 
+/** Pasajero del manifiesto (viajes de transporte de personal). */
+export interface PasajeroViaje {
+  id: string;
+  nombre: string;
+  identificacion?: string | null;
+  telefono?: string | null;
+  /** Parada donde sube (opcional). */
+  escalaId?: string | null;
+}
+
 /** Entrada del historial de cambios de estado de un viaje. */
 export interface HistorialViaje {
   id: string;
@@ -124,7 +134,11 @@ export interface Viaje {
   destinoDireccion: string;
   destinoLat?: number | null;
   destinoLng?: number | null;
-  tipoCarga: string;
+  /** Tipo de servicio: carga (mercancía) o personal (pasajeros). */
+  tipoServicio: 'CARGA' | 'PERSONAL';
+  /** Nº de pasajeros (servicio de personal). */
+  numPasajeros?: number | null;
+  tipoCarga?: string | null;
   descripcionCarga?: string | null;
   pesoKg?: number | null;
   dimensiones?: string | null;
@@ -138,6 +152,8 @@ export interface Viaje {
   /** Plan multi-día asignado por el monitorista (horas/día, descanso, escala, inicio). */
   planRuta?: PlanRutaParams | null;
   escalas?: EscalaViaje[];
+  /** Manifiesto de pasajeros (servicio de personal). */
+  pasajeros?: PasajeroViaje[];
   fechaProgramada?: string | null;
   trackingToken?: string | null;
   historial?: HistorialViaje[];
@@ -178,6 +194,8 @@ export interface CrearViajePayload {
   fechaProgramada?: string;
   unidadId?: string;
   conductorId?: string;
+  tipoServicio?: 'CARGA' | 'PERSONAL';
+  numPasajeros?: number;
 }
 
 /** Tipo genérico para los catálogos (clientes / unidades / conductores). */

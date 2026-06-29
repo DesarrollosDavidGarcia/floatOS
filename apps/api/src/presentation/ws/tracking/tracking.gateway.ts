@@ -13,12 +13,14 @@ import {
   WS_EVENTS,
   type AlertaLlegadaPayload,
   type CambioEstadoViajePayload,
+  type ChatRecepcionPayload,
   type CotizacionActualizadaPayload,
   type IncidenciaReportadaPayload,
   type MensajeChatPayload,
   type ReasignacionViajePayload,
 } from '@flotaos/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PushService } from '../../../infrastructure/push/push.service';
 import { COOKIE_ACCESS, valorDeCookie } from '../../http/auth/cookies';
 
 /** Construye el nombre de la sala de un viaje. */
@@ -91,6 +93,7 @@ export class TrackingGateway implements OnGatewayConnection {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -230,6 +233,11 @@ export class TrackingGateway implements OnGatewayConnection {
     this.server
       .to(salaViaje(viajeId))
       .emit(WS_EVENTS.VIAJE_ESTADO_CAMBIADO, payload);
+    void this.pushAViajeSiDesconectado(viajeId, {
+      titulo: 'Viaje actualizado',
+      cuerpo: 'El monitorista actualizó el estado de tu viaje.',
+      data: { tipo: 'estado', viajeId },
+    });
   }
 
   /**
@@ -242,6 +250,11 @@ export class TrackingGateway implements OnGatewayConnection {
       .to(salaViaje(viajeId))
       .to(SALA_ADMIN)
       .emit(WS_EVENTS.ALERTA, payload);
+    void this.pushAViajeSiDesconectado(viajeId, {
+      titulo: payload.esDestino ? 'Llegada al destino' : 'Llegada a escala',
+      cuerpo: payload.escalaDireccion || 'Se registró tu llegada.',
+      data: { tipo: 'alerta', viajeId },
+    });
   }
 
   /**
@@ -260,6 +273,26 @@ export class TrackingGateway implements OnGatewayConnection {
       emisor = emisor.to(salaConductor(payload.conductorNuevoId));
     }
     emisor.emit(WS_EVENTS.VIAJE_REASIGNADO, payload);
+
+    const folio = payload.folio;
+    // Entrante: le aparece el viaje (tap → abrir el viaje).
+    if (payload.conductorNuevoId) {
+      void this.pushSiDesconectado(payload.conductorNuevoId, {
+        titulo: 'Nuevo viaje asignado',
+        cuerpo: folio ? `Te asignaron el viaje #${folio}.` : 'Te asignaron un viaje.',
+        data: { tipo: 'reasignacion', viajeId: payload.viajeId },
+      });
+    }
+    // Saliente: ya no es suyo; sin viajeId para no abrir un viaje sin acceso.
+    if (payload.conductorAnteriorId) {
+      void this.pushSiDesconectado(payload.conductorAnteriorId, {
+        titulo: 'Viaje reasignado',
+        cuerpo: folio
+          ? `Ya no tienes el viaje #${folio}.`
+          : 'Un viaje dejó de estar asignado a ti.',
+        data: { tipo: 'reasignacion' },
+      });
+    }
   }
 
   /**
@@ -289,6 +322,97 @@ export class TrackingGateway implements OnGatewayConnection {
       emisor = emisor.to(salaConductor(conductorId));
     }
     emisor.emit(WS_EVENTS.CHAT_MENSAJE, payload);
+
+    // Push al conductor solo si es un mensaje del monitorista y no está
+    // conectado (si lo está, ya le llega por WS → notificación local).
+    if (payload.autorTipo === 'MONITORISTA' && conductorId) {
+      void this.pushSiDesconectado(conductorId, {
+        titulo: payload.autorNombre || 'Nuevo mensaje',
+        cuerpo:
+          payload.texto?.trim() ||
+          (payload.archivoUrl ? '📎 Adjunto' : 'Nuevo mensaje'),
+        canalId: 'chat',
+        data: { tipo: 'chat', viajeId: payload.viajeId },
+      });
+    }
+  }
+
+  /** Envía push al conductor solo si no tiene un socket vivo (app cerrada). */
+  private async pushSiDesconectado(
+    conductorId: string,
+    msg: {
+      titulo: string;
+      cuerpo: string;
+      canalId?: string;
+      data?: Record<string, string>;
+    },
+  ): Promise<void> {
+    const sockets = await this.server
+      .in(salaConductor(conductorId))
+      .fetchSockets();
+    if (sockets.length > 0) return;
+    await this.push.enviarAConductor(conductorId, msg);
+  }
+
+  /** Resuelve el conductor del viaje y le envía push si está desconectado. */
+  private async pushAViajeSiDesconectado(
+    viajeId: string,
+    msg: {
+      titulo: string;
+      cuerpo: string;
+      canalId?: string;
+      data?: Record<string, string>;
+    },
+  ): Promise<void> {
+    const viaje = await this.prisma.viaje.findUnique({
+      where: { id: viajeId },
+      select: { conductorId: true },
+    });
+    if (viaje?.conductorId) {
+      await this.pushSiDesconectado(viaje.conductorId, msg);
+    }
+  }
+
+  /** Acuse "entregado": el destinatario recibió los mensajes del emisor. */
+  emitirChatEntregado(
+    viajeId: string,
+    conductorId: string | null,
+    payload: ChatRecepcionPayload,
+  ): void {
+    this.emitirChatRecepcion(
+      viajeId,
+      conductorId,
+      WS_EVENTS.CHAT_ENTREGADO,
+      payload,
+    );
+  }
+
+  /** Acuse "leído": el destinatario abrió el chat y leyó los mensajes. */
+  emitirChatLeido(
+    viajeId: string,
+    conductorId: string | null,
+    payload: ChatRecepcionPayload,
+  ): void {
+    this.emitirChatRecepcion(
+      viajeId,
+      conductorId,
+      WS_EVENTS.CHAT_LEIDO,
+      payload,
+    );
+  }
+
+  /** Emite un acuse de chat a las mismas salas que el mensaje (emisor incluido). */
+  private emitirChatRecepcion(
+    viajeId: string,
+    conductorId: string | null,
+    evento: string,
+    payload: ChatRecepcionPayload,
+  ): void {
+    let emisor = this.server.to(salaViaje(viajeId)).to(SALA_ADMIN);
+    if (conductorId) {
+      emisor = emisor.to(salaConductor(conductorId));
+    }
+    emisor.emit(evento, payload);
   }
 
   /**
