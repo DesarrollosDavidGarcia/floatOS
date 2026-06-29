@@ -35,6 +35,33 @@ class ViajeCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (viaje.esPersonal) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: colores.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.groups_outlined,
+                              size: 13, color: colores.onSecondaryContainer),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Personal',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: colores.onSecondaryContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   EstadoChip(viaje.estado, compacto: true),
                 ],
               ),

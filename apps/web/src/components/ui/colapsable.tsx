@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
  */
 export function Colapsable({
   titulo,
+  icono,
   descripcion,
   badge,
   derecha,
@@ -20,6 +21,8 @@ export function Colapsable({
   contentClassName,
 }: {
   titulo: string;
+  /** Icono representativo de la sección, mostrado enseguida del título. */
+  icono?: ReactNode;
   descripcion?: string;
   /** Indicador breve junto al título (conteo, ⚠, etc.). */
   badge?: ReactNode;
@@ -51,6 +54,11 @@ export function Colapsable({
           </span>
           {badge}
         </button>
+        {icono ? (
+          <span className="shrink-0 text-muted-foreground [&_svg]:size-5">
+            {icono}
+          </span>
+        ) : null}
         {derecha}
       </div>
       {open && (

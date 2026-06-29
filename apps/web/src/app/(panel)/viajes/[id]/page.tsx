@@ -6,16 +6,24 @@ import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  ArrowLeftRight,
+  BadgeCheck,
   Building2,
+  CalendarClock,
   Clock,
   Container,
   Copy,
+  History,
   MapPin,
   Pencil,
   PlayCircle,
+  Receipt,
+  Route,
+  Share2,
   Siren,
   Truck,
   User,
+  Users,
 } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -38,6 +46,7 @@ import { ChatViaje } from '@/components/chat/chat-viaje';
 import { PlanRutaDialog } from '@/components/viajes/plan-ruta-dialog';
 import { formatearDuracion, planificarRuta } from '@/components/viajes/plan-ruta';
 import { ContactosEscalaDialog } from '@/components/viajes/contactos-escala-dialog';
+import { ManifiestoDialog } from '@/components/viajes/manifiesto-dialog';
 import type { Viaje } from '@/components/viajes/types';
 import type { Cotizacion } from '@/components/cotizaciones/types';
 
@@ -171,6 +180,16 @@ export default function ViajeDetallePage() {
       : null;
 
   const escalas = viaje.escalas ?? [];
+  const pasajeros = viaje.pasajeros ?? [];
+  const esPersonal = viaje.tipoServicio === 'PERSONAL';
+  const paradaLabel = (id?: string | null): string | null => {
+    if (!id) return null;
+    const e = escalas.find((x) => x.id === id);
+    if (!e) return null;
+    if (e.orden === 0) return 'Origen';
+    if (e.orden === escalas.length - 1) return 'Destino';
+    return `Parada ${e.orden}`;
+  };
   const reasignaciones = viaje.historialAsignaciones ?? [];
   const incidencias = viaje.incidencias ?? [];
   const hayIncidenciaCritica = incidencias.some(
@@ -198,6 +217,9 @@ export default function ViajeDetallePage() {
               <Badge variant={ESTADO_VIAJE_BADGE[viaje.estado]}>
                 {ESTADO_VIAJE_LABEL[viaje.estado]}
               </Badge>
+              <Badge variant={viaje.tipoServicio === 'PERSONAL' ? 'default' : 'outline'}>
+                {viaje.tipoServicio === 'PERSONAL' ? 'Personal' : 'Carga'}
+              </Badge>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <ClaveInline icon={Building2}>
@@ -209,6 +231,11 @@ export default function ViajeDetallePage() {
               <ClaveInline icon={User}>
                 {viaje.conductor?.nombre ?? 'Sin conductor'}
               </ClaveInline>
+              {viaje.tipoServicio === 'PERSONAL' && viaje.numPasajeros != null && (
+                <ClaveInline icon={Users}>
+                  {viaje.numPasajeros} pasajero(s)
+                </ClaveInline>
+              )}
               {plan ? (
                 <ClaveInline icon={Clock}>
                   ETA {fechaLarga(plan.llegada.toISOString())}
@@ -264,6 +291,7 @@ export default function ViajeDetallePage() {
       <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Colapsable
           titulo="Itinerario"
+          icono={<Route className="h-4 w-4" />}
           descripcion={`${escalas.length} escala(s) · Programada: ${fechaLarga(viaje.fechaProgramada)}`}
         >
           <div className="space-y-4">
@@ -348,7 +376,7 @@ export default function ViajeDetallePage() {
           </div>
         </Colapsable>
 
-        <Colapsable titulo="Asignación">
+        <Colapsable titulo="Asignación" icono={<Truck className="h-4 w-4" />}>
           <div className="grid gap-4 text-sm sm:grid-cols-2">
             <div className="flex items-start gap-3">
               <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -395,8 +423,55 @@ export default function ViajeDetallePage() {
           </div>
         </Colapsable>
 
+        {esPersonal && (
+          <Colapsable
+            titulo="Pasajeros"
+            icono={<Users className="h-4 w-4" />}
+            descripcion={`${pasajeros.length} en el manifiesto${
+              viaje.numPasajeros ? ` · ${viaje.numPasajeros} esperados` : ''
+            }`}
+            derecha={
+              <ManifiestoDialog
+                viajeId={viaje.id}
+                pasajeros={pasajeros}
+                escalas={escalas}
+              />
+            }
+            defaultOpen
+          >
+            {pasajeros.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no hay pasajeros en el manifiesto.
+              </p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {pasajeros.map((p) => {
+                  const parada = paradaLabel(p.escalaId);
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex items-center justify-between gap-2 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium">{p.nombre}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[p.identificacion, p.telefono]
+                            .filter(Boolean)
+                            .join(' · ') || '—'}
+                        </p>
+                      </div>
+                      {parada && <Badge variant="outline">{parada}</Badge>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Colapsable>
+        )}
+
         <Colapsable
           titulo="Plan de viaje"
+          icono={<CalendarClock className="h-4 w-4" />}
           descripcion="Llegada estimada multi-día"
           derecha={<PlanRutaDialog viaje={viaje} />}
         >
@@ -431,12 +506,13 @@ export default function ViajeDetallePage() {
           </div>
         </Colapsable>
 
-        <Colapsable titulo="Cotización">
+        <Colapsable titulo="Cotización" icono={<Receipt className="h-4 w-4" />}>
           <CotizacionesCard viaje={viaje} plano />
         </Colapsable>
 
         <Colapsable
           titulo="Historial"
+          icono={<History className="h-4 w-4" />}
           descripcion="Línea de tiempo de cambios de estado."
         >
           <HistorialTimeline historial={viaje.historial ?? []} />
@@ -445,6 +521,7 @@ export default function ViajeDetallePage() {
         {reasignaciones.length > 0 && (
           <Colapsable
             titulo="Reasignaciones"
+            icono={<ArrowLeftRight className="h-4 w-4" />}
             descripcion="Cambios de unidad o conductor (con motivo)."
             badge={<Badge variant="secondary">{reasignaciones.length}</Badge>}
           >
@@ -492,6 +569,7 @@ export default function ViajeDetallePage() {
         {incidencias.length > 0 && (
           <Colapsable
             titulo="Incidencias"
+            icono={<Siren className="h-4 w-4" />}
             descripcion="Reportes de avería, choque u otros problemas del viaje."
             defaultOpen={hayIncidenciaCritica}
             badge={
@@ -545,7 +623,10 @@ export default function ViajeDetallePage() {
         )}
 
         {tieneUnidad && hayCargas && (
-          <Colapsable titulo="Idoneidad de la unidad">
+          <Colapsable
+            titulo="Idoneidad de la unidad"
+            icono={<BadgeCheck className="h-4 w-4" />}
+          >
             <VeredictoUnidadCard viaje={viaje} plano />
           </Colapsable>
         )}
@@ -553,6 +634,7 @@ export default function ViajeDetallePage() {
         {viaje.trackingToken ? (
           <Colapsable
             titulo="Seguimiento público"
+            icono={<Share2 className="h-4 w-4" />}
             descripcion="Comparte este enlace con el cliente para rastrear el viaje."
           >
             <TrackingLink token={viaje.trackingToken} />

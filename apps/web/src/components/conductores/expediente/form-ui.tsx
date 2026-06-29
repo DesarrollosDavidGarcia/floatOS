@@ -140,13 +140,15 @@ export function ExpedienteFormDialog({
   onSubmit: React.FormEventHandler<HTMLFormElement>;
   saving?: boolean;
   submitLabel?: string;
-  size?: 'md' | 'lg';
+  size?: 'md' | 'lg' | 'xl';
   description?: string;
   children: ReactNode;
 }) {
+  const anchoMax =
+    size === 'xl' ? 'max-w-4xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={size === 'lg' ? 'max-w-2xl' : 'max-w-lg'}>
+      <DialogContent className={anchoMax}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

@@ -79,17 +79,26 @@ export class CrearViajeUseCase {
       await asegurarConductorDisponible(this.prisma, input.conductorId);
     }
 
+    const esPersonal = input.tipoServicio === 'PERSONAL';
+    if (esPersonal && (!input.numPasajeros || input.numPasajeros < 1)) {
+      throw new BadRequestException(
+        'Indica el número de pasajeros del servicio de personal',
+      );
+    }
+
     const sim = simularCarga(itemsDeEscalas(input.escalas));
     // La fecha programada (si es futura) hace que TomTom use tráfico predicho.
     const ruta = await this.motor.distanciaKm(input.escalas, {
       departAt: input.fechaProgramada,
     });
-    const resumen = derivarResumen(input.escalas, sim);
+    const resumen = derivarResumen(input.escalas, sim, esPersonal);
 
     const data: Prisma.ViajeCreateInput = {
       cliente: { connect: { id: input.clienteId } },
       ...resumen,
       ...snapshotRuta(ruta),
+      tipoServicio: esPersonal ? 'PERSONAL' : 'CARGA',
+      numPasajeros: esPersonal ? input.numPasajeros : null,
       fechaProgramada: input.fechaProgramada
         ? new Date(input.fechaProgramada)
         : undefined,

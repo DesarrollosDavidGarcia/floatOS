@@ -28,13 +28,21 @@ export function itemsDeEscalas(escalas: EscalaInput[]): ItemCargaEval[] {
   return items;
 }
 
-/** Resumen denormalizado que se guarda en Viaje (origen/destino/carga + snapshot). */
-export function derivarResumen(escalas: EscalaInput[], sim: CargaSimulada) {
+/**
+ * Resumen denormalizado que se guarda en Viaje (origen/destino/carga + snapshot).
+ * En servicio de PERSONAL los campos de carga se anulan (no aplican); el
+ * origen/destino se siguen derivando de las paradas.
+ */
+export function derivarResumen(
+  escalas: EscalaInput[],
+  sim: CargaSimulada,
+  esPersonal = false,
+) {
   const primera = escalas[0];
   const ultima = escalas[escalas.length - 1];
-  const primeraCarga = escalas
-    .flatMap((e) => e.cargas ?? [])
-    .find((c) => c.sentido !== 'DESCARGA');
+  const primeraCarga = esPersonal
+    ? undefined
+    : escalas.flatMap((e) => e.cargas ?? []).find((c) => c.sentido !== 'DESCARGA');
 
   return {
     origenDireccion: primera.direccion,
@@ -43,11 +51,11 @@ export function derivarResumen(escalas: EscalaInput[], sim: CargaSimulada) {
     destinoDireccion: ultima.direccion,
     destinoLat: ultima.lat ?? null,
     destinoLng: ultima.lng ?? null,
-    tipoCarga: primeraCarga?.tipoCarga ?? 'GENERAL',
-    descripcionCarga: primeraCarga?.descripcion ?? null,
-    pesoKg: sim.pesoMaxKg,
-    pesoMaxKg: sim.pesoMaxKg,
-    volumenMaxM3: sim.volumenMaxM3,
+    tipoCarga: esPersonal ? null : (primeraCarga?.tipoCarga ?? 'GENERAL'),
+    descripcionCarga: esPersonal ? null : (primeraCarga?.descripcion ?? null),
+    pesoKg: esPersonal ? null : sim.pesoMaxKg,
+    pesoMaxKg: esPersonal ? null : sim.pesoMaxKg,
+    volumenMaxM3: esPersonal ? null : sim.volumenMaxM3,
   };
 }
 

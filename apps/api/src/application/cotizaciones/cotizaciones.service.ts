@@ -82,14 +82,18 @@ export class CotizacionesService {
     return cotizar(params, datos);
   }
 
-  /** Carga y mapea los datos (km/kg/escalas) del viaje para el motor. */
-  private async datosViaje(viajeId: string): Promise<DatosCotizacion> {
+  /** Carga y mapea los datos (km/kg/pasajeros/escalas) + tipo de servicio. */
+  private async datosViaje(
+    viajeId: string,
+  ): Promise<{ datos: DatosCotizacion; tipoServicio: 'CARGA' | 'PERSONAL' }> {
     const viaje = await this.prisma.viaje.findUnique({
       where: { id: viajeId },
       select: {
         distanciaEstimadaKm: true,
         pesoMaxKg: true,
         pesoKg: true,
+        numPasajeros: true,
+        tipoServicio: true,
         _count: { select: { escalas: true } },
       },
     });
@@ -97,11 +101,16 @@ export class CotizacionesService {
       throw new NotFoundException(`Viaje con id ${viajeId} no encontrado`);
     }
     return {
-      distanciaKm: dec(viaje.distanciaEstimadaKm),
-      // Mismo criterio que el preview del diálogo (`??`): usa pesoMaxKg si existe
-      // —incluido 0—, si no el pesoKg. Evita que preview y guardado difieran.
-      pesoKg: viaje.pesoMaxKg != null ? Number(viaje.pesoMaxKg) : dec(viaje.pesoKg),
-      numEscalas: viaje._count.escalas,
+      tipoServicio: viaje.tipoServicio,
+      datos: {
+        distanciaKm: dec(viaje.distanciaEstimadaKm),
+        // Mismo criterio que el preview del diálogo (`??`): usa pesoMaxKg si existe
+        // —incluido 0—, si no el pesoKg. Evita que preview y guardado difieran.
+        pesoKg:
+          viaje.pesoMaxKg != null ? Number(viaje.pesoMaxKg) : dec(viaje.pesoKg),
+        numPasajeros: viaje.numPasajeros ?? 0,
+        numEscalas: viaje._count.escalas,
+      },
     };
   }
 
@@ -130,13 +139,14 @@ export class CotizacionesService {
     };
   }
 
-  /** Crea una cotización tomando los datos (km/kg/escalas) del viaje. */
+  /** Crea una cotización tomando los datos del viaje (el tipo manda el viaje). */
   async crear(viajeId: string, params: ParamsCotizacion, notas?: string) {
-    const datos = await this.datosViaje(viajeId);
+    const { datos, tipoServicio } = await this.datosViaje(viajeId);
+    const paramsFinal = { ...params, tipoServicio };
     return this.prisma.cotizacion.create({
       data: {
         viaje: { connect: { id: viajeId } },
-        ...this.snapshot(params, datos, notas),
+        ...this.snapshot(paramsFinal, datos, notas),
       },
     });
   }
@@ -153,10 +163,11 @@ export class CotizacionesService {
         `Solo se pueden editar cotizaciones en borrador (estado actual: ${cot.estado}).`,
       );
     }
-    const datos = await this.datosViaje(cot.viajeId);
+    const { datos, tipoServicio } = await this.datosViaje(cot.viajeId);
+    const paramsFinal = { ...params, tipoServicio };
     return this.prisma.cotizacion.update({
       where: { id },
-      data: this.snapshot(params, datos, notas),
+      data: this.snapshot(paramsFinal, datos, notas),
     });
   }
 
@@ -244,6 +255,8 @@ export class CotizacionesService {
             folio: true,
             origenDireccion: true,
             destinoDireccion: true,
+            tipoServicio: true,
+            numPasajeros: true,
             cliente: { select: { razonSocial: true, rfc: true } },
           },
         },
@@ -290,6 +303,8 @@ export class CotizacionesService {
         destino: cot.viaje.destinoDireccion,
         distanciaKm: dec(cot.distanciaKm),
         pesoKg: dec(cot.pesoKg),
+        tipoServicio: cot.viaje.tipoServicio,
+        numPasajeros: cot.viaje.numPasajeros,
         numEscalas: cot.numEscalas,
       },
       cotizacion: {

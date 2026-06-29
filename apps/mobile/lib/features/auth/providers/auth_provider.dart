@@ -68,6 +68,8 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _cerrarServiciosDeSesion() async {
     await ref.read(trackingControllerProvider.notifier).detener();
     ref.read(socketServiceProvider).desconectar();
+    // Da de baja el token FCM para no recibir push tras cerrar sesión.
+    ref.read(pushMessagingServiceProvider).baja();
   }
 }
 

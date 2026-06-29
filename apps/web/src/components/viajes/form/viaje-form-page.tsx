@@ -32,7 +32,7 @@ import {
   NINGUNO,
   defaultsCrear,
   defaultsDeViaje,
-  escalasPayload,
+  escalasParaEnviar,
   toCrearPayload,
   viajeFormSchema,
   type ViajeFormValues,
@@ -68,10 +68,15 @@ export function ViajeFormPage({
       }
       const id = viaje!.id;
       await api.patch(`/viajes/${id}`, {
-        escalas: escalasPayload(values.escalas),
+        escalas: escalasParaEnviar(values),
         fechaProgramada: values.fechaProgramada
           ? new Date(values.fechaProgramada).toISOString()
           : undefined,
+        tipoServicio: values.tipoServicio,
+        numPasajeros:
+          values.tipoServicio === 'PERSONAL'
+            ? Number(values.numPasajeros)
+            : undefined,
       });
       await api.patch(`/viajes/${id}/asignar`, {
         unidadId: values.unidadId !== NINGUNO ? values.unidadId : null,
@@ -89,9 +94,11 @@ export function ViajeFormPage({
     onError: (err) => toast.error(apiError(err)),
   });
 
+  const tipoServicio = watch('tipoServicio');
   const clienteId = watch('clienteId');
   const unidadId = watch('unidadId');
   const conductorId = watch('conductorId');
+  const esPersonal = tipoServicio === 'PERSONAL';
 
   const volver = mode === 'editar' && viaje ? `/viajes/${viaje.id}` : '/viajes';
 
@@ -132,6 +139,31 @@ export function ViajeFormPage({
           <div className="space-y-4">
             <div className="space-y-3 rounded-lg border bg-card p-3 shadow-sm">
               <h2 className="text-sm font-semibold">Datos del viaje</h2>
+
+              <Campo label="Tipo de servicio" htmlFor="tipoServicio" full>
+                <Select
+                  value={tipoServicio}
+                  onValueChange={(v) =>
+                    setValue('tipoServicio', v as 'CARGA' | 'PERSONAL', {
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  <SelectTrigger id="tipoServicio">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CARGA">Carga (mercancía)</SelectItem>
+                    <SelectItem value="PERSONAL">Personal (pasajeros)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Campo>
+
+              {esPersonal && (
+                <Campo label="N° de pasajeros" htmlFor="numPasajeros" required error={errors.numPasajeros?.message} full>
+                  <Input id="numPasajeros" type="number" min="1" step="1" {...register('numPasajeros')} />
+                </Campo>
+              )}
 
               <Campo label="Cliente" htmlFor="clienteId" required error={errors.clienteId?.message} full>
                 <Select
@@ -183,7 +215,8 @@ export function ViajeFormPage({
               </Campo>
             </div>
 
-            <PanelMotor />
+            {/* El motor de peso/volumen/idoneidad solo aplica a carga. */}
+            {!esPersonal && <PanelMotor />}
           </div>
         </div>
       </form>

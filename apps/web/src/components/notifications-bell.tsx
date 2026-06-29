@@ -4,8 +4,9 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Bell, Check, MapPin, MessageSquare, MonitorSmartphone, Siren, Trash2 } from 'lucide-react';
-import { WS_EVENTS } from '@flotaos/shared-types';
+import { WS_EVENTS, type MensajeChatPayload } from '@flotaos/shared-types';
 import { api } from '@/lib/api';
+import { esChatAbierto } from '@/lib/chat-abierto';
 import { getSocket } from '@/lib/socket';
 import { cn } from '@/lib/utils';
 import { horaCorta } from '@/lib/fecha';
@@ -67,11 +68,18 @@ export function NotificationsBell() {
   // la sala global de admin, así recibe los mensajes de todos los viajes).
   useEffect(() => {
     const socket = getSocket();
-    const refrescar = () =>
+    const onMensaje = (m: MensajeChatPayload) => {
       queryClient.invalidateQueries({ queryKey: ['chat-no-leidos'] });
-    socket.on(WS_EVENTS.CHAT_MENSAJE, refrescar);
+      // Acusa "entregado" aunque el chat no esté abierto: el conductor verá la
+      // palomita doble en cuanto el panel recibe el mensaje por socket. Si ese
+      // chat está abierto, lo cubre `marcarLeido` (evita el POST redundante).
+      if (m.autorTipo === 'CONDUCTOR' && !esChatAbierto(m.viajeId)) {
+        api.post(`/viajes/${m.viajeId}/chat/recibido`).catch(() => undefined);
+      }
+    };
+    socket.on(WS_EVENTS.CHAT_MENSAJE, onMensaje);
     return () => {
-      socket.off(WS_EVENTS.CHAT_MENSAJE, refrescar);
+      socket.off(WS_EVENTS.CHAT_MENSAJE, onMensaje);
     };
   }, [queryClient]);
 

@@ -21,6 +21,10 @@ out/
 # Prisma
 apps/api/prisma/migrations/dev.db*
 
+# Credenciales de servicio Firebase (push) — secretas.
+apps/api/secrets/
+**/firebase-service-account*.json
+
 # Logs
 *.log
 npm-debug.log*

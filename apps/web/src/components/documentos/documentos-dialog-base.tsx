@@ -313,7 +313,13 @@ export function DocumentosDialogBase<T extends DocumentoBase>({
               <h3 className="font-medium">
                 {editando ? 'Editar documento' : 'Nuevo documento'}
               </h3>
-              <Button type="button" variant="ghost" size="icon" onClick={cerrarForm}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Cerrar formulario"
+                onClick={cerrarForm}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>

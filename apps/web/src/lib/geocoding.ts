@@ -103,9 +103,16 @@ async function pedir(
     const lugares = results.slice(0, LIMITE).map(aLugar);
     guardarEnCache(clave, lugares);
     return lugares;
-  } catch {
-    // ZERO_RESULTS u otro estado de error → sin coincidencias (se cachea vacío
-    // para no reintentar la misma consulta fallida).
+  } catch (e) {
+    // ZERO_RESULTS es normal (sin coincidencias). Otros estados suelen ser
+    // configuración de la key (Geocoding API deshabilitada, restricción de
+    // referrer o billing sin activar): los exponemos para diagnóstico.
+    const code = (e as { code?: string } | null)?.code;
+    if (code !== 'ZERO_RESULTS') {
+      // eslint-disable-next-line no-console
+      console.warn('[geocoding] el Geocoder de Google falló:', code ?? e);
+    }
+    // Se cachea vacío para no reintentar la misma consulta fallida.
     guardarEnCache(clave, []);
     return [];
   }
@@ -136,8 +143,12 @@ export async function buscarDireccionEstructurada(
 ): Promise<LugarGeocodificado[]> {
   const calleNum = [d.calle?.trim(), d.numero?.trim()].filter(Boolean).join(' ');
   const localidad = d.ciudad?.trim() || d.municipio?.trim();
+  // Solo se restringe por país. El CP va dentro del texto de la dirección; NO se
+  // pasa como componentRestrictions.postalCode porque esa restricción sesga al
+  // geocoder hacia el CENTRO del código postal y arruina la precisión a nivel
+  // calle/número (por eso la búsqueda por campos separados caía peor que la
+  // combinada en un solo input).
   const restricciones: google.maps.GeocoderComponentRestrictions = { country: 'MX' };
-  if (d.cp?.trim()) restricciones.postalCode = d.cp.trim();
 
   const completa = [calleNum, d.colonia?.trim(), d.cp?.trim(), localidad, d.estado?.trim()]
     .filter(Boolean)

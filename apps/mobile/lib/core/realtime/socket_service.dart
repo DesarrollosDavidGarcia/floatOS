@@ -12,6 +12,8 @@ abstract final class WsEvents {
   static const alerta = 'alerta';
   static const viajeReasignado = 'viaje:reasignado';
   static const chatMensaje = 'chat:mensaje';
+  static const chatEntregado = 'chat:entregado';
+  static const chatLeido = 'chat:leido';
 }
 
 /// Conexión Socket.io al namespace /tracking del API.
@@ -28,12 +30,20 @@ class SocketService {
   final _cambiosEstado = StreamController<Map<String, dynamic>>.broadcast();
   final _reasignaciones = StreamController<Map<String, dynamic>>.broadcast();
   final _chatMensajes = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatEntregados = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatLeidos = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get alertas => _alertas.stream;
   Stream<Map<String, dynamic>> get cambiosEstado => _cambiosEstado.stream;
 
   /// Mensajes de chat entrantes (sala `viaje:<id>` / personal del conductor).
   Stream<Map<String, dynamic>> get chatMensajes => _chatMensajes.stream;
+
+  /// Acuse: el monitorista recibió los mensajes del conductor (palomita doble).
+  Stream<Map<String, dynamic>> get chatEntregados => _chatEntregados.stream;
+
+  /// Acuse: el monitorista leyó los mensajes del conductor (palomita azul).
+  Stream<Map<String, dynamic>> get chatLeidos => _chatLeidos.stream;
 
   /// Reasignaciones de viaje (sala personal `conductor:<id>`): el conductor
   /// saliente o entrante recibe el aviso aunque no esté en la sala del viaje.
@@ -66,6 +76,12 @@ class SocketService {
       })
       ..on(WsEvents.chatMensaje, (data) {
         if (data is Map) _chatMensajes.add(Map<String, dynamic>.from(data));
+      })
+      ..on(WsEvents.chatEntregado, (data) {
+        if (data is Map) _chatEntregados.add(Map<String, dynamic>.from(data));
+      })
+      ..on(WsEvents.chatLeido, (data) {
+        if (data is Map) _chatLeidos.add(Map<String, dynamic>.from(data));
       })
       ..onReconnectAttempt((_) async {
         // El access token dura 15 min y un viaje dura horas: si el payload
@@ -108,5 +124,7 @@ class SocketService {
     _cambiosEstado.close();
     _reasignaciones.close();
     _chatMensajes.close();
+    _chatEntregados.close();
+    _chatLeidos.close();
   }
 }

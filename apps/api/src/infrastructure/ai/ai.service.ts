@@ -225,7 +225,14 @@ export class AiService {
         'NOVITA_API_KEY no configurada: las funciones de IA quedan deshabilitadas.',
       );
     } else {
-      this.client = new OpenAI({ apiKey, baseURL });
+      // timeout/maxRetries explícitos: el default del SDK (~10 min, 2 reintentos)
+      // retendría el request HTTP demasiado si el proveedor se cuelga.
+      this.client = new OpenAI({
+        apiKey,
+        baseURL,
+        timeout: 60_000,
+        maxRetries: 1,
+      });
       this.logger.log(`IA lista (modelo: ${this.modelo}, base: ${baseURL}).`);
     }
   }

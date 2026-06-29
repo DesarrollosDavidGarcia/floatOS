@@ -29,6 +29,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textoCtrl = TextEditingController();
   final _scroll = ScrollController();
   StreamSubscription<Map<String, dynamic>>? _subChat;
+  StreamSubscription<Map<String, dynamic>>? _subEntregado;
+  StreamSubscription<Map<String, dynamic>>? _subLeido;
+  late final ChatAbiertoNotifier _chatAbierto;
 
   bool _cargando = true;
   bool _enviando = false;
@@ -40,19 +43,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _cargar();
+    // Marca este chat como abierto: el coordinador de notificaciones no
+    // disparará notificaciones de los mensajes que ya estás viendo aquí.
+    // Leer el notifier en initState es válido; modificar su estado NO (Riverpod
+    // prohíbe mutar providers durante el ciclo de vida), así que se difiere.
+    _chatAbierto = ref.read(chatAbiertoProvider.notifier);
+    Future(() {
+      if (mounted) _chatAbierto.abrir(widget.viajeId);
+    });
     // Tiempo real: el conductor ya está suscrito a la sala de su viaje activo
     // (tracking); aquí solo consumimos los mensajes entrantes.
-    _subChat = ref.read(socketServiceProvider).chatMensajes.listen((data) {
+    final socket = ref.read(socketServiceProvider);
+    _subChat = socket.chatMensajes.listen((data) {
       if (data['viajeId'] != widget.viajeId) return;
       _agregar(MensajeChat.fromJson(data));
       // El chat está abierto: marca leído lo que llega del panel.
       ref.read(chatRepositoryProvider).marcarLeido(widget.viajeId);
     });
+    // Acuses del monitorista sobre MIS mensajes: actualiza las palomitas.
+    _subEntregado =
+        socket.chatEntregados.listen((d) => _aplicarAcuse(d, leido: false));
+    _subLeido = socket.chatLeidos.listen((d) => _aplicarAcuse(d, leido: true));
+  }
+
+  /// Aplica un acuse (entregado/leído) del monitorista a mis propios mensajes.
+  void _aplicarAcuse(Map<String, dynamic> data, {required bool leido}) {
+    if (!mounted) return;
+    if (data['viajeId'] != widget.viajeId || data['lector'] != 'MONITORISTA') {
+      return;
+    }
+    setState(() {
+      for (var i = 0; i < _mensajes.length; i++) {
+        final m = _mensajes[i];
+        if (m.esMio) {
+          _mensajes[i] = m.copyWith(entregado: true, leido: leido ? true : null);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    // Diferido y usando el notifier ya capturado (no `ref`, inválido tras
+    // dispose): mutar el provider en dispose lanzaría el assert de Riverpod.
+    final chatAbierto = _chatAbierto;
+    final viajeId = widget.viajeId;
+    Future(() => chatAbierto.cerrar(viajeId));
     _subChat?.cancel();
+    _subEntregado?.cancel();
+    _subLeido?.cancel();
     _textoCtrl.dispose();
     _scroll.dispose();
     super.dispose();
@@ -372,14 +411,39 @@ class _Burbuja extends StatelessWidget {
             if (mensaje.texto != null && mensaje.texto!.isNotEmpty)
               Text(mensaje.texto!, style: TextStyle(color: texto)),
             const SizedBox(height: 2),
-            Text(
-              DateFormat('d MMM, HH:mm', 'es').format(mensaje.createdAt),
-              style: TextStyle(fontSize: 10, color: texto.withValues(alpha: 0.7)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat('d MMM, HH:mm', 'es').format(mensaje.createdAt),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: texto.withValues(alpha: 0.7),
+                  ),
+                ),
+                if (mio) ...[
+                  const SizedBox(width: 4),
+                  _palomita(texto.withValues(alpha: 0.7)),
+                ],
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Palomitas de estado de MIS mensajes: enviado (✓), entregado (✓✓),
+  /// leído (✓✓ en azul).
+  Widget _palomita(Color base) {
+    if (mensaje.leido) {
+      // Azul cielo brillante: contrasta sobre la burbuja azul del emisor.
+      return const Icon(Icons.done_all, size: 14, color: Color(0xFF80D8FF));
+    }
+    if (mensaje.entregado) {
+      return Icon(Icons.done_all, size: 14, color: base);
+    }
+    return Icon(Icons.check, size: 14, color: base);
   }
 
   Widget _adjunto(BuildContext context, Color texto) {

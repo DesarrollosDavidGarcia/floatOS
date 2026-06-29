@@ -5,12 +5,28 @@ import { ConnectionOptions } from 'bullmq';
  * REDIS_URL (p. ej. redis://localhost:6379). Si no está definida, usa
  * localhost:6379 por defecto.
  *
- * `maxRetriesPerRequest: null` es requerido por BullMQ para los workers.
- * No lanzamos error aquí: la tolerancia a Redis caído se maneja en el
- * módulo capturando los eventos de error de cola/worker.
+ * `modo`:
+ * - `'worker'` (por defecto): `maxRetriesPerRequest: null`, requerido por BullMQ
+ *   para los comandos bloqueantes del worker. Con Redis caído reintenta sin tope.
+ * - `'productor'`: tope finito de reintentos + `enableOfflineQueue: false`, para
+ *   que `queue.add()` FALLE RÁPIDO en vez de colgar el request cuando Redis no
+ *   responde. Lo usa la cola de cotizaciones, que tiene fallback síncrono: sin
+ *   esto, el comando se encolaría offline y el endpoint quedaría esperando en
+ *   lugar de degradar al envío síncrono.
+ *
+ * No lanzamos error aquí: la tolerancia a Redis caído se maneja en el módulo
+ * capturando los eventos de error de cola/worker.
  */
-export function crearConexionRedis(): ConnectionOptions {
+export function crearConexionRedis(
+  modo: 'worker' | 'productor' = 'worker',
+): ConnectionOptions {
   const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
+
+  // Productor: falla rápido (no cuelga el request). Worker: reintenta indefinido.
+  const fiabilidad: ConnectionOptions =
+    modo === 'productor'
+      ? { maxRetriesPerRequest: 1, enableOfflineQueue: false }
+      : { maxRetriesPerRequest: null };
 
   let parsed: URL;
   try {
@@ -20,7 +36,7 @@ export function crearConexionRedis(): ConnectionOptions {
     return {
       host: 'localhost',
       port: 6379,
-      maxRetriesPerRequest: null,
+      ...fiabilidad,
     };
   }
 
@@ -29,8 +45,7 @@ export function crearConexionRedis(): ConnectionOptions {
     port: parsed.port ? Number(parsed.port) : 6379,
     username: parsed.username || undefined,
     password: parsed.password || undefined,
-    // BullMQ exige null para workers/blocking commands.
-    maxRetriesPerRequest: null,
+    ...fiabilidad,
   };
 }
 

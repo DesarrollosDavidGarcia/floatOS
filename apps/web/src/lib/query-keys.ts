@@ -12,3 +12,19 @@ export function invalidarViajes(qc: QueryClient, viajeId?: string): void {
   qc.invalidateQueries({ queryKey: ['tracking'] });
   if (viajeId) qc.invalidateQueries({ queryKey: ['viaje', viajeId] });
 }
+
+/** Query key del listado de cotizaciones de un viaje (fuente única). */
+export function cotizacionesKey(viajeId: string): [string, string] {
+  return ['cotizaciones', viajeId];
+}
+
+/**
+ * Invalida el listado de cotizaciones de un viaje y, de paso, las queries de
+ * viajes (su estado/contadores pueden depender de si hay cotización aceptada).
+ * Espejo de `invalidarViajes` para no repetir el par de invalidaciones en cada
+ * mutación de cotización.
+ */
+export function invalidarCotizaciones(qc: QueryClient, viajeId: string): void {
+  qc.invalidateQueries({ queryKey: cotizacionesKey(viajeId) });
+  invalidarViajes(qc, viajeId);
+}

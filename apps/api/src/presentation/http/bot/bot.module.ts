@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RoutingModule } from '../../../infrastructure/routing/routing.module';
 import { BotController } from './bot.controller';
+import { BotCotizacionService } from './bot-cotizacion.service';
 
 /**
  * Superficie HTTP para el bot de cotización (n8n), autenticada por API key.
@@ -10,5 +11,6 @@ import { BotController } from './bot.controller';
 @Module({
   imports: [RoutingModule],
   controllers: [BotController],
+  providers: [BotCotizacionService],
 })
 export class BotModule {}

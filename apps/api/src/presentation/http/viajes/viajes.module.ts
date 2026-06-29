@@ -10,6 +10,7 @@ import { AsignarViajeUseCase } from '../../../application/viajes/asignar-viaje.u
 import { CambiarEstadoViajeUseCase } from '../../../application/viajes/cambiar-estado-viaje.usecase';
 import { ActualizarPlanRutaUseCase } from '../../../application/viajes/actualizar-plan-ruta.usecase';
 import { GestionarContactosEscalaUseCase } from '../../../application/viajes/gestionar-contactos-escala.usecase';
+import { GestionarPasajerosUseCase } from '../../../application/viajes/gestionar-pasajeros.usecase';
 import { ListarLlegadasRecientesUseCase } from '../../../application/viajes/listar-llegadas-recientes.usecase';
 import { ReportarIncidenciaViajeUseCase } from '../../../application/viajes/reportar-incidencia-viaje.usecase';
 import { MotorViajeService } from '../../../application/viajes/motor-viaje.service';
@@ -38,6 +39,7 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
     CambiarEstadoViajeUseCase,
     ActualizarPlanRutaUseCase,
     GestionarContactosEscalaUseCase,
+    GestionarPasajerosUseCase,
     ListarLlegadasRecientesUseCase,
     ReportarIncidenciaViajeUseCase,
   ],

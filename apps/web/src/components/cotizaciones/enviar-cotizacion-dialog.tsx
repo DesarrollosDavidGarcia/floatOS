@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Send, X } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
-import { invalidarViajes } from '@/lib/query-keys';
+import { invalidarCotizaciones } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,11 +39,17 @@ function ChipsCorreo({
 }) {
   const [nuevo, setNuevo] = useState('');
 
-  function agregar() {
+  /**
+   * Commitea el borrador a un chip. `silencioso` (usado en blur) no muestra el
+   * error de validación: así, si el usuario teclea un correo y hace clic en
+   * "Enviar" sin pulsar "Agregar", el blur del input lo agrega antes del envío
+   * y no se pierde.
+   */
+  function agregar(silencioso = false) {
     const email = nuevo.trim().toLowerCase();
     if (!email) return;
     if (!EMAIL_RE.test(email)) {
-      toast.error('Correo inválido');
+      if (!silencioso) toast.error('Correo inválido');
       return;
     }
     if (!valores.includes(email)) onChange([...valores, email]);
@@ -59,6 +65,7 @@ function ChipsCorreo({
           type="email"
           value={nuevo}
           onChange={(e) => setNuevo(e.target.value)}
+          onBlur={() => agregar(true)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -67,7 +74,12 @@ function ChipsCorreo({
           }}
           placeholder={placeholder ?? 'correo@dominio.com'}
         />
-        <Button type="button" variant="outline" onClick={agregar} disabled={!nuevo.trim()}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => agregar()}
+          disabled={!nuevo.trim()}
+        >
           <Plus />
           Agregar
         </Button>
@@ -139,12 +151,8 @@ export function EnviarCotizacionDialog({
       // Invalida ya (cubre el caso síncrono) y de nuevo tras un pequeño retardo
       // por si el envío en cola tarda un poco, además del refresco por WS
       // (cotizacion:actualizada) que escucha la tarjeta de cotizaciones.
-      qc.invalidateQueries({ queryKey: ['cotizaciones', viajeId] });
-      invalidarViajes(qc, viajeId);
-      setTimeout(() => {
-        qc.invalidateQueries({ queryKey: ['cotizaciones', viajeId] });
-        invalidarViajes(qc, viajeId);
-      }, 4000);
+      invalidarCotizaciones(qc, viajeId);
+      setTimeout(() => invalidarCotizaciones(qc, viajeId), 4000);
       setOpen(false);
     },
     onError: (err) => toast.error(apiError(err)),
@@ -234,7 +242,10 @@ export function EnviarCotizacionDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={enviar.isPending}>
             Cancelar
           </Button>
-          <Button onClick={() => enviar.mutate()} disabled={enviar.isPending}>
+          <Button
+            onClick={() => enviar.mutate()}
+            disabled={enviar.isPending || correos.length === 0}
+          >
             {enviar.isPending ? 'Enviando…' : 'Enviar'}
           </Button>
         </DialogFooter>

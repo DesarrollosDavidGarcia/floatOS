@@ -31,7 +31,8 @@ export class CotizacionesQueue implements OnModuleDestroy {
   async iniciar(): Promise<void> {
     try {
       this.queue = new Queue(COLA_COTIZACIONES, {
-        connection: crearConexionRedis(),
+        // 'productor': add() falla rápido si Redis no responde → fallback síncrono.
+        connection: crearConexionRedis('productor'),
         defaultJobOptions: {
           removeOnComplete: 100,
           removeOnFail: 200,

@@ -122,6 +122,31 @@ class HistorialEstado {
       );
 }
 
+/// Pasajero del manifiesto (viajes de transporte de personal).
+class Pasajero {
+  Pasajero({
+    required this.id,
+    required this.nombre,
+    this.identificacion,
+    this.telefono,
+    this.escalaId,
+  });
+
+  final String id;
+  final String nombre;
+  final String? identificacion;
+  final String? telefono;
+  final String? escalaId;
+
+  factory Pasajero.fromJson(Map<String, dynamic> json) => Pasajero(
+        id: json['id'] as String,
+        nombre: json['nombre'] as String? ?? '',
+        identificacion: json['identificacion'] as String?,
+        telefono: json['telefono'] as String?,
+        escalaId: json['escalaId'] as String?,
+      );
+}
+
 class Viaje {
   Viaje({
     required this.id,
@@ -132,6 +157,9 @@ class Viaje {
     required this.tipoCarga,
     required this.pesoKg,
     required this.distanciaEstimadaKm,
+    this.tipoServicio = 'CARGA',
+    this.numPasajeros,
+    this.pasajeros = const [],
     this.origenLat,
     this.origenLng,
     this.destinoLat,
@@ -162,6 +190,13 @@ class Viaje {
   final String? descripcionCarga;
   final double pesoKg;
   final double distanciaEstimadaKm;
+
+  /// Tipo de servicio: 'CARGA' (mercancía) o 'PERSONAL' (pasajeros).
+  final String tipoServicio;
+  final int? numPasajeros;
+  final List<Pasajero> pasajeros;
+
+  bool get esPersonal => tipoServicio == 'PERSONAL';
   final DateTime? fechaProgramada;
   final DateTime? fechaInicio;
   final DateTime? fechaEntrega;
@@ -201,6 +236,11 @@ class Viaje {
       descripcionCarga: json['descripcionCarga'] as String?,
       pesoKg: _aDouble(json['pesoKg']) ?? 0,
       distanciaEstimadaKm: _aDouble(json['distanciaEstimadaKm']) ?? 0,
+      tipoServicio: json['tipoServicio'] as String? ?? 'CARGA',
+      numPasajeros: (json['numPasajeros'] as num?)?.toInt(),
+      pasajeros: (json['pasajeros'] as List<dynamic>? ?? [])
+          .map((p) => Pasajero.fromJson(p as Map<String, dynamic>))
+          .toList(),
       fechaProgramada: _aFecha(json['fechaProgramada']),
       fechaInicio: _aFecha(json['fechaInicio']),
       fechaEntrega: _aFecha(json['fechaEntrega']),

@@ -37,11 +37,30 @@ export class EditarViajeUseCase {
   async execute(id: string, input: EditarViajeInput) {
     const existe = await this.prisma.viaje.findUnique({
       where: { id },
-      select: { id: true, estado: true, fechaProgramada: true },
+      select: {
+        id: true,
+        estado: true,
+        fechaProgramada: true,
+        tipoServicio: true,
+      },
     });
     if (!existe) {
       throw new NotFoundException(`Viaje con id ${id} no encontrado`);
     }
+
+    // Tipo efectivo: el que se envía o, si no, el guardado.
+    const tipoServicio = input.tipoServicio ?? existe.tipoServicio;
+    const esPersonal = tipoServicio === 'PERSONAL';
+    if (esPersonal && (!input.numPasajeros || input.numPasajeros < 1)) {
+      throw new BadRequestException(
+        'Indica el número de pasajeros del servicio de personal',
+      );
+    }
+    // Campos de tipo de servicio a actualizar en cualquiera de las dos ramas.
+    const datosServicio = {
+      tipoServicio,
+      numPasajeros: esPersonal ? input.numPasajeros : null,
+    };
 
     const fechaProgramada =
       input.fechaProgramada !== undefined
@@ -58,7 +77,7 @@ export class EditarViajeUseCase {
     if (!input.escalas) {
       return this.prisma.viaje.update({
         where: { id },
-        data: { fechaProgramada },
+        data: { fechaProgramada, ...datosServicio },
         include: RELACIONES_DETALLE,
       });
     }
@@ -73,11 +92,12 @@ export class EditarViajeUseCase {
     // departAt = fecha programada efectiva (la nueva o la ya guardada) → tráfico predicho.
     const departAt = (fechaProgramada ?? existe.fechaProgramada)?.toISOString();
     const ruta = await this.motor.distanciaKm(input.escalas, { departAt });
-    const resumen = derivarResumen(input.escalas, sim);
+    const resumen = derivarResumen(input.escalas, sim, esPersonal);
 
     const data: Prisma.ViajeUpdateInput = {
       ...resumen,
       ...snapshotRuta(ruta),
+      ...datosServicio,
       fechaProgramada,
       escalas: { create: nestedEscalasCreate(input.escalas) },
     };

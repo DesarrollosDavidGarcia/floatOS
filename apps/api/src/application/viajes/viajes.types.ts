@@ -34,6 +34,7 @@ export const RELACIONES_DETALLE = {
     orderBy: { orden: 'asc' },
     include: { cargas: true, contactos: { orderBy: { createdAt: 'asc' } } },
   },
+  pasajeros: { orderBy: { createdAt: 'asc' } },
   // Acotado a las reasignaciones recientes (no hay endpoint paginado aparte, por
   // eso un take algo más alto). En la práctica un viaje rara vez supera unas
   // pocas reasignaciones; 100 cubre cualquier caso real sin inflar el payload.
@@ -70,6 +71,8 @@ export const SELECCION_LISTADO = {
   destinoDireccion: true,
   destinoLat: true,
   destinoLng: true,
+  tipoServicio: true,
+  numPasajeros: true,
   tipoCarga: true,
   descripcionCarga: true,
   pesoKg: true,
@@ -118,6 +121,9 @@ export interface EscalaInput {
   cargas?: CargaInput[];
 }
 
+/** Tipo de servicio del viaje. */
+export type TipoServicioInput = 'CARGA' | 'PERSONAL';
+
 /** Datos para crear un viaje. */
 export interface CrearViajeInput {
   clienteId: string;
@@ -125,12 +131,18 @@ export interface CrearViajeInput {
   fechaProgramada?: string;
   unidadId?: string;
   conductorId?: string;
+  /** Tipo de servicio (default CARGA). */
+  tipoServicio?: TipoServicioInput;
+  /** Nº de pasajeros (obligatorio para PERSONAL). */
+  numPasajeros?: number;
 }
 
 /** Datos para editar un viaje. Si `escalas` viene, reemplaza el itinerario. */
 export interface EditarViajeInput {
   escalas?: EscalaInput[];
   fechaProgramada?: string;
+  tipoServicio?: TipoServicioInput;
+  numPasajeros?: number;
 }
 
 /** Datos para evaluar un itinerario contra la flota (motor de cálculo). */

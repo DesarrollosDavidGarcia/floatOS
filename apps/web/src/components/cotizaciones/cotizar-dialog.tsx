@@ -6,7 +6,7 @@ import { FileText, Pencil } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
 import { useDebounce } from '@/lib/hooks';
 import { formatearMoneda } from '@/lib/estado-cotizacion';
-import { invalidarViajes } from '@/lib/query-keys';
+import { invalidarCotizaciones } from '@/lib/query-keys';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -21,10 +21,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Viaje } from '@/components/viajes/types';
 import {
   PARAMS_COTIZACION_DEFAULT,
   type Cotizacion,
+  type ModoPrecioPersonal,
   type ParamsCotizacion,
   type ResultadoCotizacion,
 } from './types';
@@ -48,10 +56,20 @@ export function CotizarDialog({
   cotizacion?: Cotizacion;
 }) {
   const esEdicion = !!cotizacion;
-  const inicial = (): ParamsCotizacion =>
-    cotizacion
+  const esPersonal = viaje.tipoServicio === 'PERSONAL';
+  const inicial = (): ParamsCotizacion => {
+    const base = cotizacion
       ? { ...PARAMS_COTIZACION_DEFAULT, ...cotizacion.params }
       : PARAMS_COTIZACION_DEFAULT;
+    return esPersonal
+      ? {
+          ...base,
+          tipoServicio: 'PERSONAL',
+          modoPrecio: base.modoPrecio ?? 'POR_VIAJE',
+          precioPorPasajero: base.precioPorPasajero ?? 0,
+        }
+      : { ...base, tipoServicio: 'CARGA' };
+  };
   const [open, setOpen] = useState(false);
   const [params, setParams] = useState<ParamsCotizacion>(inicial);
   const [notas, setNotas] = useState(cotizacion?.notas ?? '');
@@ -60,11 +78,16 @@ export function CotizarDialog({
   const datos = {
     distanciaKm: Number(viaje.distanciaEstimadaKm ?? 0),
     pesoKg: Number(viaje.pesoMaxKg ?? viaje.pesoKg ?? 0),
+    numPasajeros: viaje.numPasajeros ?? 0,
     numEscalas: viaje.escalas?.length ?? 0,
   };
 
   const claveParams = useDebounce(JSON.stringify(params), 500);
-  const { data: preview } = useQuery<ResultadoCotizacion>({
+  const {
+    data: preview,
+    isError: previewError,
+    refetch: recalcular,
+  } = useQuery<ResultadoCotizacion>({
     queryKey: ['cotizar-calcular', viaje.id, claveParams],
     queryFn: async () => {
       const { data } = await api.post<ResultadoCotizacion>('/cotizaciones/calcular', {
@@ -88,8 +111,7 @@ export function CotizarDialog({
     },
     onSuccess: () => {
       toast.success(esEdicion ? 'Cotización actualizada' : 'Cotización creada');
-      qc.invalidateQueries({ queryKey: ['cotizaciones', viaje.id] });
-      invalidarViajes(qc, viaje.id);
+      invalidarCotizaciones(qc, viaje.id);
       setOpen(false);
     },
     onError: (err) => toast.error(apiError(err)),
@@ -129,23 +151,99 @@ export function CotizarDialog({
               : 'Nueva cotización'}
           </DialogTitle>
           <DialogDescription>
-            Viaje #{viaje.folio} · {datos.distanciaKm} km · {datos.pesoKg} kg ·{' '}
-            {datos.numEscalas} escala(s)
+            Viaje #{viaje.folio} · {datos.distanciaKm} km ·{' '}
+            {esPersonal
+              ? `${datos.numPasajeros} pasajero(s)`
+              : `${datos.pesoKg} kg`}{' '}
+            · {datos.numEscalas} escala(s)
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {CAMPOS.map((c) => (
-            <div key={c.key} className="space-y-1.5">
-              <Label htmlFor={c.key}>{c.label}</Label>
+        {esPersonal ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="modoPrecio">Cómo se cobra</Label>
+              <Select
+                value={params.modoPrecio ?? 'POR_VIAJE'}
+                onValueChange={(v) =>
+                  setParams((p) => ({
+                    ...p,
+                    modoPrecio: v as ModoPrecioPersonal,
+                  }))
+                }
+              >
+                <SelectTrigger id="modoPrecio">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="POR_VIAJE">Por viaje (precio fijo)</SelectItem>
+                  <SelectItem value="POR_KM">Por kilómetro</SelectItem>
+                  <SelectItem value="POR_PASAJERO">Por pasajero</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tarifa-personal">
+                {params.modoPrecio === 'POR_KM'
+                  ? 'Precio por km ($)'
+                  : params.modoPrecio === 'POR_PASAJERO'
+                    ? 'Precio por pasajero ($)'
+                    : 'Precio del viaje ($)'}
+              </Label>
               <NumberField
-                id={c.key}
-                value={params[c.key] as number}
-                onChange={(n) => set(c.key, n)}
+                id="tarifa-personal"
+                value={
+                  params.modoPrecio === 'POR_KM'
+                    ? params.precioPorKm
+                    : params.modoPrecio === 'POR_PASAJERO'
+                      ? params.precioPorPasajero ?? 0
+                      : params.tarifaBase
+                }
+                onChange={(n) =>
+                  set(
+                    params.modoPrecio === 'POR_KM'
+                      ? 'precioPorKm'
+                      : params.modoPrecio === 'POR_PASAJERO'
+                        ? 'precioPorPasajero'
+                        : 'tarifaBase',
+                    n,
+                  )
+                }
               />
             </div>
-          ))}
-        </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="casetas-p">Casetas ($)</Label>
+              <NumberField
+                id="casetas-p"
+                value={params.casetas}
+                onChange={(n) => set('casetas', n)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="margen-p">Margen (%)</Label>
+              <NumberField
+                id="margen-p"
+                value={params.margenPct}
+                onChange={(n) => set('margenPct', n)}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {CAMPOS.map((c) => (
+              <div key={c.key} className="space-y-1.5">
+                <Label htmlFor={c.key}>{c.label}</Label>
+                <NumberField
+                  id={c.key}
+                  value={params[c.key] as number}
+                  onChange={(n) => set(c.key, n)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-6">
           <label className="flex items-center gap-2 text-sm">
@@ -203,6 +301,13 @@ export function CotizarDialog({
               <span>Total</span>
               <span className="tabular-nums">{formatearMoneda(preview.total)}</span>
             </div>
+          </div>
+        ) : previewError ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <span className="text-destructive">No se pudo calcular el desglose.</span>
+            <Button variant="outline" size="sm" onClick={() => recalcular()}>
+              Reintentar
+            </Button>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">Calculando desglose…</p>

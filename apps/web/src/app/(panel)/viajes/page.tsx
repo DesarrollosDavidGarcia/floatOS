@@ -176,9 +176,16 @@ export default function ViajesPage() {
                   <TableCell>
                     <CeldaPrincipal
                       titulo={
-                        <Link href={`/viajes/${v.id}`} className="hover:underline">
-                          #{v.folio}
-                        </Link>
+                        <span className="flex items-center gap-1.5">
+                          <Link href={`/viajes/${v.id}`} className="hover:underline">
+                            #{v.folio}
+                          </Link>
+                          {v.tipoServicio === 'PERSONAL' && (
+                            <Badge variant="secondary" className="px-1.5 text-[10px]">
+                              Personal
+                            </Badge>
+                          )}
+                        </span>
                       }
                       subtitulo={v.cliente?.razonSocial}
                     />

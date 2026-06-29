@@ -4,9 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FileText, Paperclip, Send, X } from 'lucide-react';
-import { WS_EVENTS, type MensajeChatPayload } from '@flotaos/shared-types';
+import { Check, CheckCheck, FileText, Paperclip, Send, X } from 'lucide-react';
+import {
+  WS_EVENTS,
+  type ChatRecepcionPayload,
+  type MensajeChatPayload,
+} from '@flotaos/shared-types';
 import { api, apiError } from '@/lib/api';
+import { setChatAbierto } from '@/lib/chat-abierto';
 import { getSocket } from '@/lib/socket';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
@@ -33,6 +38,27 @@ function agregarMensaje(
     if (lista.some((m) => m.id === msg.id)) return lista;
     return [...lista, msg];
   });
+}
+
+/**
+ * Marca el estado (entregado/leído) de los mensajes PROPIos (del monitorista) en
+ * la cache, para refrescar las palomitas al recibir el acuse del conductor.
+ * "leído" implica "entregado".
+ */
+function marcarEstadoPropio(
+  qc: ReturnType<typeof useQueryClient>,
+  viajeId: string,
+  estado: 'entregado' | 'leido',
+) {
+  qc.setQueryData<MensajeChatPayload[]>(['chat', viajeId], (prev) =>
+    (prev ?? []).map((m) =>
+      m.autorTipo === 'MONITORISTA'
+        ? estado === 'leido'
+          ? { ...m, entregado: true, leido: true }
+          : { ...m, entregado: true }
+        : m,
+    ),
+  );
 }
 
 /**
@@ -116,9 +142,12 @@ export function ChatViaje({ viajeId }: { viajeId: string }) {
       .catch(() => undefined);
   };
 
-  // Al abrir el chat: marca como leído lo pendiente de este viaje.
+  // Al abrir el chat: marca como leído lo pendiente y registra el chat abierto
+  // (para que la campana no acuse "recibido" lo que aquí ya se marca leído).
   useEffect(() => {
     marcarLeido();
+    setChatAbierto(viajeId);
+    return () => setChatAbierto(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeId]);
 
@@ -132,9 +161,24 @@ export function ChatViaje({ viajeId }: { viajeId: string }) {
       // Como el chat está abierto, marcamos leído lo que llega del conductor.
       if (m.autorTipo === 'CONDUCTOR') marcarLeido();
     };
+    // Acuses del conductor sobre los mensajes del monitorista: actualiza palomitas.
+    const onEntregado = (p: ChatRecepcionPayload) => {
+      if (p.viajeId === viajeId && p.lector === 'CONDUCTOR') {
+        marcarEstadoPropio(qc, viajeId, 'entregado');
+      }
+    };
+    const onLeido = (p: ChatRecepcionPayload) => {
+      if (p.viajeId === viajeId && p.lector === 'CONDUCTOR') {
+        marcarEstadoPropio(qc, viajeId, 'leido');
+      }
+    };
     socket.on(WS_EVENTS.CHAT_MENSAJE, onMensaje);
+    socket.on(WS_EVENTS.CHAT_ENTREGADO, onEntregado);
+    socket.on(WS_EVENTS.CHAT_LEIDO, onLeido);
     return () => {
       socket.off(WS_EVENTS.CHAT_MENSAJE, onMensaje);
+      socket.off(WS_EVENTS.CHAT_ENTREGADO, onEntregado);
+      socket.off(WS_EVENTS.CHAT_LEIDO, onLeido);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeId, qc]);
@@ -318,10 +362,24 @@ function Burbuja({ mensaje }: { mensaje: MensajeChatPayload }) {
 
         {mensaje.texto && <p className="whitespace-pre-wrap break-words">{mensaje.texto}</p>}
 
-        <p className={cn('mt-1 text-[10px]', propio ? 'opacity-70' : 'text-muted-foreground')}>
-          {format(new Date(mensaje.createdAt), 'd MMM, HH:mm', { locale: es })}
-        </p>
+        <div className={cn('mt-1 flex items-center gap-1 text-[10px]', propio && 'justify-end')}>
+          <span className={propio ? 'opacity-70' : 'text-muted-foreground'}>
+            {format(new Date(mensaje.createdAt), 'd MMM, HH:mm', { locale: es })}
+          </span>
+          {propio && <EstadoMensaje entregado={mensaje.entregado} leido={mensaje.leido} />}
+        </div>
       </div>
     </div>
   );
+}
+
+/** Palomitas de estado del mensaje propio: enviado (✓), entregado (✓✓), leído (✓✓ azul). */
+function EstadoMensaje({ entregado, leido }: { entregado: boolean; leido: boolean }) {
+  if (leido) {
+    return <CheckCheck className="h-3.5 w-3.5 text-sky-300" aria-label="Leído" />;
+  }
+  if (entregado) {
+    return <CheckCheck className="h-3.5 w-3.5 opacity-70" aria-label="Entregado" />;
+  }
+  return <Check className="h-3.5 w-3.5 opacity-70" aria-label="Enviado" />;
 }
