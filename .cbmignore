@@ -1,0 +1,20 @@
+# codebase-memory-mcp — exclusiones de indexado (sintaxis .gitignore)
+# Solo indexamos código TypeScript: apps/api (NestJS), apps/web (Next.js), packages/shared-types.
+
+# Flutter / Dart — sin soporte semántico en la herramienta
+apps/mobile/
+
+# Infra y datos, no código de aplicación
+n8n/
+nginx/
+infra/
+postgres/
+scripts/
+backups/
+node_modules/
+dist/
+build/
+.next/
+
+# Documentación y auditorías (markdown grande)
+*.md

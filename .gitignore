@@ -59,3 +59,6 @@ apps/mobile/ios/Pods/
 # Test / coverage
 coverage/
 *.tsbuildinfo
+
+# codebase-memory-mcp: registro MCP con ruta absoluta por máquina (no portable)
+.mcp.json
