@@ -42,7 +42,8 @@ nginx/certs/*
 infra/traefik/acme.json
 
 # Instancias de cliente (secretos + datos por cliente; no se versionan)
-clientes/
+# Anclado a la raíz: NO debe ignorar los módulos de código apps/**/clientes.
+/clientes/
 
 # Respaldos de base de datos (datos; pueden contener información sensible)
 backups/
