@@ -1,0 +1,15 @@
+# Firma de release de Android. Copia este archivo a `key.properties` (gitignored)
+# y rellena con los datos reales del keystore. build.gradle.kts lo carga solo si
+# existe; si falta, el release se firma con la clave de debug (NO publicable).
+#
+# Generar keystore (una sola vez, guardarlo FUERA de git y con respaldo seguro):
+#   keytool -genkey -v -keystore ~/flotaos-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias flotaos
+#
+# Recomendado: habilitar Play App Signing en Google Play Console (Google custodia
+# la clave de firma de la app y este keystore pasa a ser la clave de subida).
+
+storeFile=/ruta/absoluta/a/flotaos-release.jks
+storePassword=CAMBIAR
+keyAlias=flotaos
+keyPassword=CAMBIAR

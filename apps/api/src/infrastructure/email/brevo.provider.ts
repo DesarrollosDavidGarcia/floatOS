@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { MailProvider, MensajeCorreo } from './mail-provider';
 
 const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
+// Timeout defensivo: sin él, una API de Brevo colgada bloquearía el slot del
+// worker de cotizaciones (concurrency 3) indefinidamente.
+const TIMEOUT_MS = 15_000;
 
 /**
  * Proveedor Brevo (API transaccional). Configuración por env:
@@ -39,18 +42,28 @@ export class BrevoMailProvider implements MailProvider {
       })),
     };
 
-    const res = await fetch(BREVO_URL, {
-      method: 'POST',
-      headers: {
-        'api-key': key,
-        'content-type': 'application/json',
-        accept: 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const detalle = await res.text().catch(() => '');
-      throw new Error(`Brevo HTTP ${res.status} ${detalle}`.trim());
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(BREVO_URL, {
+        method: 'POST',
+        headers: {
+          'api-key': key,
+          'content-type': 'application/json',
+          accept: 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const detalle = await res.text().catch(() => '');
+        throw new Error(`Brevo HTTP ${res.status} ${detalle}`.trim());
+      }
+    } catch (e) {
+      if (ac.signal.aborted) throw new Error(`Brevo timeout tras ${TIMEOUT_MS}ms`);
+      throw e;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

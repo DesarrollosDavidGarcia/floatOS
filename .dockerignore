@@ -1,0 +1,40 @@
+# El contexto de build de las imágenes es la RAÍZ del repo (docker-compose.build.yml
+# usa `context: .`), así que Docker solo honra ESTE .dockerignore (los de apps/*
+# quedan sin efecto). Sin él, todo el repo —incl. secretos y datos— se enviaría
+# al daemon y podría hornearse en capas intermedias del build.
+
+# Dependencias y artefactos (se regeneran dentro del build)
+**/node_modules
+**/dist
+**/build
+**/.next
+**/.turbo
+*.tsbuildinfo
+
+# Secretos y entornos (NUNCA al contexto de build)
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/secrets/
+**/firebase-service-account*.json
+nginx/certs/*
+infra/traefik/acme.json
+
+# Datos e instancias por cliente
+/clientes/
+backups/
+postgres/data/
+
+# La app móvil no participa en las imágenes Docker
+apps/mobile/
+
+# VCS, editores, logs, coverage
+.git/
+.gitignore
+.idea/
+.vscode/
+*.log
+coverage/
+
+# Documentación de auditorías / notas (no se necesita en imagen)
+FlotaOS_*.md

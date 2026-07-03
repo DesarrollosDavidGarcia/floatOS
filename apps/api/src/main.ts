@@ -41,27 +41,38 @@ async function bootstrap() {
     }),
   );
 
-  // Documentación interactiva (Swagger UI) en /api/docs
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('FlotaOS API')
-    .setDescription('Backend de FlotaOS — Fase 1. Usa el botón "Authorize" con el accessToken de POST /api/auth/login.')
-    .setVersion('1.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'bearer',
-    )
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  // Aplica el esquema bearer globalmente (las rutas públicas igual funcionan sin token).
-  document.security = [{ bearer: [] }];
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: { persistAuthorization: true },
-  });
+  // Documentación interactiva (Swagger UI) en /api/docs. Solo fuera de
+  // producción: en prod expondría todo el esquema de endpoints/DTOs a cualquiera
+  // (reconocimiento). Reactivable en un entorno protegido si hace falta.
+  const swaggerHabilitado = process.env.NODE_ENV !== 'production';
+  if (swaggerHabilitado) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('FlotaOS API')
+      .setDescription('Backend de FlotaOS — Fase 1. Usa el botón "Authorize" con el accessToken de POST /api/auth/login.')
+      .setVersion('1.0')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'bearer',
+      )
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    // Aplica el esquema bearer globalmente (las rutas públicas igual funcionan sin token).
+    document.security = [{ bearer: [] }];
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: { persistAuthorization: true },
+    });
+  }
+
+  // Cierre ordenado ante SIGTERM/SIGINT: dispara los OnModuleDestroy (Prisma,
+  // colas BullMQ, workers) para no cortar conexiones ni abortar jobs en vuelo.
+  app.enableShutdownHooks();
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
   await app.listen(port, '0.0.0.0');
   Logger.log(`FlotaOS API escuchando en http://0.0.0.0:${port}/api`, 'Bootstrap');
-  Logger.log(`Swagger UI en http://0.0.0.0:${port}/api/docs`, 'Bootstrap');
+  if (swaggerHabilitado) {
+    Logger.log(`Swagger UI en http://0.0.0.0:${port}/api/docs`, 'Bootstrap');
+  }
 }
 
 bootstrap();

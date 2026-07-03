@@ -35,4 +35,7 @@ COPY --from=build /repo/apps/web/public ./apps/web/public
 
 EXPOSE 3001
 WORKDIR /repo/apps/web
+# No correr como root: `node` (uid 1000) ya existe en node:*-alpine y el puerto
+# 3001 no es privilegiado.
+USER node
 CMD ["npm", "run", "start"]

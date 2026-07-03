@@ -23,6 +23,17 @@ import type { NotificacionLlegada } from '@/components/tracking/tipos';
 const STORAGE_KEY = 'flotaos.notif.llegadas';
 const MAX_NOTIFS = 50;
 
+/**
+ * Borra las notificaciones persistidas. Se llama en el logout: la clave es
+ * global (no está namespaced por usuario), así que sin limpiarla el siguiente
+ * usuario en el mismo dispositivo vería folios/direcciones de la sesión previa.
+ */
+export function limpiarNotificacionesGuardadas(): void {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
 /** Título corto de una notificación de llegada (compartido por toast y campana). */
 export function tituloLlegada(n: {
   folio: number | null;
