@@ -48,6 +48,10 @@ COPY --from=build /repo/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 EXPOSE 3000
 WORKDIR /repo/apps/api
+# No correr como root: la imagen node:*-alpine ya trae el usuario `node` (uid
+# 1000). Los artefactos copiados son legibles/ejecutables para todos por defecto,
+# así que migrate deploy + node arrancan sin privilegios.
+USER node
 # Al arrancar: aplica migraciones pendientes (estricto: si falla, no levanta) y
 # siembra/actualiza los catálogos (tolerante: un fallo no tumba el API, son
 # idempotentes y la DB ya está migrada).

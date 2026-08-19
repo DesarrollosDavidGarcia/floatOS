@@ -55,6 +55,11 @@ apps/mobile/.flutter-plugins
 apps/mobile/.flutter-plugins-dependencies
 apps/mobile/android/.gradle/
 apps/mobile/ios/Pods/
+# Firma de release (secreta): keystore + credenciales. NUNCA versionar.
+apps/mobile/android/key.properties
+apps/mobile/android/**/*.jks
+apps/mobile/android/**/*.keystore
+!apps/mobile/android/key.properties.example
 
 # Test / coverage
 coverage/

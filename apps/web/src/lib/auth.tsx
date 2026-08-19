@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { RolUsuario } from '@flotaos/shared-types';
 import { api } from './api';
 import { closeSocket } from './socket';
+import { limpiarNotificacionesGuardadas } from './notificaciones';
 
 /** Usuario autenticado del panel (vista pública que devuelve GET /auth/me). */
 export interface AuthUser {
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // global reintentaría conectar en bucle (el gateway lo rechaza). Forzar un
     // handshake nuevo en el próximo login.
     closeSocket();
+    limpiarNotificacionesGuardadas();
     setUser(null);
     router.push('/login');
   }, [router]);

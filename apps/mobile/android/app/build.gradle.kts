@@ -16,6 +16,17 @@ if (localPropertiesFile.exists()) {
 }
 val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: ""
 
+// Firma de release desde key.properties (gitignored; fuera de git). Si el
+// archivo no existe (dev / CI sin secretos) se cae a la firma de debug para que
+// `flutter run --release` siga funcionando, pero un artefacto PUBLICABLE exige
+// key.properties + keystore reales (ver android/README para el alta).
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hayFirmaRelease = keystorePropertiesFile.exists()
+if (hayFirmaRelease) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "mx.flotaos.flotaos_conductor"
     // Forzado a 36: plugins como file_picker / flutter_plugin_android_lifecycle
@@ -44,11 +55,26 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    signingConfigs {
+        if (hayFirmaRelease) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Firma real si hay key.properties; si no, debug (solo para pruebas
+            // locales, NO publicable). Habilitar Play App Signing en la consola.
+            signingConfig = if (hayFirmaRelease) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

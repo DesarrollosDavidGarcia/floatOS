@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -23,7 +25,7 @@ class PushMessagingService {
     try {
       await _api.dio.post<void>(
         '/push/registrar',
-        data: {'token': token, 'plataforma': 'android'},
+        data: {'token': token, 'plataforma': Platform.isIOS ? 'ios' : 'android'},
       );
     } on DioException {
       // No crítico: se reintenta en el próximo arranque / refresh de token.

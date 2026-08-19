@@ -9,12 +9,21 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     restart: unless-stopped
 
   api:
     image: ${IMAGE_REGISTRY:-ghcr.io/desarrollosdavidgarcia}/flotaos-api:${FLOTAOS_VERSION:-latest}
+    # Carga TODO el .env de la instancia. La lista `environment:` de abajo antes
+    # era la única fuente y omitía variables (CORS_ORIGIN, SECRETS_KEY,
+    # ROUTING_PROVIDER, *_API_KEY, BREVO_*, FIREBASE_*, EMPRESA_*): con env_file
+    # se propagan todas. `environment:` sigue fijando las que no vienen del .env
+    # (MINIO_ENDPOINT, etc.) y tiene prioridad sobre env_file.
+    env_file:
+      - .env
     environment:
       - NODE_ENV=${NODE_ENV}
       - DATABASE_URL=${DATABASE_URL}
@@ -42,9 +51,24 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       minio:
         condition: service_started
+    # Endurecimiento: sin escalada de privilegios y sin capabilities de Linux
+    # (Node no las necesita escuchando en 3000). Complementa a `USER node` del
+    # Dockerfile.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      # /api/health es público y consulta la DB. start_period holgado por las
+      # migraciones que corren al arrancar.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
 
   web:
@@ -57,6 +81,16 @@ services:
       - NODE_ENV=${NODE_ENV}
     depends_on:
       - api
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   postgres:
@@ -79,6 +113,11 @@ services:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   minio:
