@@ -16,7 +16,10 @@ import {
   snapshotRuta,
 } from './viaje-escalas.helper';
 import { CrearViajeInput, RELACIONES_DETALLE } from './viajes.types';
-import { asegurarConductorDisponible } from './disponibilidad-conductor.helper';
+import {
+  asegurarConductorDisponible,
+  bloquearRecursosAsignacion,
+} from './disponibilidad-conductor.helper';
 
 /**
  * Caso de uso: crear un viaje con su itinerario de escalas. Valida cliente
@@ -75,7 +78,9 @@ export class CrearViajeUseCase {
           `El conductor ${input.conductorId} está inactivo`,
         );
       }
-      // Un conductor con un viaje abierto no puede recibir otro (409).
+      // Un conductor con un viaje abierto no puede recibir otro (409). Check
+      // temprano, para no gastar la llamada de ruteo; el que manda es el que se
+      // repite dentro de la transacción, ya con el conductor bloqueado.
       await asegurarConductorDisponible(this.prisma, input.conductorId);
     }
 
@@ -121,9 +126,20 @@ export class CrearViajeUseCase {
       },
     };
 
-    return this.prisma.viaje.create({
-      data,
-      include: RELACIONES_DETALLE,
+    return this.prisma.$transaction(async (tx) => {
+      // Sin el lock hay TOCTOU: dos altas simultáneas con el mismo conductor
+      // pasan las dos el check de arriba y lo dejan en dos viajes abiertos. El
+      // lock serializa, y la segunda ya ve el viaje de la primera -> 409.
+      if (input.conductorId) {
+        await bloquearRecursosAsignacion(tx, {
+          conductorId: input.conductorId,
+        });
+        await asegurarConductorDisponible(tx, input.conductorId);
+      }
+      return tx.viaje.create({
+        data,
+        include: RELACIONES_DETALLE,
+      });
     });
   }
 }
