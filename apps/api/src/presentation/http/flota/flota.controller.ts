@@ -24,6 +24,11 @@ import {
 } from '../../../application/flota/unidades.usecase';
 import { DocumentosUnidadUseCase } from '../../../application/flota/documentos-unidad.usecase';
 import {
+  ConceptosCostoUseCase,
+  ConceptoCostoVista,
+  CostosUnidadVista,
+} from '../../../application/flota/conceptos-costo.usecase';
+import {
   ArchivosUnidadUseCase,
   ArchivoSubido,
   TAMANO_MAX_BYTES,
@@ -35,6 +40,10 @@ import { DiasVencimientoDto } from '../shared/dias-vencimiento.dto';
 import { CrearUnidadDto } from './dto/crear-unidad.dto';
 import { ActualizarUnidadDto } from './dto/actualizar-unidad.dto';
 import { ListarUnidadesDto } from './dto/listar-unidades.dto';
+import {
+  ActualizarConceptoCostoDto,
+  CrearConceptoCostoDto,
+} from './dto/concepto-costo.dto';
 import { CrearDocumentoUnidadDto } from './dto/crear-documento-unidad.dto';
 import { ActualizarDocumentoUnidadDto } from './dto/actualizar-documento-unidad.dto';
 
@@ -55,7 +64,40 @@ export class FlotaController {
     private readonly unidades: UnidadesUseCase,
     private readonly documentos: DocumentosUnidadUseCase,
     private readonly archivos: ArchivosUnidadUseCase,
+    private readonly conceptosCosto: ConceptosCostoUseCase,
   ) {}
+
+  // ── Costos de operación de la unidad ──
+
+  /**
+   * Conceptos de costo con su aportación por km y el total. Es el número que el
+   * motor de margen le carga a cada viaje de esta unidad.
+   */
+  @Get(':unidadId/costos')
+  listarCostos(@Param('unidadId') unidadId: string): Promise<CostosUnidadVista> {
+    return this.conceptosCosto.listar(unidadId);
+  }
+
+  @Post(':unidadId/costos')
+  crearCosto(
+    @Param('unidadId') unidadId: string,
+    @Body() dto: CrearConceptoCostoDto,
+  ): Promise<ConceptoCostoVista> {
+    return this.conceptosCosto.crear(unidadId, dto);
+  }
+
+  @Patch('costos/:id')
+  actualizarCosto(
+    @Param('id') id: string,
+    @Body() dto: ActualizarConceptoCostoDto,
+  ): Promise<ConceptoCostoVista> {
+    return this.conceptosCosto.actualizar(id, dto);
+  }
+
+  @Delete('costos/:id')
+  eliminarCosto(@Param('id') id: string): Promise<{ id: string }> {
+    return this.conceptosCosto.eliminar(id);
+  }
 
   // ── Documentos por vencer (ruta estática antes de :id) ──
 

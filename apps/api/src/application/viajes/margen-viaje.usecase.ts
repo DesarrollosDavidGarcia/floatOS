@@ -119,6 +119,7 @@ export class MargenViajeUseCase {
                 rendimientoKmL: true,
                 costoMantenimientoPorKm: true,
                 costoFijoMensual: true,
+                conceptosCosto: { select: { costo: true, vidaUtilKm: true } },
               },
             },
             conductor: {
@@ -169,6 +170,16 @@ export class MargenViajeUseCase {
         : Promise.resolve(0),
     ]);
 
+    // Costo variable por km: manda el desglose por conceptos (llantas, servicios,
+    // frenos…) porque es el que se puede auditar. El campo manual de la unidad
+    // queda de respaldo para las unidades que aún no lo tengan desmenuzado.
+    const porConceptos = (viaje.unidad?.conceptosCosto ?? []).reduce(
+      (total, c) => (c.vidaUtilKm > 0 ? total + Number(c.costo) / c.vidaUtilKm : total),
+      0,
+    );
+    const costoPorKm =
+      porConceptos > 0 ? porConceptos : dec(viaje.unidad?.costoMantenimientoPorKm);
+
     const datos: DatosMargen = {
       precioAcordado: dec(viaje.precioAcordado),
       distanciaEstimadaKm: dec(viaje.distanciaEstimadaKm),
@@ -177,7 +188,7 @@ export class MargenViajeUseCase {
       unidad: viaje.unidad
         ? {
             rendimientoKmL: dec(viaje.unidad.rendimientoKmL),
-            costoMantenimientoPorKm: dec(viaje.unidad.costoMantenimientoPorKm),
+            costoMantenimientoPorKm: costoPorKm,
             costoFijoMensual: dec(viaje.unidad.costoFijoMensual),
             viajesDelMes,
           }
