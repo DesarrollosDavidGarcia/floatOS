@@ -175,7 +175,15 @@ export default function FlotaPage() {
                     <div className="flex items-center gap-3">
                     <UnidadFotoMini fotoUrl={u.fotoUrl} placas={u.placas} />
                     <CeldaPrincipal
-                      titulo={u.placas}
+                      titulo={
+                        <Link
+                          href={`/flota/${u.id}`}
+                          className="hover:underline"
+                          title="Abrir la ficha de la unidad"
+                        >
+                          {u.placas}
+                        </Link>
+                      }
                       subtitulo={
                         <>
                           <CatalogoTexto grupo="TIPO_UNIDAD" codigo={u.tipo} />

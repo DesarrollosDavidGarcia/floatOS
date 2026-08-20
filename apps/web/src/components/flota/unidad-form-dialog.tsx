@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { z } from 'zod';
 import { api, apiError } from '@/lib/api';
 import { toast } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
@@ -16,88 +15,15 @@ import {
 } from '@/components/ui/dialog';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
 import { UnidadFotoUploader } from '@/components/flota/unidad-foto';
-import {
-  Campo,
-  CamposGrid,
-  SeccionHeader,
-} from '@/components/conductores/expediente/form-ui';
-import { textoRequerido, seleccionRequerida, numeroOpcional } from '@/lib/validacion';
+import { Campo, CamposGrid } from '@/components/conductores/expediente/form-ui';
 import { useEntityFormDialog } from '@/lib/use-entity-form-dialog';
 import type { Unidad } from './types';
-
-const schema = z.object({
-  placas:       textoRequerido('Las placas son obligatorias'),
-  tipo:         seleccionRequerida('Selecciona el tipo de unidad'),
-  marca:        z.string().trim().optional(),
-  modelo:       z.string().trim().optional(),
-  anio:         numeroOpcional({ min: 1950, max: 2100, entero: true }),
-  capacidadKg:  numeroOpcional({ min: 0 }),
-  capacidadM3:  numeroOpcional({ min: 0 }),
-  rendimientoKmL: numeroOpcional({ min: 0 }),
-  capacidadTanqueL: numeroOpcional({ min: 0 }),
-  capacidadPasajeros: numeroOpcional({ min: 0, entero: true }),
-  costoMantenimientoPorKm: numeroOpcional({ min: 0 }),
-  costoFijoMensual: numeroOpcional({ min: 0 }),
-  aseguradora:  z.string().trim().optional(),
-  numeroPoliza: z.string().trim().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
-
-function toDefaults(unidad?: Unidad | null): FormValues {
-  return {
-    placas:       unidad?.placas ?? '',
-    tipo:         unidad?.tipo ?? '',
-    marca:        unidad?.marca ?? '',
-    modelo:       unidad?.modelo ?? '',
-    anio:         unidad?.anio != null ? String(unidad.anio) : '',
-    capacidadKg:  unidad?.capacidadKg != null ? String(unidad.capacidadKg) : '',
-    capacidadM3:  unidad?.capacidadM3 != null ? String(unidad.capacidadM3) : '',
-    rendimientoKmL:
-      unidad?.rendimientoKmL != null ? String(unidad.rendimientoKmL) : '',
-    capacidadTanqueL:
-      unidad?.capacidadTanqueL != null ? String(unidad.capacidadTanqueL) : '',
-    capacidadPasajeros:
-      unidad?.capacidadPasajeros != null ? String(unidad.capacidadPasajeros) : '',
-    costoMantenimientoPorKm:
-      unidad?.costoMantenimientoPorKm != null
-        ? String(unidad.costoMantenimientoPorKm)
-        : '',
-    costoFijoMensual:
-      unidad?.costoFijoMensual != null ? String(unidad.costoFijoMensual) : '',
-    aseguradora:  unidad?.aseguradora ?? '',
-    numeroPoliza: unidad?.numeroPoliza ?? '',
-  };
-}
-
-function toPayload(values: FormValues) {
-  return {
-    placas:       values.placas,
-    tipo:         values.tipo,
-    marca:        values.marca || undefined,
-    modelo:       values.modelo || undefined,
-    anio:         values.anio ? Number(values.anio) : undefined,
-    capacidadKg:  values.capacidadKg ? Number(values.capacidadKg) : undefined,
-    capacidadM3:  values.capacidadM3 ? Number(values.capacidadM3) : undefined,
-    rendimientoKmL: values.rendimientoKmL
-      ? Number(values.rendimientoKmL)
-      : undefined,
-    capacidadTanqueL: values.capacidadTanqueL
-      ? Number(values.capacidadTanqueL)
-      : undefined,
-    capacidadPasajeros: values.capacidadPasajeros
-      ? Number(values.capacidadPasajeros)
-      : undefined,
-    costoMantenimientoPorKm: values.costoMantenimientoPorKm
-      ? Number(values.costoMantenimientoPorKm)
-      : undefined,
-    costoFijoMensual: values.costoFijoMensual
-      ? Number(values.costoFijoMensual)
-      : undefined,
-    aseguradora:  values.aseguradora || undefined,
-    numeroPoliza: values.numeroPoliza || undefined,
-  };
-}
+import {
+  unidadADefaults,
+  unidadAPayload,
+  unidadSchema,
+  type UnidadFormValues,
+} from './unidad-form-schema';
 
 export function UnidadFormDialog({
   unidad,
@@ -112,15 +38,15 @@ export function UnidadFormDialog({
   const [fotoNueva, setFotoNueva] = useState<File | null>(null);
 
   const { open, setOpen, form, editando, submit, isPending } = useEntityFormDialog<
-    FormValues,
+    UnidadFormValues,
     Unidad
   >({
-    schema,
+    schema: unidadSchema,
     entity: unidad,
     open: openProp,
     onOpenChange,
-    toDefaults,
-    toPayload,
+    toDefaults: unidadADefaults,
+    toPayload: unidadAPayload,
     endpoint: '/unidades',
     invalidateKeys: [['unidades']],
     mensajes: { creado: 'Unidad creada', actualizado: 'Unidad actualizada' },
@@ -252,84 +178,6 @@ export function UnidadFormDialog({
               error={errors.numeroPoliza?.message}
             >
               <Input id="numeroPoliza" {...register('numeroPoliza')} />
-            </Campo>
-          </CamposGrid>
-
-          <SeccionHeader titulo="Capacidad y consumo" />
-          <CamposGrid cols={2}>
-            <Campo
-              label="Capacidad (m³)"
-              htmlFor="capacidadM3"
-              error={errors.capacidadM3?.message}
-            >
-              <Input id="capacidadM3" inputMode="decimal" {...register('capacidadM3')} />
-            </Campo>
-
-            <Campo
-              label="Rendimiento (km/L)"
-              htmlFor="rendimientoKmL"
-              error={errors.rendimientoKmL?.message}
-              hint="Alimenta el diesel estimado del viaje cuando no hay ticket."
-            >
-              <Input
-                id="rendimientoKmL"
-                inputMode="decimal"
-                {...register('rendimientoKmL')}
-              />
-            </Campo>
-
-            <Campo
-              label="Tanque (L)"
-              htmlFor="capacidadTanqueL"
-              error={errors.capacidadTanqueL?.message}
-            >
-              <Input
-                id="capacidadTanqueL"
-                inputMode="decimal"
-                {...register('capacidadTanqueL')}
-              />
-            </Campo>
-
-            <Campo
-              label="Pasajeros"
-              htmlFor="capacidadPasajeros"
-              error={errors.capacidadPasajeros?.message}
-              hint="Solo unidades de transporte de personal."
-            >
-              <Input
-                id="capacidadPasajeros"
-                inputMode="numeric"
-                {...register('capacidadPasajeros')}
-              />
-            </Campo>
-          </CamposGrid>
-
-          <SeccionHeader titulo="Costos de operación" />
-          <CamposGrid cols={2}>
-            <Campo
-              label="Mantenimiento por km"
-              htmlFor="costoMantenimientoPorKm"
-              error={errors.costoMantenimientoPorKm?.message}
-              hint="Sin diesel: el combustible se calcula aparte."
-            >
-              <Input
-                id="costoMantenimientoPorKm"
-                inputMode="decimal"
-                {...register('costoMantenimientoPorKm')}
-              />
-            </Campo>
-
-            <Campo
-              label="Costo fijo mensual"
-              htmlFor="costoFijoMensual"
-              error={errors.costoFijoMensual?.message}
-              hint="Seguro, tenencia, financiamiento."
-            >
-              <Input
-                id="costoFijoMensual"
-                inputMode="decimal"
-                {...register('costoFijoMensual')}
-              />
             </Campo>
           </CamposGrid>
 
