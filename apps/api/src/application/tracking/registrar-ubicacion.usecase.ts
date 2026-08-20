@@ -4,11 +4,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { RADIO_GEOCERCA_METROS } from '../../infrastructure/realtime/geo.util';
 import { EmailService } from '../../infrastructure/email/email.service';
 import { TrackingGateway } from '../../presentation/ws/tracking/tracking.gateway';
-import {
-  EscalaCercana,
-  PuntoUbicacion,
-  UbicacionPublica,
-} from './tracking.types';
+import { EscalaCercana, EscalaSalida, PuntoUbicacion, UbicacionPublica } from './tracking.types';
 
 /**
  * Estados en los que NO tiene sentido evaluar geocercas de llegada: el viaje ya
@@ -121,6 +117,58 @@ export class RegistrarUbicacionUseCase {
   }
 
   /**
+   * Orquesta las dos mitades de la geocerca sobre el mismo lote de puntos:
+   * la LLEGADA a una escala (abre la estancia y avisa) y la SALIDA (la cierra,
+   * que es lo que permite medir la demora).
+   *
+   * Cortocircuito barato ANTES del PostGIS: el ST_DWithin solo sirve para (a)
+   * emitir el aviso WS de escalas con `llegadaNotificadaEn IS NULL`, (b) mandar
+   * email a contactos con `notificadoEn IS NULL` y (c) sellar la salida de las
+   * escalas con estancia abierta. Si no queda nada de eso pendiente, la geocerca
+   * no tiene nada que hacer y el $queryRaw es trabajo puro perdido (caso típico
+   * de los pings tardíos, ya con todo sellado). Los tres counts usan el índice
+   * por `viajeId` y son mucho más baratos que el ST_DWithin sobre GIST.
+   *
+   * Cada mitad se consulta por separado y solo si SU parte está pendiente: son
+   * consultas opuestas (dentro del radio vs. ya fuera) y unirlas obligaría a
+   * pagar las dos siempre.
+   *
+   * No se filtra por `ubicacion IS NOT NULL` (columna Unsupported, no
+   * consultable desde el query API de Prisma): contar de más solo nos hace MÁS
+   * conservadores (no cortocircuitar de más), nunca menos. El propio PostGIS ya
+   * descarta las escalas sin `ubicacion`.
+   */
+  private async evaluarGeocercas(viajeId: string, puntos: UbicacionPublica[]): Promise<void> {
+    const [escalasPendientes, contactosPendientes, salidasPendientes] = await Promise.all([
+      this.prisma.escalaViaje.count({
+        where: { viajeId, llegadaNotificadaEn: null },
+      }),
+      this.prisma.contactoEscala.count({
+        where: {
+          escala: { viajeId },
+          email: { not: null },
+          notificadoEn: null,
+        },
+      }),
+      // Estancia abierta: ya llegó y todavía no se le ha sellado la salida.
+      this.prisma.escalaViaje.count({
+        where: {
+          viajeId,
+          llegadaNotificadaEn: { not: null },
+          salidaRegistradaEn: null,
+        },
+      }),
+    ]);
+
+    if (escalasPendientes > 0 || contactosPendientes > 0) {
+      await this.evaluarLlegadas(viajeId, puntos);
+    }
+    if (salidasPendientes > 0) {
+      await this.evaluarSalidas(viajeId, puntos);
+    }
+  }
+
+  /**
    * Busca, vía PostGIS, las escalas del viaje dentro del radio de geocerca de
    * CUALQUIER punto del lote (índice GIST sobre `escalas_viaje.ubicacion`).
    *
@@ -132,49 +180,26 @@ export class RegistrarUbicacionUseCase {
    *   aviso mientras el conductor siga dentro del radio (por eso se consideran
    *   TODAS las escalas cercanas, no solo las nuevas).
    */
-  private async evaluarGeocercas(
-    viajeId: string,
-    puntos: UbicacionPublica[],
-  ): Promise<void> {
-    // Cortocircuito barato ANTES del PostGIS: el ST_DWithin solo sirve para (a)
-    // emitir el aviso WS de escalas con `llegadaNotificadaEn IS NULL` y (b)
-    // mandar email a contactos con `notificadoEn IS NULL`. Si NO queda ninguna
-    // de las dos cosas pendiente para este viaje, la geocerca no tiene nada que
-    // notificar y el $queryRaw es trabajo puro perdido (caso típico de los pings
-    // tardíos, ya con todas las llegadas selladas). Estos dos counts usan el
-    // índice por `viajeId` y son mucho más baratos que el ST_DWithin sobre GIST.
-    //
-    // No se filtra por `ubicacion IS NOT NULL` (columna Unsupported, no
-    // consultable desde el query API de Prisma): contar de más solo nos hace MÁS
-    // conservadores (no cortocircuitar de más), nunca menos. El propio PostGIS ya
-    // descarta las escalas sin `ubicacion`.
-    //
-    // Seguridad: si HAY alguna escala sin sellar o algún contacto sin notificar,
-    // ese count es > 0 y seguimos al PostGIS exactamente igual que antes, así que
-    // no se pierde ninguna llegada. El cortocircuito no depende de la posición del
-    // conductor, solo del estado de notificación.
-    const [escalasPendientes, contactosPendientes] = await Promise.all([
-      this.prisma.escalaViaje.count({
-        where: { viajeId, llegadaNotificadaEn: null },
-      }),
-      this.prisma.contactoEscala.count({
-        where: {
-          escala: { viajeId },
-          email: { not: null },
-          notificadoEn: null,
-        },
-      }),
-    ]);
-    if (escalasPendientes === 0 && contactosPendientes === 0) return;
-
+  private async evaluarLlegadas(viajeId: string, puntos: UbicacionPublica[]): Promise<void> {
     const lats = puntos.map((p) => p.lat);
     const lngs = puntos.map((p) => p.lng);
+    const tiempos = puntos.map((p) => p.capturadoEn);
 
     // Todas las escalas dentro del radio (con su sello de llegada, para separar
     // las nuevas de las ya notificadas).
     const cercanas = await this.prisma.$queryRaw<EscalaCercana[]>`
       SELECT DISTINCT e."id", e."orden", e."accion", e."direccion",
-             e."llegadaNotificadaEn"
+             e."llegadaNotificadaEn",
+             -- Hora real de entrada: el primer ping del lote dentro del radio.
+             (SELECT min(p.capturado_en)
+                FROM unnest(${lats}::float8[], ${lngs}::float8[], ${tiempos}::timestamptz[])
+                  AS p(lat, lng, capturado_en)
+               WHERE ST_DWithin(
+                 e."ubicacion",
+                 ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326)::geography,
+                 ${RADIO_GEOCERCA_METROS}
+               )
+             ) AS "primeraDentroEn"
       FROM "escalas_viaje" e
       WHERE e."viajeId" = ${viajeId}
         AND e."ubicacion" IS NOT NULL
@@ -210,11 +235,26 @@ export class RegistrarUbicacionUseCase {
     const ordenDestino = maxOrden._max.orden;
 
     if (nuevas.length > 0) {
-      // Sella las nuevas para no reemitir el aviso WS en lotes posteriores.
-      await this.prisma.escalaViaje.updateMany({
-        where: { id: { in: nuevas.map((e) => e.id) } },
-        data: { llegadaNotificadaEn: new Date() },
-      });
+      const ahora = new Date();
+      // Sella cada escala con SU hora real de entrada (el primer ping dentro del
+      // radio), además del sello del aviso. Van por separado porque miden cosas
+      // distintas: `llegadaEn` es el hecho y `llegadaNotificadaEn` el aviso, que
+      // en un lote offline puede ser horas después. Por eso tampoco se puede
+      // agrupar en un solo updateMany. El `llegadaNotificadaEn: null` del filtro
+      // hace idempotente el sellado si dos lotes del viaje entran a la vez.
+      await Promise.all(
+        nuevas.map((e) =>
+          this.prisma.escalaViaje.updateMany({
+            where: { id: e.id, llegadaNotificadaEn: null },
+            data: {
+              llegadaNotificadaEn: ahora,
+              // Si el punto viniera sin hora utilizable, el aviso es el mejor
+              // dato disponible: preferible a dejar la estancia sin abrir.
+              llegadaEn: e.primeraDentroEn ?? ahora,
+            },
+          }),
+        ),
+      );
 
       for (const escala of nuevas) {
         this.gateway.emitirAlerta(viajeId, {
@@ -241,6 +281,89 @@ export class RegistrarUbicacionUseCase {
       this.logger.error(
         `Error al notificar contactos de llegada (viaje ${viajeId}): ${(e as Error).message}`,
       ),
+    );
+  }
+
+  /**
+   * Sella la SALIDA de las escalas donde el conductor ya había llegado. Sin esa
+   * marca la estancia queda abierta para siempre y la demora en la escala no se
+   * puede calcular: la llegada la sella `evaluarLlegadas` y nada cerraba el otro
+   * extremo.
+   *
+   * Solo se sella si el punto MÁS RECIENTE del lote está fuera del radio: basta
+   * un ping de vuelta dentro para que la estancia siga abierta, así que un rebote
+   * del GPS a mitad del lote no dispara una salida falsa (además el radio es de
+   * 300 m, muy por encima del error típico).
+   *
+   * El sello NO es "cuando lo notamos" sino el primer ping fuera del radio
+   * posterior al último ping dentro. En una sincronización offline el lote puede
+   * traer horas de recorrido de golpe, y fecharlo con `now()` le cargaría a la
+   * estancia todo el tiempo que el conductor pasó sin cobertura.
+   */
+  private async evaluarSalidas(viajeId: string, puntos: UbicacionPublica[]): Promise<void> {
+    const lats = puntos.map((p) => p.lat);
+    const lngs = puntos.map((p) => p.lng);
+    const tiempos = puntos.map((p) => p.capturadoEn);
+
+    const salidas = await this.prisma.$queryRaw<EscalaSalida[]>`
+      WITH puntos AS (
+        SELECT p.lat, p.lng, p.capturado_en
+        FROM unnest(${lats}::float8[], ${lngs}::float8[], ${tiempos}::timestamptz[])
+          AS p(lat, lng, capturado_en)
+      ),
+      -- Escalas con la llegada ya sellada y la estancia todavía abierta.
+      candidatas AS (
+        SELECT e."id", e."ubicacion"
+        FROM "escalas_viaje" e
+        WHERE e."viajeId" = ${viajeId}
+          AND e."ubicacion" IS NOT NULL
+          AND e."llegadaNotificadaEn" IS NOT NULL
+          AND e."salidaRegistradaEn" IS NULL
+      ),
+      -- Cada punto del lote contra cada escala candidata: dentro o fuera.
+      marcado AS (
+        SELECT c."id",
+               p.capturado_en,
+               ST_DWithin(
+                 c."ubicacion",
+                 ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326)::geography,
+                 ${RADIO_GEOCERCA_METROS}
+               ) AS dentro
+        FROM candidatas c
+        CROSS JOIN puntos p
+      ),
+      resumen AS (
+        SELECT "id",
+               max(capturado_en) FILTER (WHERE dentro) AS ultimo_dentro,
+               max(capturado_en) AS ultimo_punto
+        FROM marcado
+        GROUP BY "id"
+      )
+      SELECT r."id",
+             (SELECT min(m.capturado_en)
+                FROM marcado m
+               WHERE m."id" = r."id"
+                 AND NOT m.dentro
+                 AND (r.ultimo_dentro IS NULL OR m.capturado_en > r.ultimo_dentro)
+             ) AS "salidaEn"
+      FROM resumen r
+      -- Si el último ping sigue dentro, ultimo_dentro = ultimo_punto y no salió.
+      WHERE r.ultimo_dentro IS NULL OR r.ultimo_dentro < r.ultimo_punto
+    `;
+
+    // Cada escala se sella con SU propio instante de salida, así que no se puede
+    // agrupar en un único updateMany.
+    await Promise.all(
+      salidas
+        .filter((s) => s.salidaEn != null)
+        .map((s) =>
+          this.prisma.escalaViaje.updateMany({
+            // El `salidaRegistradaEn: null` del filtro evita que dos lotes
+            // concurrentes del mismo viaje se pisen el sello entre ellos.
+            where: { id: s.id, salidaRegistradaEn: null },
+            data: { salidaRegistradaEn: s.salidaEn },
+          }),
+        ),
     );
   }
 

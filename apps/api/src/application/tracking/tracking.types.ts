@@ -24,6 +24,16 @@ export interface UbicacionPublica {
 /** Tipos de alerta de geocerca emitidos al monitorista. */
 export type TipoAlertaGeocerca = 'llegada_escala';
 
+/** Fila de la consulta PostGIS que detecta el fin de una estancia en escala. */
+export interface EscalaSalida {
+  id: string;
+  /**
+   * Primer ping fuera del radio posterior al último ping dentro: el instante en
+   * que el conductor dejó la escala, no el momento en que se procesó el lote.
+   */
+  salidaEn: Date | null;
+}
+
 /** Fila de la consulta PostGIS de escalas dentro del radio de geocerca. */
 export interface EscalaCercana {
   id: string;
@@ -32,6 +42,12 @@ export interface EscalaCercana {
   direccion: string;
   /** Sello de la primera alerta WS de llegada; null si aún no se ha avisado. */
   llegadaNotificadaEn: Date | null;
+  /**
+   * Hora del primer ping del lote dentro del radio: la entrada REAL a la
+   * geocerca, que es la que sirve para medir la estancia. Null si la escala
+   * quedó fuera del radio en este lote.
+   */
+  primeraDentroEn: Date | null;
 }
 
 /** Vista pública del viaje para el link de seguimiento del cliente final. */

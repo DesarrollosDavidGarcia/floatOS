@@ -1092,6 +1092,11 @@ model EscalaViaje {
   ventanaHasta        DateTime?
   // Marca de tiempo de la primera alerta de geocerca emitida (dedup entre lotes).
   llegadaNotificadaEn DateTime?
+  // Hora REAL de entrada a la geocerca: el `capturadoEn` del primer ping dentro
+  // del radio. Distinta de `llegadaNotificadaEn`, que dice cuándo se avisó. La
+  // demora se mide con llegadaEn/salidaRegistradaEn: usar el sello del aviso da
+  // estancias infladas (o negativas) cuando el lote entra por sync offline.
+  llegadaEn           DateTime?
   // Marca de salida de la geocerca, que cierra la estancia. Sin esto la demora en
   // la escala no se puede calcular: la llegada se sella y la salida no.
   salidaRegistradaEn  DateTime?
