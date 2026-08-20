@@ -104,6 +104,8 @@ export class CrearViajeUseCase {
       ...snapshotRuta(ruta),
       tipoServicio: esPersonal ? 'PERSONAL' : 'CARGA',
       numPasajeros: esPersonal ? input.numPasajeros : null,
+      precioAcordado: input.precioAcordado ?? null,
+      moneda: input.moneda ?? 'MXN',
       fechaProgramada: input.fechaProgramada
         ? new Date(input.fechaProgramada)
         : undefined,

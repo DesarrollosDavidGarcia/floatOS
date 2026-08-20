@@ -188,6 +188,8 @@ export class CotizacionesService {
   /**
    * Cambia el estado de la cotización validando contra `TRANSICIONES_COTIZACION`.
    * Al pasar a ENVIADA por primera vez sella `enviadaEn` (marcado manual sin correo).
+   * Al pasar a ACEPTADA copia el total al `precioAcordado` del viaje: aceptar es el
+   * acto que fija el ingreso, y sin él el viaje no tiene margen calculable.
    */
   async cambiarEstado(id: string, estado: EstadoCotizacion) {
     const cot = await this.prisma.cotizacion.findUnique({
@@ -201,14 +203,26 @@ export class CotizacionesService {
         `Transición inválida: ${cot.estado} → ${estado}.`,
       );
     }
-    return this.prisma.cotizacion.update({
-      where: { id },
-      data: {
-        estado,
-        ...(estado === EstadoCotizacion.ENVIADA && !cot.enviadaEn
-          ? { enviadaEn: new Date() }
-          : {}),
-      },
+    const data = {
+      estado,
+      ...(estado === EstadoCotizacion.ENVIADA && !cot.enviadaEn
+        ? { enviadaEn: new Date() }
+        : {}),
+    };
+
+    if (estado !== EstadoCotizacion.ACEPTADA) {
+      return this.prisma.cotizacion.update({ where: { id }, data });
+    }
+
+    // El precio del viaje y el estado de la cotización se mueven juntos: si el
+    // viaje no se actualizara, quedaría una cotización aceptada sin ingreso.
+    return this.prisma.$transaction(async (tx) => {
+      const aceptada = await tx.cotizacion.update({ where: { id }, data });
+      await tx.viaje.update({
+        where: { id: aceptada.viajeId },
+        data: { precioAcordado: aceptada.total, moneda: aceptada.moneda },
+      });
+      return aceptada;
     });
   }
 

@@ -86,6 +86,8 @@ export const SELECCION_LISTADO = {
   fechaEntrega: true,
   odometroInicial: true,
   odometroFinal: true,
+  precioAcordado: true,
+  moneda: true,
   createdAt: true,
   updatedAt: true,
   ...RELACIONES_RESUMEN,
@@ -135,6 +137,10 @@ export interface CrearViajeInput {
   tipoServicio?: TipoServicioInput;
   /** Nº de pasajeros (obligatorio para PERSONAL). */
   numPasajeros?: number;
+  /** Ingreso del viaje; si nace de una cotización aceptada se copia solo. */
+  precioAcordado?: number;
+  /** Código ISO de la moneda del precio (default MXN). */
+  moneda?: string;
 }
 
 /** Datos para editar un viaje. Si `escalas` viene, reemplaza el itinerario. */
@@ -143,6 +149,9 @@ export interface EditarViajeInput {
   fechaProgramada?: string;
   tipoServicio?: TipoServicioInput;
   numPasajeros?: number;
+  /** undefined = no tocar; null = borrar el precio. */
+  precioAcordado?: number | null;
+  moneda?: string;
 }
 
 /** Datos para evaluar un itinerario contra la flota (motor de cálculo). */

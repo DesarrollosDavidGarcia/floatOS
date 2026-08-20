@@ -36,6 +36,12 @@ export interface CrearConductorInput {
   vigenciaDesde?: string;
   vigenciaHasta?: string;
   notasContratacion?: string;
+  // Pago (componentes independientes; ver CrearConductorDto)
+  sueldoPeriodo?: number;
+  periodicidadSueldo?: string;
+  tarifaPorViaje?: number;
+  pagoPorKm?: number;
+  porcentajeFlete?: number;
 }
 
 /** Caso de uso: el admin crea un conductor con credenciales para la app. */
@@ -102,6 +108,14 @@ export class CrearConductorUseCase {
         vigenciaDesde: externo && input.vigenciaDesde ? new Date(input.vigenciaDesde) : null,
         vigenciaHasta: externo && input.vigenciaHasta ? new Date(input.vigenciaHasta) : null,
         notasContratacion: externo ? (input.notasContratacion ?? null) : null,
+        // Pago: cada componente es independiente, así que se guarda tal cual sin
+        // depender del tipo de contratación (un freelance puede llevar sueldo y
+        // un conductor de planta, comisión).
+        sueldoPeriodo: input.sueldoPeriodo ?? null,
+        periodicidadSueldo: input.periodicidadSueldo ?? null,
+        tarifaPorViaje: input.tarifaPorViaje ?? null,
+        pagoPorKm: input.pagoPorKm ?? null,
+        porcentajeFlete: input.porcentajeFlete ?? null,
       },
     });
 

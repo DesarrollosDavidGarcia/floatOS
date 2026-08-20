@@ -233,6 +233,13 @@ const CATALOGOS = {
     ['FREELANCE', 'Freelance / temporal', 'secondary'],
     ['TERCIARIZADO', 'Terciarizado (otra empresa)', 'outline'],
   ],
+  // Cada cuánto se paga el sueldo fijo del conductor. Define el periodo entre
+  // cuyos viajes se prorratea ese sueldo al calcular el costo de cada viaje.
+  PERIODICIDAD_SUELDO: [
+    ['SEMANAL', 'Semanal'],
+    ['QUINCENAL', 'Quincenal'],
+    ['MENSUAL', 'Mensual'],
+  ],
   // Régimen fiscal del cliente (catálogo SAT c_RegimenFiscal, CFDI 4.0).
   REGIMEN_FISCAL: [
     ['601', '601 - General de Ley Personas Morales'],
