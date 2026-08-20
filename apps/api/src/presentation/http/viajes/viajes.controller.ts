@@ -77,6 +77,16 @@ export class ViajesController {
     return this.viajes.llegadasRecientes();
   }
 
+  /**
+   * Margen del viaje: ingreso, desglose de costos y estancia por escala. Solo
+   * ADMIN — el monitorista opera los viajes, no ve la economía de la flota.
+   */
+  @Get(':id/margen')
+  @UseGuards(AdminGuard)
+  margen(@Param('id') id: string) {
+    return this.viajes.margen(id);
+  }
+
   @Get(':id')
   detalle(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
     if (user.type === 'conductor') {

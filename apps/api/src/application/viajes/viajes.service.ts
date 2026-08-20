@@ -20,6 +20,7 @@ import {
   ReportarIncidenciaInput,
   ReportarIncidenciaViajeUseCase,
 } from './reportar-incidencia-viaje.usecase';
+import { MargenViajeUseCase } from './margen-viaje.usecase';
 import { MotorViajeService } from './motor-viaje.service';
 import {
   AsignarViajeInput,
@@ -51,6 +52,7 @@ export class ViajesService {
     private readonly listarLlegadas: ListarLlegadasRecientesUseCase,
     private readonly reportarIncidenciaUC: ReportarIncidenciaViajeUseCase,
     private readonly motor: MotorViajeService,
+    private readonly margenViaje: MargenViajeUseCase,
   ) {}
 
   crear(input: CrearViajeInput, registradoPor: string) {
@@ -73,6 +75,11 @@ export class ViajesService {
 
   obtener(id: string) {
     return this.obtenerViaje.execute(id);
+  }
+
+  /** Desglose de ingreso, costos y estancias por escala de un viaje. */
+  margen(id: string) {
+    return this.margenViaje.execute(id);
   }
 
   /** Detalle restringido: el conductor solo puede ver sus propios viajes. */

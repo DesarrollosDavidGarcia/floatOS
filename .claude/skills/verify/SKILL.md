@@ -128,6 +128,12 @@ Se ejecuta con `docker exec -i floatos-postgres-1 psql -U flotaos_user -d flotao
 
 Borra tus filas al terminar: `DELETE FROM viajes …` cascadea a escalas/historial sin problema.
 
+**Borra SOLO lo tuyo.** Esta BD es la que el usuario usa para revisar el panel, así que puede
+tener filas suyas recién creadas. Un `DELETE FROM precios_diesel` para probar el caso "sin datos"
+se llevó por delante un precio que el usuario acababa de guardar. Antes de borrar, `SELECT` y
+mira qué hay: identifica tus filas por un prefijo propio (`ZZ-…`) y, si vas a vaciar una tabla
+para probar un caso, guarda las filas previas y vuelve a insertarlas al terminar.
+
 ## 5. Concurrencia
 
 Para carreras (TOCTOU, doble reserva) lanza los curl en paralelo con `&` + `wait` y comprueba el
