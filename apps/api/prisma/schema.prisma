@@ -911,6 +911,7 @@ model Viaje {
   historialAsignaciones HistorialAsignacionViaje[]
   ubicaciones           UbicacionConductor[]
   gastos                GastoViaje[]
+  revisiones            RevisionViaje[]
   evidencias            EvidenciaViaje[]
   incidencias           IncidenciaConductor[]
   cartaPorte            CartaPorte?
@@ -1337,4 +1338,58 @@ model ConceptoCostoUnidad {
 
   @@index([unidadId])
   @@map("conceptos_costo_unidad")
+}
+
+// ──────────────── Revisión del vehículo (salida / llegada) ────────────────
+
+/// Momento de la revisión: antes de arrancar o al cerrar el servicio.
+enum TipoRevisionViaje {
+  SALIDA
+  LLEGADA
+}
+
+/// Quién capturó la revisión. El conductor es la fuente de primera mano; el
+/// monitorista solo debería aparecer cuando el conductor no pudo (teléfono sin
+/// batería, roto), y por eso queda registrado en el dato.
+enum OrigenRevision {
+  CONDUCTOR
+  MONITORISTA
+}
+
+/// Revisión del vehículo alrededor del viaje. Es la puerta de entrada del dato
+/// que el margen necesita y que hoy no existe: el odómetro real y el estado con
+/// el que sale y llega la unidad.
+///
+/// Su razón de ser es que sea OBLIGATORIA: sin revisión de SALIDA el viaje no
+/// puede pasar a EN_CAMINO_ORIGEN, y sin la de LLEGADA no puede pasar a
+/// ENTREGADO. La regla vive en el backend, no en la app, para que no se salte
+/// desde el panel ni reinstalando.
+model RevisionViaje {
+  id                  String            @id @default(cuid())
+  viajeId             String
+  tipo                TipoRevisionViaje
+  /// Lectura del odómetro. Es el dato que convierte los km de estimados a reales.
+  odometro            Int
+  /// Combustible en el tablero, 0-100 %.
+  nivelCombustiblePct Int?
+  /// Foto del tablero: hace auditable el odómetro en vez de ser un número tecleado.
+  fotoTableroKey      String?
+  /// Check list mecánico: [{ clave, estado: OK | MAL | NA, nota? }]. Las claves
+  /// son del catálogo CHECKLIST_UNIDAD; se guarda como JSON porque la lista de
+  /// puntos a revisar cambia por flota y no vale una migración cada vez.
+  checklist           Json?
+  novedades           String?
+  origen              OrigenRevision    @default(CONDUCTOR)
+  /// Id de quien la capturó (conductor o usuario del panel), para trazabilidad.
+  capturadaPor        String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  // Una revisión de cada tipo por viaje: recapturar corrige la existente en vez
+  // de acumular versiones que dejarían el odómetro ambiguo.
+  @@unique([viajeId, tipo])
+  @@index([viajeId])
+  @@map("revisiones_viaje")
 }

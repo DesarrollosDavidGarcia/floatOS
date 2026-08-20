@@ -1,13 +1,16 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ViajesService } from '../../../application/viajes/viajes.service';
 import { CrearViajeDto } from './dto/crear-viaje.dto';
@@ -21,6 +24,15 @@ import { GestionarContactosEscalaDto } from './dto/contactos-escala.dto';
 import { GestionarPasajerosDto } from './dto/pasajeros-viaje.dto';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ArchivoSubido,
+  TAMANO_MAX_BYTES,
+} from '../../../application/flota/archivos-unidad.usecase';
+import {
+  CapturarRevisionDto,
+  CrearGastoDto,
+} from './dto/revision-viaje.dto';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import {
@@ -76,6 +88,79 @@ export class ViajesController {
   @UseGuards(AdminGuard)
   llegadasRecientes() {
     return this.viajes.llegadasRecientes();
+  }
+
+  // ── Revisión del vehículo y gastos (ingesta de campo) ──
+
+  /** Revisiones capturadas del viaje (salida y llegada). */
+  @Get(':id/revisiones')
+  revisiones(@Param('id') id: string) {
+    return this.viajes.revisiones(id);
+  }
+
+  /**
+   * Captura la revisión de salida o de llegada. Sin ella el viaje no avanza de
+   * estado: es lo que garantiza la ingesta del odómetro.
+   *
+   * Si la captura el conductor queda marcada como de primera mano; si la
+   * captura el panel se registra como MONITORISTA, que es la salida de
+   * emergencia para cuando el conductor se quedó sin teléfono.
+   */
+  @Post(':id/revisiones/:tipo')
+  capturarRevision(
+    @Param('id') id: string,
+    @Param('tipo') tipo: string,
+    @Body() dto: CapturarRevisionDto,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.viajes.capturarRevision(id, tipo, dto, user);
+  }
+
+  /** Foto del tablero: hace auditable el odómetro capturado. */
+  @Post('revisiones/:revisionId/foto')
+  @UseInterceptors(
+    FileInterceptor('foto', { limits: { fileSize: TAMANO_MAX_BYTES } }),
+  )
+  fotoRevision(
+    @Param('revisionId') revisionId: string,
+    @UploadedFile() foto: ArchivoSubido | undefined,
+  ) {
+    return this.viajes.fotoRevision(revisionId, foto);
+  }
+
+  @Get(':id/gastos')
+  gastos(@Param('id') id: string, @CurrentUser() user: AuthPrincipal) {
+    return this.viajes.gastos(id, user);
+  }
+
+  /** Alta de un gasto. Se puede capturar en cualquier momento del viaje. */
+  @Post(':id/gastos')
+  crearGasto(
+    @Param('id') id: string,
+    @Body() dto: CrearGastoDto,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.viajes.crearGasto(id, dto, user);
+  }
+
+  @Post('gastos/:gastoId/ticket')
+  @UseInterceptors(
+    FileInterceptor('ticket', { limits: { fileSize: TAMANO_MAX_BYTES } }),
+  )
+  ticketGasto(
+    @Param('gastoId') gastoId: string,
+    @UploadedFile() ticket: ArchivoSubido | undefined,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.viajes.ticketGasto(gastoId, ticket, user);
+  }
+
+  @Delete('gastos/:gastoId')
+  eliminarGasto(
+    @Param('gastoId') gastoId: string,
+    @CurrentUser() user: AuthPrincipal,
+  ) {
+    return this.viajes.eliminarGasto(gastoId, user);
   }
 
   /**

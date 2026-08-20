@@ -17,6 +17,8 @@ import { MotorViajeService } from '../../../application/viajes/motor-viaje.servi
 import { RoutingModule } from '../../../infrastructure/routing/routing.module';
 import { CostosModule } from '../costos/costos.module';
 import { MargenViajeUseCase } from '../../../application/viajes/margen-viaje.usecase';
+import { RevisionesViajeUseCase } from '../../../application/viajes/revisiones-viaje.usecase';
+import { GastosViajeUseCase } from '../../../application/viajes/gastos-viaje.usecase';
 import { TrackingModule } from '../../ws/tracking/tracking.module';
 
 /**
@@ -45,6 +47,8 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
     ListarLlegadasRecientesUseCase,
     ReportarIncidenciaViajeUseCase,
     MargenViajeUseCase,
+    RevisionesViajeUseCase,
+    GastosViajeUseCase,
   ],
   exports: [ViajesService],
 })
