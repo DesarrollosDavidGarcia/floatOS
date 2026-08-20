@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Container, FileText, MoreHorizontal, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react';
 import { api, apiError } from '@/lib/api';
@@ -47,8 +48,9 @@ export default function FlotaPage() {
   const [page, setPage] = useState(1);
   const qDebounced = useDebounce(busqueda);
 
+  const router = useRouter();
+
   const [formOpen, setFormOpen] = useState(false);
-  const [unidadEditar, setUnidadEditar] = useState<Unidad | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [unidadDocs, setUnidadDocs] = useState<Unidad | null>(null);
   const [archivosOpen, setArchivosOpen] = useState(false);
@@ -78,13 +80,11 @@ export default function FlotaPage() {
   });
 
   function abrirNueva() {
-    setUnidadEditar(null);
     setFormOpen(true);
   }
 
-  function abrirEdicion(unidad: Unidad) {
-    setUnidadEditar(unidad);
-    setFormOpen(true);
+  function abrirFicha(unidad: Unidad) {
+    router.push(`/flota/${unidad.id}`);
   }
 
   function abrirDocumentos(unidad: Unidad) {
@@ -247,7 +247,7 @@ export default function FlotaPage() {
                           <DropdownMenuItem onSelect={() => abrirArchivos(u)}>
                             <Paperclip className="h-4 w-4" /> Archivos
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => abrirEdicion(u)}>
+                          <DropdownMenuItem onSelect={() => abrirFicha(u)}>
                             <Pencil className="h-4 w-4" /> Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -278,7 +278,13 @@ export default function FlotaPage() {
       />
 
       {/* Diálogos */}
-      <UnidadFormDialog unidad={unidadEditar} open={formOpen} onOpenChange={setFormOpen} />
+      {/* Alta rápida: al crear se entra a la ficha para completar capacidades,
+          consumo y costos, que es donde se capturan. */}
+      <UnidadFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onCreada={(u) => router.push(`/flota/${u.id}`)}
+      />
       <DocumentosDialog unidad={unidadDocs} open={docsOpen} onOpenChange={setDocsOpen} />
       <ArchivosDialog
         unidad={unidadArchivos}
