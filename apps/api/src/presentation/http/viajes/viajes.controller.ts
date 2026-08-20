@@ -22,6 +22,7 @@ import { GestionarPasajerosDto } from './dto/pasajeros-viaje.dto';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import {
   AuthPrincipal,
   CurrentUser,
@@ -83,6 +84,7 @@ export class ViajesController {
    */
   @Get(':id/margen')
   @UseGuards(AdminGuard)
+  @Roles('ADMIN')
   margen(@Param('id') id: string) {
     return this.viajes.margen(id);
   }
