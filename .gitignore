@@ -67,3 +67,6 @@ coverage/
 
 # codebase-memory-mcp: registro MCP con ruta absoluta por máquina (no portable)
 .mcp.json
+
+# Ajustes locales de Claude Code (permisos por máquina)
+.claude/settings.local.json
