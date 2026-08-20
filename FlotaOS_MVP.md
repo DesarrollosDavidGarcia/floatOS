@@ -480,6 +480,45 @@ Sin `tenantId` en ninguna tabla — cada instancia Docker es un cliente, la BD y
 
 > Bitácora de implementación. Cada entrada documenta qué se construyó y cómo se verificó.
 
+### 2026-08-20 — Cimientos del margen por viaje + demoras (apuesta 1, fase 1) ✅
+
+Primer paso de la apuesta de **margen real por viaje y demoras cobrables**. Es
+trabajo de datos: faltaba la materia prima, no la fórmula.
+
+- **Ingreso del viaje:** `Viaje.precioAcordado` + `moneda`. Antes el ingreso solo
+  existía en la `Cotizacion` ACEPTADA, así que un viaje creado por `POST /viajes`
+  no tenía margen calculable. La migración hace backfill desde la cotización
+  aceptada más reciente de cada viaje.
+- **Costos:** `Unidad.costoMantenimientoPorKm` (variable, sin diesel para no
+  contarlo dos veces) y `costoFijoMensual`; en `Conductor`, los cuatro
+  componentes de pago que usa la flota —`sueldoPeriodo` + `periodicidadSueldo`,
+  `tarifaPorViaje`, `pagoPorKm`, `porcentajeFlete`—, independientes entre sí para
+  que un conductor pueda combinar esquemas (sueldo base + comisión).
+- **Diesel:** tabla `precios_diesel` (precio/litro con vigencia) para estimar, y
+  `GastoViaje.litros`/`precioPorLitro` para el consumo real del ticket, que manda
+  sobre el estimado.
+- **Demora en escala:** `EscalaViaje.salidaRegistradaEn` cierra la estancia, que
+  la geocerca nunca cerraba, y `llegadaEn` guarda la hora REAL de entrada. Este
+  segundo campo salió de la verificación: `llegadaNotificadaEn` se sella con
+  `now()` porque su trabajo es deduplicar el aviso, así que restarle una salida
+  fechada con el GPS daba demoras negativas en lotes offline.
+- La detección de salida solo cierra si el ping más reciente del lote está fuera
+  del radio (un rebote de GPS no la dispara) y fecha el sello en el primer ping
+  fuera, no en el momento de procesarlo.
+
+**Verificado:** migraciones escritas a mano y aplicadas con `migrate deploy` (el
+`migrate dev` rompe con PostGIS); 12 columnas nuevas comprobadas contra la BD
+real con su precisión, backfill correcto tomando la cotización ACEPTADA y no la
+RECHAZADA del mismo viaje; el flujo de geocerca ejercitado contra
+Postgres+PostGIS con el caso de uso real (**11/11**: estancia de 15 min exactos,
+sello idempotente, rebote de GPS, salida sin cobertura). **jest 142/142**, tsc 0.
+
+**Pendiente:** `odometroInicial`/`odometroFinal` existen y se leen, pero **nadie
+los escribe** (sin DTO, sin endpoint, sin UI, sin captura en Flutter), así que
+los km reales todavía no existen; falta la capa de API/UI para capturar precios
+y costos; y sigue sin decidirse la retención de `ubicaciones_conductor` (el
+worker purga a los 90 días) y el prorrateo de los costos fijos.
+
 ### 2026-06-22 — Migración de mapas a Google Maps Platform (Fases 1-3) ✅
 
 La capa de mapas pasó de OSM/TomTom a **Google Maps Platform** (tiles + geocoding + routing). Alcance acordado: completo. Requiere API key con billing; los términos de Google piden mostrar sus datos sobre mapa de Google y **limitan el cacheo de rutas** (la retención de `ruta_cache` bajó de 180 → 30 días). ⚠️ **Google Routes API no tiene perfil de camión** (usa `DRIVE`/auto); por eso el routing sigue **conmutable por env** y TomTom queda como fallback.

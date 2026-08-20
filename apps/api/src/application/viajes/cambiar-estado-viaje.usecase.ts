@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TipoRevisionViaje } from '@prisma/client';
 import { EstadoViaje } from '@flotaos/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { mensajeTransicionInvalida } from '../../domain/viaje/transiciones-viaje';
@@ -75,6 +75,27 @@ export class CambiarEstadoViajeUseCase {
       throw new ConflictException(
         'La cotización del viaje aún no está aceptada por el cliente',
       );
+    }
+
+    // La revisión del vehículo es obligatoria para avanzar. La regla vive aquí
+    // —y no en la app— para que no se salte desde el panel ni reinstalando.
+    const revisionExigida =
+      estadoNuevo === EstadoViaje.EN_CAMINO_ORIGEN
+        ? TipoRevisionViaje.SALIDA
+        : estadoNuevo === EstadoViaje.ENTREGADO
+          ? TipoRevisionViaje.LLEGADA
+          : null;
+    if (revisionExigida) {
+      const capturada = await this.prisma.revisionViaje.count({
+        where: { viajeId: id, tipo: revisionExigida },
+      });
+      if (capturada === 0) {
+        throw new ConflictException(
+          revisionExigida === TipoRevisionViaje.SALIDA
+            ? 'Antes de arrancar hay que capturar la revisión de salida (odómetro y estado de la unidad).'
+            : 'Antes de cerrar el servicio hay que capturar la revisión de llegada (odómetro y estado de la unidad).',
+        );
+      }
     }
 
     const ahora = new Date();

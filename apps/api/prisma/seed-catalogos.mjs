@@ -233,6 +233,27 @@ const CATALOGOS = {
     ['FREELANCE', 'Freelance / temporal', 'secondary'],
     ['TERCIARIZADO', 'Terciarizado (otra empresa)', 'outline'],
   ],
+  // Puntos del check list de revisión del vehículo (salida y llegada). Se
+  // guardan por clave en RevisionViaje.checklist; la lista puede crecer sin
+  // migración porque el check list es JSON.
+  CHECKLIST_UNIDAD: [
+    ['LLANTAS', 'Llantas y presión'],
+    ['LUCES', 'Luces y direccionales'],
+    ['FRENOS', 'Frenos'],
+    ['NIVELES', 'Niveles (aceite, refrigerante)'],
+    ['FUGAS', 'Sin fugas visibles'],
+    ['EXTINTOR', 'Extintor vigente'],
+    ['LLANTA_REFACCION', 'Llanta de refacción y herramienta'],
+    ['DOCUMENTOS', 'Documentos de la unidad a bordo'],
+    ['CARROCERIA', 'Carrocería sin daños nuevos'],
+  ],
+  // Cada cuánto se paga el sueldo fijo del conductor. Define el periodo entre
+  // cuyos viajes se prorratea ese sueldo al calcular el costo de cada viaje.
+  PERIODICIDAD_SUELDO: [
+    ['SEMANAL', 'Semanal'],
+    ['QUINCENAL', 'Quincenal'],
+    ['MENSUAL', 'Mensual'],
+  ],
   // Régimen fiscal del cliente (catálogo SAT c_RegimenFiscal, CFDI 4.0).
   REGIMEN_FISCAL: [
     ['601', '601 - General de Ley Personas Morales'],

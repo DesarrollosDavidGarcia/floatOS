@@ -5,6 +5,7 @@ import { UnidadesUseCase } from '../../../application/flota/unidades.usecase';
 import { CajasUseCase } from '../../../application/flota/cajas.usecase';
 import { DocumentosUnidadUseCase } from '../../../application/flota/documentos-unidad.usecase';
 import { ArchivosUnidadUseCase } from '../../../application/flota/archivos-unidad.usecase';
+import { ConceptosCostoUseCase } from '../../../application/flota/conceptos-costo.usecase';
 
 /**
  * Módulo FLOTA (módulo 2 del MVP): CRUD de unidades (tractores), cajas/remolques
@@ -17,6 +18,7 @@ import { ArchivosUnidadUseCase } from '../../../application/flota/archivos-unida
     CajasUseCase,
     DocumentosUnidadUseCase,
     ArchivosUnidadUseCase,
+    ConceptosCostoUseCase,
   ],
   exports: [UnidadesUseCase, DocumentosUnidadUseCase],
 })

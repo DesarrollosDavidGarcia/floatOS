@@ -6,6 +6,12 @@ export interface CrearUnidadInput {
   modelo?: string;
   anio?: number;
   capacidadKg?: number;
+  capacidadM3?: number;
+  rendimientoKmL?: number;
+  capacidadTanqueL?: number;
+  capacidadPasajeros?: number;
+  costoMantenimientoPorKm?: number;
+  costoFijoMensual?: number;
   aseguradora?: string;
   numeroPoliza?: string;
 }

@@ -21,6 +21,7 @@ import { CatalogosModule } from './presentation/http/catalogos/catalogos.module'
 import { ViajesModule } from './presentation/http/viajes/viajes.module';
 import { CotizacionesModule } from './presentation/http/cotizaciones/cotizaciones.module';
 import { EmpresaModule } from './presentation/http/empresa/empresa.module';
+import { CostosModule } from './presentation/http/costos/costos.module';
 import { TrackingModule } from './presentation/ws/tracking/tracking.module';
 import { AlertasModule } from './presentation/http/alertas/alertas.module';
 import { UsuariosModule } from './presentation/http/usuarios/usuarios.module';
@@ -50,6 +51,7 @@ import { PushHttpModule } from './presentation/http/push/push.module';
     ViajesModule,
     CotizacionesModule,
     EmpresaModule,
+    CostosModule,
     TrackingModule,
     AlertasModule,
     UsuariosModule,

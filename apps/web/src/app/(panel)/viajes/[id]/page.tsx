@@ -17,7 +17,9 @@ import {
   MapPin,
   Pencil,
   PlayCircle,
+  ClipboardCheck,
   Receipt,
+  TrendingUp,
   Route,
   Share2,
   Siren,
@@ -42,6 +44,10 @@ import { HistorialTimeline } from '@/components/viajes/historial-timeline';
 import { TrackingLink } from '@/components/viajes/tracking-link';
 import { VeredictoUnidadCard } from '@/components/viajes/veredicto-unidad-card';
 import { CotizacionesCard } from '@/components/cotizaciones/cotizaciones-card';
+import { MargenCard } from '@/components/viajes/margen-card';
+import { RevisionesCard } from '@/components/viajes/revisiones-card';
+import { GastosCard } from '@/components/viajes/gastos-card';
+import { useSoloLectura } from '@/lib/auth';
 import { ChatViaje } from '@/components/chat/chat-viaje';
 import { PlanRutaDialog } from '@/components/viajes/plan-ruta-dialog';
 import { formatearDuracion, planificarRuta } from '@/components/viajes/plan-ruta';
@@ -94,6 +100,7 @@ export default function ViajeDetallePage() {
   const id = params.id;
 
   const router = useRouter();
+  const soloLectura = useSoloLectura();
 
   const { data: viaje, isLoading, isError } = useQuery<Viaje>({
     queryKey: ['viaje', id],
@@ -509,6 +516,34 @@ export default function ViajeDetallePage() {
         <Colapsable titulo="Cotización" icono={<Receipt className="h-4 w-4" />}>
           <CotizacionesCard viaje={viaje} plano />
         </Colapsable>
+
+        <Colapsable
+          titulo="Revisión del vehículo"
+          icono={<ClipboardCheck className="h-4 w-4" />}
+          descripcion="Odómetro y estado de la unidad a la salida y a la llegada."
+        >
+          <RevisionesCard viajeId={viaje.id} />
+        </Colapsable>
+
+        <Colapsable
+          titulo="Gastos del viaje"
+          icono={<Receipt className="h-4 w-4" />}
+          descripcion="Combustible, casetas y viáticos capturados en campo."
+        >
+          <GastosCard viajeId={viaje.id} />
+        </Colapsable>
+
+        {/* La economía del viaje es cosa del dueño de la flota: el monitorista
+            opera los viajes y su endpoint devolvería 403. */}
+        {!soloLectura && (
+          <Colapsable
+            titulo="Margen"
+            icono={<TrendingUp className="h-4 w-4" />}
+            descripcion="Ingreso contra costos reales y estimados, y estancia en escalas."
+          >
+            <MargenCard viajeId={viaje.id} />
+          </Colapsable>
+        )}
 
         <Colapsable
           titulo="Historial"

@@ -1,4 +1,4 @@
-import { Conductor } from '@prisma/client';
+import { Conductor, Prisma } from '@prisma/client';
 
 /**
  * Representación pública del Conductor: excluye campos sensibles
@@ -38,6 +38,13 @@ export interface ConductorPublico {
   vigenciaDesde: Date | null;
   vigenciaHasta: Date | null;
   notasContratacion: string | null;
+  // Componentes de pago: aplica cada uno que tenga valor, así que un conductor
+  // puede combinar esquemas (sueldo base + comisión). Decimal de Prisma.
+  sueldoPeriodo: Prisma.Decimal | null;
+  periodicidadSueldo: string | null; // catálogo PERIODICIDAD_SUELDO
+  tarifaPorViaje: Prisma.Decimal | null;
+  pagoPorKm: Prisma.Decimal | null;
+  porcentajeFlete: Prisma.Decimal | null;
 }
 
 /** Resumen del viaje abierto que ocupa a un conductor (chip de disponibilidad). */

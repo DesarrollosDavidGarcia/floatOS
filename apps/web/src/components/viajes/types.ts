@@ -138,6 +138,9 @@ export interface Viaje {
   tipoServicio: 'CARGA' | 'PERSONAL';
   /** Nº de pasajeros (servicio de personal). */
   numPasajeros?: number | null;
+  /** Ingreso del viaje. Decimal de Prisma: llega como string en el JSON. */
+  precioAcordado?: number | string | null;
+  moneda?: string | null;
   tipoCarga?: string | null;
   descripcionCarga?: string | null;
   pesoKg?: number | null;
@@ -196,6 +199,7 @@ export interface CrearViajePayload {
   conductorId?: string;
   tipoServicio?: 'CARGA' | 'PERSONAL';
   numPasajeros?: number;
+  precioAcordado?: number;
 }
 
 /** Tipo genérico para los catálogos (clientes / unidades / conductores). */

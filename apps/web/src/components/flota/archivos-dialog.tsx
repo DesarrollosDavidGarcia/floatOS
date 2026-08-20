@@ -28,7 +28,7 @@ function formatoTamano(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function SeccionArchivos({
+export function SeccionArchivos({
   unidadId,
   categoria,
   titulo,

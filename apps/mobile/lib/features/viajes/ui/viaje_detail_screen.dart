@@ -9,10 +9,16 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/offline/operacion_pendiente.dart';
+import '../../../core/offline/pendientes_provider.dart';
 import '../../../core/providers.dart';
 import '../../chat/ui/chat_screen.dart';
 import '../domain/estado_viaje.dart';
+import '../data/viajes_repository.dart';
+import '../domain/revision_viaje.dart';
 import '../domain/viaje.dart';
+import 'gastos_screen.dart';
+import 'revision_screen.dart';
 import 'mapa_pantalla_completa.dart';
 import '../providers/viajes_providers.dart';
 import 'widgets/estado_chip.dart';
@@ -71,6 +77,15 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
           orElse: () => const Text('Viaje'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined),
+            tooltip: 'Gastos del viaje',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GastosScreen(viajeId: widget.viajeId),
+              ),
+            ),
+          ),
           _ChatBoton(
             viajeId: widget.viajeId,
             folioTexto: viajeAsync.maybeWhen(
@@ -99,22 +114,75 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
             ),
           ),
         ),
-        data: (viaje) => _Contenido(
-          viaje: viaje,
-          cambiandoEstado: _cambiandoEstado,
-          onAvanzarEstado: () => _avanzarEstado(viaje),
-          onReportarProblema: () => _reportarProblema(viaje),
-          onReanudar: () => _reanudar(viaje),
-          onPanico: () => _panico(viaje),
+        data: (viaje) => Column(
+          children: [
+            _AvisoPendientes(viajeId: widget.viajeId),
+            Expanded(
+              child: _Contenido(
+                viaje: viaje,
+                cambiandoEstado: _cambiandoEstado,
+                onAvanzarEstado: () => _avanzarEstado(viaje),
+                onReportarProblema: () => _reportarProblema(viaje),
+                onReanudar: () => _reanudar(viaje),
+                onPanico: () => _panico(viaje),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  /// Revisión que exige el backend para entrar a ese estado, si es que exige
+  /// alguna. Duplicar aquí la regla no es redundancia inútil: evita que el
+  /// conductor descubra el bloqueo con un error del servidor cuando ya está
+  /// arrancando, y le abre el formulario en su lugar.
+  TipoRevision? _revisionQueExige(EstadoViaje siguiente) {
+    if (siguiente == EstadoViaje.enCaminoOrigen) return TipoRevision.salida;
+    if (siguiente == EstadoViaje.entregado) return TipoRevision.llegada;
+    return null;
+  }
+
+  /// Abre la revisión si hace falta. Devuelve false si no quedó capturada, en
+  /// cuyo caso el cambio de estado ni se intenta.
+  Future<bool> _asegurarRevision(Viaje viaje, EstadoViaje siguiente) async {
+    final tipo = _revisionQueExige(siguiente);
+    if (tipo == null) return true;
+
+    final repo = ref.read(viajesRepositoryProvider);
+    List<RevisionViaje> revisiones;
+    try {
+      revisiones = await repo.revisiones(viaje.id);
+    } catch (_) {
+      // Sin señal no se puede saber si ya existe: se ofrece capturarla y el
+      // backend decide. Es preferible a bloquear al conductor en el patio.
+      revisiones = const [];
+    }
+    if (revisiones.any((r) => r.tipo == tipo)) return true;
+    if (!mounted) return false;
+
+    final salida = revisiones
+        .where((r) => r.tipo == TipoRevision.salida)
+        .firstOrNull;
+    final capturada = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RevisionScreen(
+          viajeId: viaje.id,
+          tipo: tipo,
+          odometroSalida: salida?.odometro,
+        ),
+      ),
+    );
+    return capturada == true;
   }
 
   Future<void> _avanzarEstado(Viaje viaje) async {
     final siguiente = viaje.estado.siguiente;
     final accion = viaje.estado.accionSiguiente;
     if (siguiente == null || accion == null) return;
+
+    if (!await _asegurarRevision(viaje, siguiente)) return;
+    if (!mounted) return;
 
     final nota = await showModalBottomSheet<String>(
       context: context,
@@ -168,10 +236,47 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Listo: ${siguiente.etiqueta}')),
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (!e.esSinConexion) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.mensaje),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              onPressed: () => _ejecutarCambio(viaje, siguiente, nota),
+            ),
+          ),
+        );
+        return;
+      }
+      // Sin señal el viaje avanza igual: el cambio se encola detrás de su
+      // revisión —la cola respeta el orden de captura— y el GPS arranca ya, que
+      // es lo que de verdad importa que no se pierda del trayecto.
+      await ref.read(pendientesProvider.notifier).encolar(
+            tipo: TipoPendiente.cambioEstado,
+            viajeId: viaje.id,
+            datos: {
+              'estado': siguiente.api,
+              if (nota.trim().isNotEmpty) 'nota': nota.trim(),
+            },
+          );
+      if (siguiente.requiereTracking) {
+        await tracking.iniciar(viaje.id);
+      } else if (viajeConGps == viaje.id) {
+        await tracking.detener();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Sin señal: ${siguiente.etiqueta} se enviará en cuanto vuelva.',
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      // Caso típico en carretera: confirmó la entrega sin señal. Ofrecer
-      // reintento conservando la nota — que no tenga que reescribir nada.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(mensajeDeError(e)),
@@ -326,6 +431,50 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
 /// Confirmación de cambio de estado con nota opcional. Es StatefulWidget
 /// para que el TextEditingController viva y muera con el sheet (sin tocar
 /// un controller disposed durante la animación de salida).
+/// Aviso de lo capturado sin señal que sigue esperando envío.
+///
+/// El conductor tiene que saber que su revisión o su gasto todavía no llegaron:
+/// sin este aviso creería que ya entregó todo y podría no volver a abrir la app
+/// en horas.
+class _AvisoPendientes extends ConsumerWidget {
+  const _AvisoPendientes({required this.viajeId});
+
+  final String viajeId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pendientes = ref.watch(pendientesDeViajeProvider(viajeId));
+    if (pendientes.isEmpty) return const SizedBox.shrink();
+
+    final tema = Theme.of(context);
+    return Material(
+      color: tema.colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                pendientes.length == 1
+                    ? 'Sin enviar: ${pendientes.first.resumen}'
+                    : '${pendientes.length} capturas sin enviar',
+                style: tema.textTheme.bodySmall,
+              ),
+            ),
+            TextButton(
+              onPressed: () =>
+                  ref.read(pendientesProvider.notifier).sincronizar(),
+              child: const Text('Enviar ahora'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Botón de chat con badge de mensajes sin leer (mensajes del panel).
 class _ChatBoton extends ConsumerWidget {
   const _ChatBoton({required this.viajeId, this.folioTexto});

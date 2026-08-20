@@ -42,6 +42,12 @@ export interface ActualizarConductorInput {
   vigenciaDesde?: string;
   vigenciaHasta?: string;
   notasContratacion?: string;
+  // Pago (componentes independientes; ver CrearConductorDto)
+  sueldoPeriodo?: number;
+  periodicidadSueldo?: string;
+  tarifaPorViaje?: number;
+  pagoPorKm?: number;
+  porcentajeFlete?: number;
 }
 
 /** Caso de uso: actualizar datos del conductor (re-hashea password si llega). */
@@ -124,6 +130,13 @@ export class ActualizarConductorUseCase {
       data.vigenciaHasta = input.vigenciaHasta ? new Date(input.vigenciaHasta) : null;
     }
     if (input.notasContratacion !== undefined) data.notasContratacion = input.notasContratacion;
+    // Pago: independiente del tipo de contratación, no se limpia con él.
+    if (input.sueldoPeriodo !== undefined) data.sueldoPeriodo = input.sueldoPeriodo;
+    if (input.periodicidadSueldo !== undefined)
+      data.periodicidadSueldo = input.periodicidadSueldo;
+    if (input.tarifaPorViaje !== undefined) data.tarifaPorViaje = input.tarifaPorViaje;
+    if (input.pagoPorKm !== undefined) data.pagoPorKm = input.pagoPorKm;
+    if (input.porcentajeFlete !== undefined) data.porcentajeFlete = input.porcentajeFlete;
     // Consistencia por tipo: al cambiar el tipo de contratación, limpia los datos
     // que no le corresponden (evita empresa/vigencia colgados que dispararían alertas).
     if (input.tipoContratacion !== undefined) {

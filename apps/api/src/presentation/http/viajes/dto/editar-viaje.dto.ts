@@ -6,7 +6,9 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
+  Length,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -37,4 +39,17 @@ export class EditarViajeDto {
   @IsInt()
   @Min(1)
   numPasajeros?: number;
+
+  /** Precio acordado del viaje; null lo borra. */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'El precio acordado debe ser numérico' },
+  )
+  @Min(0, { message: 'El precio acordado no puede ser negativo' })
+  precioAcordado?: number | null;
+
+  @IsOptional()
+  @Length(3, 3, { message: 'La moneda debe ser un código ISO de 3 letras' })
+  moneda?: string;
 }

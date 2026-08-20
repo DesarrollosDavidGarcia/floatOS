@@ -3,12 +3,17 @@ import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../domain/estado_viaje.dart';
+import '../domain/revision_viaje.dart';
 import '../domain/viaje.dart';
 
 class ViajesRepository {
   ViajesRepository(this._api);
 
   final ApiClient _api;
+
+  /// Acceso al cliente para la extensión de revisiones y gastos: una extensión
+  /// de Dart no puede tocar los campos privados de la clase.
+  ApiClient get _apiPublico => _api;
 
   /// GET /viajes — el API ya filtra por el conductor autenticado.
   /// Recorre todas las páginas (pageSize máx del API = 100) para que un
@@ -105,5 +110,131 @@ class ViajesRepository {
     } on DioException catch (e) {
       throw ApiException.desdeDio(e);
     }
+  }
+}
+
+// ── Revisión del vehículo y gastos (ingesta de campo) ──
+
+/// Extensión con la captura obligatoria de campo. Va aparte para no engordar el
+/// repositorio principal, pero comparte el mismo cliente autenticado.
+extension RevisionesYGastos on ViajesRepository {
+  /// Revisiones capturadas del viaje (salida y llegada).
+  Future<List<RevisionViaje>> revisiones(String viajeId) async {
+    try {
+      final res =
+          await _apiPublico.dio.get<List<dynamic>>('/viajes/$viajeId/revisiones');
+      return (res.data ?? [])
+          .map((e) => RevisionViaje.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
+
+  /// Captura la revisión y, si hay foto, la sube después.
+  ///
+  /// La foto va en una segunda petición a propósito: si fallara la subida, la
+  /// revisión ya quedó guardada y el conductor puede seguir su viaje en vez de
+  /// tener que repetir todo el formulario.
+  Future<RevisionViaje> capturarRevision(
+    String viajeId,
+    TipoRevision tipo, {
+    required int odometro,
+    int? nivelCombustiblePct,
+    List<ItemChecklist> checklist = const [],
+    String? novedades,
+    String? fotoPath,
+  }) async {
+    try {
+      final res = await _apiPublico.dio.post<Map<String, dynamic>>(
+        '/viajes/$viajeId/revisiones/${tipo.api}',
+        data: {
+          'odometro': odometro,
+          'nivelCombustiblePct': ?nivelCombustiblePct,
+          if (novedades != null && novedades.trim().isNotEmpty)
+            'novedades': novedades.trim(),
+          if (checklist.isNotEmpty)
+            'checklist': checklist.map((i) => i.toJson()).toList(),
+        },
+      );
+      final revision = RevisionViaje.fromJson(res.data!);
+      if (fotoPath != null) {
+        await _subirImagen(
+          '/viajes/revisiones/${revision.id}/foto',
+          'foto',
+          fotoPath,
+        );
+      }
+      return revision;
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
+
+  Future<List<GastoViaje>> gastos(String viajeId) async {
+    try {
+      final res =
+          await _apiPublico.dio.get<List<dynamic>>('/viajes/$viajeId/gastos');
+      return (res.data ?? [])
+          .map((e) => GastoViaje.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
+
+  Future<GastoViaje> crearGasto(
+    String viajeId, {
+    required String tipo,
+    required double monto,
+    String? descripcion,
+    double? litros,
+    String? ticketPath,
+  }) async {
+    try {
+      final res = await _apiPublico.dio.post<Map<String, dynamic>>(
+        '/viajes/$viajeId/gastos',
+        data: {
+          'tipo': tipo,
+          'monto': monto,
+          if (descripcion != null && descripcion.trim().isNotEmpty)
+            'descripcion': descripcion.trim(),
+          'litros': ?litros,
+        },
+      );
+      final gasto = GastoViaje.fromJson(res.data!);
+      if (ticketPath != null) {
+        await _subirImagen('/viajes/gastos/${gasto.id}/ticket', 'ticket', ticketPath);
+      }
+      return gasto;
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
+
+  Future<void> eliminarGasto(String gastoId) async {
+    try {
+      await _apiPublico.dio.delete<void>('/viajes/gastos/$gastoId');
+    } on DioException catch (e) {
+      throw ApiException.desdeDio(e);
+    }
+  }
+
+  /// Sube una imagen de evidencia. El Content-Type del MultipartFile es
+  /// obligatorio: sin él dio manda octet-stream y el API lo rechaza.
+  Future<void> _subirImagen(String ruta, String campo, String path) async {
+    final extension = path.split('.').last.toLowerCase();
+    final mime = extension == 'png'
+        ? 'png'
+        : extension == 'webp'
+            ? 'webp'
+            : 'jpeg';
+    final form = FormData.fromMap({
+      campo: await MultipartFile.fromFile(
+        path,
+        contentType: DioMediaType('image', mime),
+      ),
+    });
+    await _apiPublico.dio.post<void>(ruta, data: form);
   }
 }

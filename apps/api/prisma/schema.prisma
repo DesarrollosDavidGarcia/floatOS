@@ -338,6 +338,16 @@ model Conductor {
   vigenciaHasta             DateTime?
   notasContratacion         String?
 
+  // ── Pago al conductor (componentes; aplica cada uno que tenga valor) ──
+  // Un conductor puede combinar esquemas (sueldo base + comisión, por ejemplo),
+  // así que no hay un enum de "esquema de pago": el costo del viaje se calcula
+  // sumando los componentes definidos. Todos en la moneda del viaje.
+  sueldoPeriodo      Decimal? @db.Decimal(10, 2) // sueldo fijo del periodo; se prorratea entre los viajes del periodo
+  periodicidadSueldo String? // catálogo PERIODICIDAD_SUELDO; obligatorio si hay sueldoPeriodo
+  tarifaPorViaje     Decimal? @db.Decimal(10, 2)
+  pagoPorKm          Decimal? @db.Decimal(8, 2)
+  porcentajeFlete    Decimal? @db.Decimal(5, 2) // % sobre Viaje.precioAcordado (0-100)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -379,29 +389,36 @@ model DispositivoPush {
 // ───────────────────────────── Flota ─────────────────────────────
 
 model Unidad {
-  id               String   @id @default(cuid())
-  placas           String   @unique
-  tipo             String // tractocamión, camión, camioneta, etc. (catálogo TIPO_UNIDAD)
-  marca            String?
-  modelo           String?
-  anio             Int?
-  capacidadKg      Decimal? @db.Decimal(10, 2)
+  id                      String   @id @default(cuid())
+  placas                  String   @unique
+  tipo                    String // tractocamión, camión, camioneta, etc. (catálogo TIPO_UNIDAD)
+  marca                   String?
+  modelo                  String?
+  anio                    Int?
+  capacidadKg             Decimal? @db.Decimal(10, 2)
   // Entradas del motor de cálculo (uso adecuado de la unidad):
-  capacidadM3      Decimal? @db.Decimal(10, 3) // capacidad volumétrica
-  rendimientoKmL   Decimal? @db.Decimal(6, 2) // km por litro
-  capacidadTanqueL Decimal? @db.Decimal(8, 2) // litros de tanque (autonomía = rendimiento * tanque)
+  capacidadM3             Decimal? @db.Decimal(10, 3) // capacidad volumétrica
+  rendimientoKmL          Decimal? @db.Decimal(6, 2) // km por litro
+  capacidadTanqueL        Decimal? @db.Decimal(8, 2) // litros de tanque (autonomía = rendimiento * tanque)
+  // Costo variable de operación por km (mantenimiento, llantas, depreciación).
+  // NO incluye diesel: el combustible se calcula aparte para no contarlo dos veces.
+  costoMantenimientoPorKm Decimal? @db.Decimal(8, 2)
+  // Costo fijo mensual de la unidad (seguro, tenencia, financiamiento). El
+  // criterio de prorrateo a cada viaje se define en el cálculo de margen.
+  costoFijoMensual        Decimal? @db.Decimal(10, 2)
   // Capacidad de asientos (unidades de transporte de personal: van, autobús…).
-  capacidadPasajeros Int?
-  aseguradora      String?
-  numeroPoliza     String?
-  fotoKey          String? // foto de referencia del vehículo (objeto en MinIO)
-  activo           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  capacidadPasajeros      Int?
+  aseguradora             String?
+  numeroPoliza            String?
+  fotoKey                 String? // foto de referencia del vehículo (objeto en MinIO)
+  activo                  Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  documentos DocumentoUnidad[]
-  archivos   ArchivoUnidad[]
-  viajes     Viaje[]
+  documentos     DocumentoUnidad[]
+  archivos       ArchivoUnidad[]
+  viajes         Viaje[]
+  conceptosCosto ConceptoCostoUnidad[]
 
   @@map("unidades")
 }
@@ -849,7 +866,7 @@ model Viaje {
   dimensiones      String?
 
   // Personal (tipoServicio=PERSONAL): nº de pasajeros del servicio.
-  numPasajeros     Int?
+  numPasajeros Int?
 
   // Snapshot del motor de cálculo (se recalcula al crear/editar).
   distanciaEstimadaKm Decimal? @db.Decimal(10, 2)
@@ -875,6 +892,12 @@ model Viaje {
   odometroInicial Int?
   odometroFinal   Int?
 
+  // Ingreso del viaje. Antes el precio solo vivía en la Cotizacion ACEPTADA, así
+  // que un viaje creado por POST /viajes quedaba sin ingreso y sin margen
+  // calculable. Se copia desde la cotización al aceptarla, o se captura a mano.
+  precioAcordado Decimal? @db.Decimal(12, 2)
+  moneda         String   @default("MXN")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -888,6 +911,7 @@ model Viaje {
   historialAsignaciones HistorialAsignacionViaje[]
   ubicaciones           UbicacionConductor[]
   gastos                GastoViaje[]
+  revisiones            RevisionViaje[]
   evidencias            EvidenciaViaje[]
   incidencias           IncidenciaConductor[]
   cartaPorte            CartaPorte?
@@ -1016,13 +1040,17 @@ model UbicacionConductor {
 }
 
 model GastoViaje {
-  id            String   @id @default(cuid())
-  viajeId       String
-  tipo          String // catálogo TIPO_GASTO
-  monto         Decimal  @db.Decimal(10, 2)
-  descripcion   String?
-  fotoTicketKey String? // objeto en MinIO
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  viajeId        String
+  tipo           String // catálogo TIPO_GASTO
+  monto          Decimal  @db.Decimal(10, 2)
+  // Solo para tipo COMBUSTIBLE: consumo REAL del ticket. Si vienen litros, mandan
+  // sobre el estimado por rendimiento × precio de catálogo.
+  litros         Decimal? @db.Decimal(8, 2)
+  precioPorLitro Decimal? @db.Decimal(8, 3)
+  descripcion    String?
+  fotoTicketKey  String? // objeto en MinIO
+  createdAt      DateTime @default(now())
 
   viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
 
@@ -1066,6 +1094,14 @@ model EscalaViaje {
   ventanaHasta        DateTime?
   // Marca de tiempo de la primera alerta de geocerca emitida (dedup entre lotes).
   llegadaNotificadaEn DateTime?
+  // Hora REAL de entrada a la geocerca: el `capturadoEn` del primer ping dentro
+  // del radio. Distinta de `llegadaNotificadaEn`, que dice cuándo se avisó. La
+  // demora se mide con llegadaEn/salidaRegistradaEn: usar el sello del aviso da
+  // estancias infladas (o negativas) cuando el lote entra por sync offline.
+  llegadaEn           DateTime?
+  // Marca de salida de la geocerca, que cierra la estancia. Sin esto la demora en
+  // la escala no se puede calcular: la llegada se sella y la salida no.
+  salidaRegistradaEn  DateTime?
   createdAt           DateTime                               @default(now())
   updatedAt           DateTime                               @updatedAt
 
@@ -1255,4 +1291,105 @@ model RutaCache {
   // Índice para la poda por antigüedad (purgarAntiguas en RouteService).
   @@index([createdAt])
   @@map("ruta_cache")
+}
+
+// ──────────────────── Costos: precio del diesel ─────────────────────
+
+/// Precio del diesel por litro, con vigencia. Sirve para ESTIMAR el combustible
+/// de un viaje (km ÷ `Unidad.rendimientoKmL` × precio vigente en la fecha del
+/// viaje) cuando el conductor no capturó litros en el ticket. El dato real del
+/// ticket (`GastoViaje.litros`/`precioPorLitro`) siempre gana sobre el estimado.
+/// Se aplica el registro con el mayor `vigenteDesde` <= fecha del viaje.
+model PrecioDiesel {
+  id             String   @id @default(cuid())
+  precioPorLitro Decimal  @db.Decimal(8, 3)
+  vigenteDesde   DateTime
+  notas          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Un solo precio por fecha de vigencia; el @@unique ya da el índice para la
+  // búsqueda por rango que hace el cálculo.
+  @@unique([vigenteDesde])
+  @@map("precios_diesel")
+}
+
+/// Un concepto del costo de operación de la unidad (llantas, servicio mayor,
+/// frenos, reparaciones…) con lo que cuesta y los kilómetros que dura. Su
+/// aportación al costo por km es `costo / vidaUtilKm`, y la suma de todos los
+/// conceptos es el costo variable por km de la unidad.
+///
+/// Existe para que ese costo deje de ser un número al tanteo: capturado por
+/// pedazos se puede revisar de dónde sale cada centavo y corregir solo la parte
+/// que cambió. Si la unidad no tiene conceptos, se usa el campo manual
+/// `Unidad.costoMantenimientoPorKm` como respaldo.
+model ConceptoCostoUnidad {
+  id         String   @id @default(cuid())
+  unidadId   String
+  concepto   String
+  costo      Decimal  @db.Decimal(12, 2)
+  /// Kilómetros que dura ese gasto antes de repetirse. Siempre > 0.
+  vidaUtilKm Int
+  notas      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  unidad Unidad @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+
+  @@index([unidadId])
+  @@map("conceptos_costo_unidad")
+}
+
+// ──────────────── Revisión del vehículo (salida / llegada) ────────────────
+
+/// Momento de la revisión: antes de arrancar o al cerrar el servicio.
+enum TipoRevisionViaje {
+  SALIDA
+  LLEGADA
+}
+
+/// Quién capturó la revisión. El conductor es la fuente de primera mano; el
+/// monitorista solo debería aparecer cuando el conductor no pudo (teléfono sin
+/// batería, roto), y por eso queda registrado en el dato.
+enum OrigenRevision {
+  CONDUCTOR
+  MONITORISTA
+}
+
+/// Revisión del vehículo alrededor del viaje. Es la puerta de entrada del dato
+/// que el margen necesita y que hoy no existe: el odómetro real y el estado con
+/// el que sale y llega la unidad.
+///
+/// Su razón de ser es que sea OBLIGATORIA: sin revisión de SALIDA el viaje no
+/// puede pasar a EN_CAMINO_ORIGEN, y sin la de LLEGADA no puede pasar a
+/// ENTREGADO. La regla vive en el backend, no en la app, para que no se salte
+/// desde el panel ni reinstalando.
+model RevisionViaje {
+  id                  String            @id @default(cuid())
+  viajeId             String
+  tipo                TipoRevisionViaje
+  /// Lectura del odómetro. Es el dato que convierte los km de estimados a reales.
+  odometro            Int
+  /// Combustible en el tablero, 0-100 %.
+  nivelCombustiblePct Int?
+  /// Foto del tablero: hace auditable el odómetro en vez de ser un número tecleado.
+  fotoTableroKey      String?
+  /// Check list mecánico: [{ clave, estado: OK | MAL | NA, nota? }]. Las claves
+  /// son del catálogo CHECKLIST_UNIDAD; se guarda como JSON porque la lista de
+  /// puntos a revisar cambia por flota y no vale una migración cada vez.
+  checklist           Json?
+  novedades           String?
+  origen              OrigenRevision    @default(CONDUCTOR)
+  /// Id de quien la capturó (conductor o usuario del panel), para trazabilidad.
+  capturadaPor        String
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  viaje Viaje @relation(fields: [viajeId], references: [id], onDelete: Cascade)
+
+  // Una revisión de cada tipo por viaje: recapturar corrige la existente en vez
+  // de acumular versiones que dejarían el odómetro ambiguo.
+  @@unique([viajeId, tipo])
+  @@index([viajeId])
+  @@map("revisiones_viaje")
 }

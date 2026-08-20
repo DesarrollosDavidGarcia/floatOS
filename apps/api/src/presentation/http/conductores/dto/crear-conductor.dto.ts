@@ -2,8 +2,11 @@ import {
   IsDateString,
   IsEmail,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -119,4 +122,46 @@ export class CrearConductorDto {
   @IsOptional()
   @IsString()
   notasContratacion?: string;
+
+  // ── Pago (componentes; se aplica cada uno que venga con valor) ─────────────
+
+  /** Sueldo fijo del periodo; se prorratea entre los viajes de ese periodo. */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'El sueldo del periodo debe ser numérico' },
+  )
+  @Min(0, { message: 'El sueldo del periodo no puede ser negativo' })
+  sueldoPeriodo?: number;
+
+  /** Catálogo PERIODICIDAD_SUELDO. Obligatorio si se manda sueldoPeriodo. */
+  @IsOptional()
+  @IsString()
+  periodicidadSueldo?: string;
+
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'La tarifa por viaje debe ser numérica' },
+  )
+  @Min(0, { message: 'La tarifa por viaje no puede ser negativa' })
+  tarifaPorViaje?: number;
+
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'El pago por km debe ser numérico' },
+  )
+  @Min(0, { message: 'El pago por km no puede ser negativo' })
+  pagoPorKm?: number;
+
+  /** Porcentaje sobre el precio acordado del viaje. */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'El porcentaje del flete debe ser numérico' },
+  )
+  @Min(0, { message: 'El porcentaje del flete no puede ser negativo' })
+  @Max(100, { message: 'El porcentaje del flete no puede pasar de 100' })
+  porcentajeFlete?: number;
 }

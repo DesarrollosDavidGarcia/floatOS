@@ -9,6 +9,11 @@ class ApiException implements Exception {
 
   bool get esSesionExpirada => statusCode == 401;
 
+  /// No hubo respuesta del servidor: sin red, timeout o el servidor caído. Es
+  /// lo que distingue "no llegó" de "llegó y lo rechazó", y decide si la
+  /// operación se guarda para reintentarla o se le muestra el error al usuario.
+  bool get esSinConexion => statusCode == null;
+
   factory ApiException.desdeDio(DioException e) {
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout ||

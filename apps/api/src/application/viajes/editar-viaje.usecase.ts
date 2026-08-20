@@ -62,6 +62,15 @@ export class EditarViajeUseCase {
       numPasajeros: esPersonal ? input.numPasajeros : null,
     };
 
+    // Precio: solo se toca si viene en la petición. undefined deja el valor
+    // guardado; null lo borra explícitamente.
+    const datosPrecio = {
+      ...(input.precioAcordado !== undefined
+        ? { precioAcordado: input.precioAcordado }
+        : {}),
+      ...(input.moneda !== undefined ? { moneda: input.moneda } : {}),
+    };
+
     const fechaProgramada =
       input.fechaProgramada !== undefined
         ? new Date(input.fechaProgramada)
@@ -77,7 +86,7 @@ export class EditarViajeUseCase {
     if (!input.escalas) {
       return this.prisma.viaje.update({
         where: { id },
-        data: { fechaProgramada, ...datosServicio },
+        data: { fechaProgramada, ...datosServicio, ...datosPrecio },
         include: RELACIONES_DETALLE,
       });
     }
@@ -98,6 +107,7 @@ export class EditarViajeUseCase {
       ...resumen,
       ...snapshotRuta(ruta),
       ...datosServicio,
+      ...datosPrecio,
       fechaProgramada,
       escalas: { create: nestedEscalasCreate(input.escalas) },
     };

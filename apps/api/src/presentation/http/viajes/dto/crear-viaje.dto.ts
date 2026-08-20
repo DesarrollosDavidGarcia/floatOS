@@ -7,8 +7,10 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Length,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -50,4 +52,21 @@ export class CrearViajeDto {
   @IsInt()
   @Min(1)
   numPasajeros?: number;
+
+  /**
+   * Precio acordado con el cliente. Es el ingreso del viaje: sin él no hay
+   * margen calculable. Si el viaje nace de una cotización aceptada se copia
+   * solo; aquí se captura cuando el viaje se da de alta directo.
+   */
+  @IsOptional()
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'El precio acordado debe ser numérico' },
+  )
+  @Min(0, { message: 'El precio acordado no puede ser negativo' })
+  precioAcordado?: number;
+
+  @IsOptional()
+  @Length(3, 3, { message: 'La moneda debe ser un código ISO de 3 letras' })
+  moneda?: string;
 }

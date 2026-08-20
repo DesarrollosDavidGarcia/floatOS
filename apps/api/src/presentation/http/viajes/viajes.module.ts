@@ -15,6 +15,10 @@ import { ListarLlegadasRecientesUseCase } from '../../../application/viajes/list
 import { ReportarIncidenciaViajeUseCase } from '../../../application/viajes/reportar-incidencia-viaje.usecase';
 import { MotorViajeService } from '../../../application/viajes/motor-viaje.service';
 import { RoutingModule } from '../../../infrastructure/routing/routing.module';
+import { CostosModule } from '../costos/costos.module';
+import { MargenViajeUseCase } from '../../../application/viajes/margen-viaje.usecase';
+import { RevisionesViajeUseCase } from '../../../application/viajes/revisiones-viaje.usecase';
+import { GastosViajeUseCase } from '../../../application/viajes/gastos-viaje.usecase';
 import { TrackingModule } from '../../ws/tracking/tracking.module';
 
 /**
@@ -25,7 +29,7 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
  * Exporta ViajesService para que el módulo de tracking pueda inyectarlo.
  */
 @Module({
-  imports: [TrackingModule, RoutingModule],
+  imports: [TrackingModule, RoutingModule, CostosModule],
   controllers: [ViajesController],
   providers: [
     ViajesService,
@@ -42,6 +46,9 @@ import { TrackingModule } from '../../ws/tracking/tracking.module';
     GestionarPasajerosUseCase,
     ListarLlegadasRecientesUseCase,
     ReportarIncidenciaViajeUseCase,
+    MargenViajeUseCase,
+    RevisionesViajeUseCase,
+    GastosViajeUseCase,
   ],
   exports: [ViajesService],
 })

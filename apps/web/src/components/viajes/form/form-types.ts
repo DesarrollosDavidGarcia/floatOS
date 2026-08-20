@@ -36,6 +36,15 @@ export const viajeFormSchema = z
     conductorId: z.string(),
     // Solo personal; se valida en superRefine según el tipo.
     numPasajeros: z.string().optional(),
+    // Ingreso del viaje: sin él no hay margen que calcular. Si el viaje nace de
+    // una cotización aceptada se llena solo al aceptarla.
+    precioAcordado: z
+      .string()
+      .optional()
+      .refine(
+        (v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0),
+        'Debe ser un número >= 0',
+      ),
     escalas: z
       .array(escalaSchema)
       .min(2, 'Se requieren al menos origen y destino'),
@@ -96,6 +105,7 @@ export function defaultsCrear(): ViajeFormValues {
     unidadId: NINGUNO,
     conductorId: NINGUNO,
     numPasajeros: '',
+    precioAcordado: '',
     escalas: [escalaVacia('RECOGER', 'CARGA'), escalaVacia('ENTREGAR', 'DESCARGA')],
   };
 }
@@ -133,6 +143,7 @@ export function defaultsDeViaje(v: Viaje): ViajeFormValues {
     unidadId: v.unidadId ?? NINGUNO,
     conductorId: v.conductorId ?? NINGUNO,
     numPasajeros: v.numPasajeros != null ? String(v.numPasajeros) : '',
+    precioAcordado: v.precioAcordado != null ? String(v.precioAcordado) : '',
     escalas: escalas.length >= 2 ? escalas : defaultsCrear().escalas,
   };
 }
@@ -206,6 +217,7 @@ export function toCrearPayload(v: ViajeFormValues): CrearViajePayload {
     tipoServicio: v.tipoServicio,
     numPasajeros:
       v.tipoServicio === 'PERSONAL' ? Number(v.numPasajeros) : undefined,
+    precioAcordado: v.precioAcordado ? Number(v.precioAcordado) : undefined,
     escalas: escalasParaEnviar(v),
   };
 }

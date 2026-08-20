@@ -11,6 +11,14 @@ export interface Unidad {
   modelo?: string | null;
   anio?: number | null;
   capacidadKg?: number | null;
+  capacidadM3?: number | null;
+  /** km/L: alimenta el diesel estimado del viaje. */
+  rendimientoKmL?: number | null;
+  capacidadTanqueL?: number | null;
+  capacidadPasajeros?: number | null;
+  /** Costo variable por km SIN diesel (el combustible se calcula aparte). */
+  costoMantenimientoPorKm?: number | null;
+  costoFijoMensual?: number | null;
   aseguradora?: string | null;
   numeroPoliza?: string | null;
   /** URL temporal de la foto de referencia (null si no tiene). */
