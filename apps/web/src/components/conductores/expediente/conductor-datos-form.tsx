@@ -212,6 +212,68 @@ export function ConductorDatosForm({
         )}
       </Seccion>
 
+      {/* Pago */}
+      <Seccion titulo="Pago">
+        <p className="text-xs text-muted-foreground">
+          Se aplica cada componente que tenga valor, así que se pueden combinar
+          (por ejemplo sueldo base más comisión). Es lo que se usa para calcular
+          el costo del conductor en cada viaje.
+        </p>
+        <CamposGrid cols={3}>
+          <Campo
+            label="Sueldo por periodo"
+            htmlFor="sueldoPeriodo"
+            error={errors.sueldoPeriodo?.message}
+            hint="Se prorratea entre los viajes del periodo."
+          >
+            <Input id="sueldoPeriodo" inputMode="decimal" {...register('sueldoPeriodo')} />
+          </Campo>
+
+          <Campo
+            label="Periodicidad del sueldo"
+            error={errors.periodicidadSueldo?.message}
+          >
+            <Controller
+              control={control}
+              name="periodicidadSueldo"
+              render={({ field }) => (
+                <CatalogoSelect
+                  grupo="PERIODICIDAD_SUELDO"
+                  value={field.value || null}
+                  onChange={field.onChange}
+                  placeholder="Selecciona…"
+                />
+              )}
+            />
+          </Campo>
+
+          <Campo
+            label="Tarifa por viaje"
+            htmlFor="tarifaPorViaje"
+            error={errors.tarifaPorViaje?.message}
+          >
+            <Input id="tarifaPorViaje" inputMode="decimal" {...register('tarifaPorViaje')} />
+          </Campo>
+
+          <Campo
+            label="Pago por km"
+            htmlFor="pagoPorKm"
+            error={errors.pagoPorKm?.message}
+          >
+            <Input id="pagoPorKm" inputMode="decimal" {...register('pagoPorKm')} />
+          </Campo>
+
+          <Campo
+            label="% del flete"
+            htmlFor="porcentajeFlete"
+            error={errors.porcentajeFlete?.message}
+            hint="Sobre el precio acordado del viaje."
+          >
+            <Input id="porcentajeFlete" inputMode="decimal" {...register('porcentajeFlete')} />
+          </Campo>
+        </CamposGrid>
+      </Seccion>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Datos personales */}
         <Seccion titulo="Datos personales">

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CatalogoSelect } from '@/components/catalogos/catalogo-select';
+import { PreciosDieselCard } from '@/components/costos/precios-diesel-card';
 
 /** Campos de texto editables (mismo orden que el DTO del backend). */
 const CAMPOS_TEXTO = [
@@ -388,6 +389,8 @@ export default function ConfiguracionPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PreciosDieselCard />
 
       <div className="flex justify-end">
         <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>

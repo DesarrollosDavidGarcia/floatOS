@@ -3,6 +3,12 @@ import type { Conductor, ConductorFormPayload } from '@/components/conductores/t
 import { isoADate } from '@/lib/fecha';
 
 const opcional = z.string().trim().optional().or(z.literal(''));
+/** Número opcional en texto: vacío o >= 0. Los importes van como string en el form. */
+const numero = z
+  .string()
+  .trim()
+  .optional()
+  .refine((v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0), 'Debe ser un número >= 0');
 const tel10 = z
   .string()
   .trim()
@@ -32,6 +38,15 @@ export const conductorFormSchema = z
     vigenciaDesde: opcional,
     vigenciaHasta: opcional,
     notasContratacion: opcional,
+    // Pago: componentes independientes entre sí (ver PagoSeccion).
+    sueldoPeriodo: numero,
+    periodicidadSueldo: opcional,
+    tarifaPorViaje: numero,
+    pagoPorKm: numero,
+    porcentajeFlete: numero.refine(
+      (v) => !v || Number(v) <= 100,
+      'No puede pasar de 100',
+    ),
     // Datos personales / RH
     curp: z
       .string()
@@ -83,6 +98,14 @@ export const conductorFormSchema = z
 
 export type ConductorFormValues = z.infer<typeof conductorFormSchema>;
 
+const VACIO_PAGO = {
+  sueldoPeriodo: '',
+  periodicidadSueldo: '',
+  tarifaPorViaje: '',
+  pagoPorKm: '',
+  porcentajeFlete: '',
+};
+
 const VACIO_RH = {
   curp: '',
   rfc: '',
@@ -115,9 +138,15 @@ export function defaultsCrear(): ConductorFormValues {
     vigenciaDesde: '',
     vigenciaHasta: '',
     notasContratacion: '',
+    ...VACIO_PAGO,
     ...VACIO_RH,
     _esEdicion: false,
   };
+}
+
+/** Decimal de Prisma: llega como string en JSON, y como number si ya se parseó. */
+function numeroATexto(v?: number | string | null): string {
+  return v == null ? '' : String(v);
 }
 
 export function defaultsDeConductor(c: Conductor): ConductorFormValues {
@@ -136,6 +165,11 @@ export function defaultsDeConductor(c: Conductor): ConductorFormValues {
     vigenciaDesde: isoADate(c.vigenciaDesde),
     vigenciaHasta: isoADate(c.vigenciaHasta),
     notasContratacion: c.notasContratacion ?? '',
+    sueldoPeriodo: numeroATexto(c.sueldoPeriodo),
+    periodicidadSueldo: c.periodicidadSueldo ?? '',
+    tarifaPorViaje: numeroATexto(c.tarifaPorViaje),
+    pagoPorKm: numeroATexto(c.pagoPorKm),
+    porcentajeFlete: numeroATexto(c.porcentajeFlete),
     curp: c.curp ?? '',
     rfc: c.rfc ?? '',
     nss: c.nss ?? '',
@@ -164,6 +198,10 @@ export function toPayload(values: ConductorFormValues): ConductorFormPayload {
     return s || undefined;
   };
   const fecha = (v?: string) => (v ? new Date(v).toISOString() : undefined);
+  const num = (v?: string) => {
+    const s = (v ?? '').trim();
+    return s ? Number(s) : undefined;
+  };
   const externo = values.tipoContratacion !== 'PLANTA';
   const terciarizado = values.tipoContratacion === 'TERCIARIZADO';
   const payload: ConductorFormPayload = {
@@ -180,6 +218,13 @@ export function toPayload(values: ConductorFormValues): ConductorFormPayload {
     vigenciaDesde: externo ? fecha(values.vigenciaDesde) : undefined,
     vigenciaHasta: externo ? fecha(values.vigenciaHasta) : undefined,
     notasContratacion: externo ? t(values.notasContratacion) : undefined,
+    // El pago NO depende del tipo de contratación: un freelance puede llevar
+    // sueldo y uno de planta, comisión.
+    sueldoPeriodo: num(values.sueldoPeriodo),
+    periodicidadSueldo: t(values.periodicidadSueldo),
+    tarifaPorViaje: num(values.tarifaPorViaje),
+    pagoPorKm: num(values.pagoPorKm),
+    porcentajeFlete: num(values.porcentajeFlete),
     // RH
     curp: t(values.curp),
     rfc: t(values.rfc),

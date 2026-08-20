@@ -48,6 +48,7 @@ export function Campo({
   label,
   htmlFor,
   error,
+  hint,
   required,
   full,
   children,
@@ -55,17 +56,20 @@ export function Campo({
   label: string;
   htmlFor?: string;
   error?: string;
+  /** Aclaración bajo el control; se anuncia junto con el campo. */
+  hint?: string;
   required?: boolean;
   full?: boolean;
   children: ReactNode;
 }) {
   const errorId = error && htmlFor ? `${htmlFor}-error` : undefined;
+  const hintId = hint && htmlFor ? `${htmlFor}-hint` : undefined;
 
   // Inyecta atributos ARIA en el control para que la validación se anuncie:
   // aria-invalid cuando hay error, aria-describedby apuntando al texto de error,
   // y aria-required cuando el campo es obligatorio.
   const control =
-    isValidElement(children) && (error || required)
+    isValidElement(children) && (error || required || hint)
       ? cloneElement(children as ReactElement<Record<string, unknown>>, {
           'aria-invalid': error ? true : undefined,
           'aria-describedby':
@@ -74,6 +78,7 @@ export function Campo({
                 'aria-describedby'
               ],
               errorId,
+              hintId,
             ]
               .filter(Boolean)
               .join(' ') || undefined,
@@ -105,6 +110,13 @@ export function Campo({
       >
         {control}
       </div>
+      {/* El error sustituye a la aclaración: dos textos bajo el mismo control
+          compiten entre sí y el que importa es el error. */}
+      {hint && !error && (
+        <p id={hintId} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      )}
       {error && (
         <p
           id={errorId}

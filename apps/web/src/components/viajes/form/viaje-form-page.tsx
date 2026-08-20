@@ -77,6 +77,9 @@ export function ViajeFormPage({
           values.tipoServicio === 'PERSONAL'
             ? Number(values.numPasajeros)
             : undefined,
+        // Vacío = borrar el precio: en edición el formulario es la fuente de
+        // verdad, así que undefined dejaría un precio viejo imposible de quitar.
+        precioAcordado: values.precioAcordado ? Number(values.precioAcordado) : null,
       });
       await api.patch(`/viajes/${id}/asignar`, {
         unidadId: values.unidadId !== NINGUNO ? values.unidadId : null,
@@ -183,6 +186,21 @@ export function ViajeFormPage({
 
               <Campo label="Fecha programada" htmlFor="fechaProgramada" full>
                 <Input id="fechaProgramada" type="datetime-local" {...register('fechaProgramada')} />
+              </Campo>
+
+              <Campo
+                label="Precio acordado (MXN)"
+                htmlFor="precioAcordado"
+                error={errors.precioAcordado?.message}
+                hint="Al aceptar una cotización de este viaje se llena solo."
+                full
+              >
+                <Input
+                  id="precioAcordado"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  {...register('precioAcordado')}
+                />
               </Campo>
 
               <Campo label="Unidad" htmlFor="unidadId" full>

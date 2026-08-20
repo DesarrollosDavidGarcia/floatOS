@@ -26,6 +26,13 @@ export interface Conductor {
   emergenciaRelacion?: string | null;
   // Contratación (planta / freelance / terciarizado)
   tipoContratacion?: string | null; // catálogo TIPO_CONTRATACION
+  // Componentes de pago: aplica cada uno que tenga valor, así que un conductor
+  // puede combinar esquemas (sueldo base + comisión).
+  sueldoPeriodo?: number | string | null;
+  periodicidadSueldo?: string | null; // catálogo PERIODICIDAD_SUELDO
+  tarifaPorViaje?: number | string | null;
+  pagoPorKm?: number | string | null;
+  porcentajeFlete?: number | string | null;
   empresaProveedor?: string | null;
   empresaProveedorRfc?: string | null;
   proveedorContactoNombre?: string | null;
@@ -85,6 +92,11 @@ export interface ConductorFormPayload {
   password?: string;
   // Contratación
   tipoContratacion?: string;
+  sueldoPeriodo?: number;
+  periodicidadSueldo?: string;
+  tarifaPorViaje?: number;
+  pagoPorKm?: number;
+  porcentajeFlete?: number;
   empresaProveedor?: string;
   empresaProveedorRfc?: string;
   proveedorContactoNombre?: string;
