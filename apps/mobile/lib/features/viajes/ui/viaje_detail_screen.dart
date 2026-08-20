@@ -12,7 +12,11 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/providers.dart';
 import '../../chat/ui/chat_screen.dart';
 import '../domain/estado_viaje.dart';
+import '../data/viajes_repository.dart';
+import '../domain/revision_viaje.dart';
 import '../domain/viaje.dart';
+import 'gastos_screen.dart';
+import 'revision_screen.dart';
 import 'mapa_pantalla_completa.dart';
 import '../providers/viajes_providers.dart';
 import 'widgets/estado_chip.dart';
@@ -71,6 +75,15 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
           orElse: () => const Text('Viaje'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined),
+            tooltip: 'Gastos del viaje',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GastosScreen(viajeId: widget.viajeId),
+              ),
+            ),
+          ),
           _ChatBoton(
             viajeId: widget.viajeId,
             folioTexto: viajeAsync.maybeWhen(
@@ -111,10 +124,56 @@ class _ViajeDetailScreenState extends ConsumerState<ViajeDetailScreen> {
     );
   }
 
+  /// Revisión que exige el backend para entrar a ese estado, si es que exige
+  /// alguna. Duplicar aquí la regla no es redundancia inútil: evita que el
+  /// conductor descubra el bloqueo con un error del servidor cuando ya está
+  /// arrancando, y le abre el formulario en su lugar.
+  TipoRevision? _revisionQueExige(EstadoViaje siguiente) {
+    if (siguiente == EstadoViaje.enCaminoOrigen) return TipoRevision.salida;
+    if (siguiente == EstadoViaje.entregado) return TipoRevision.llegada;
+    return null;
+  }
+
+  /// Abre la revisión si hace falta. Devuelve false si no quedó capturada, en
+  /// cuyo caso el cambio de estado ni se intenta.
+  Future<bool> _asegurarRevision(Viaje viaje, EstadoViaje siguiente) async {
+    final tipo = _revisionQueExige(siguiente);
+    if (tipo == null) return true;
+
+    final repo = ref.read(viajesRepositoryProvider);
+    List<RevisionViaje> revisiones;
+    try {
+      revisiones = await repo.revisiones(viaje.id);
+    } catch (_) {
+      // Sin señal no se puede saber si ya existe: se ofrece capturarla y el
+      // backend decide. Es preferible a bloquear al conductor en el patio.
+      revisiones = const [];
+    }
+    if (revisiones.any((r) => r.tipo == tipo)) return true;
+    if (!mounted) return false;
+
+    final salida = revisiones
+        .where((r) => r.tipo == TipoRevision.salida)
+        .firstOrNull;
+    final capturada = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RevisionScreen(
+          viajeId: viaje.id,
+          tipo: tipo,
+          odometroSalida: salida?.odometro,
+        ),
+      ),
+    );
+    return capturada == true;
+  }
+
   Future<void> _avanzarEstado(Viaje viaje) async {
     final siguiente = viaje.estado.siguiente;
     final accion = viaje.estado.accionSiguiente;
     if (siguiente == null || accion == null) return;
+
+    if (!await _asegurarRevision(viaje, siguiente)) return;
+    if (!mounted) return;
 
     final nota = await showModalBottomSheet<String>(
       context: context,
