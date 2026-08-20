@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/api/api_exception.dart';
+import '../../../core/offline/operacion_pendiente.dart';
+import '../../../core/offline/pendientes_provider.dart';
 import '../../../core/providers.dart';
 import '../data/viajes_repository.dart';
 import '../domain/revision_viaje.dart';
@@ -126,9 +129,43 @@ class _RevisionScreenState extends ConsumerState<RevisionScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (!e.esSinConexion) {
+        // El servidor la recibió y la rechazó: reintentar no arreglaría nada.
+        setState(() {
+          _guardando = false;
+          _error = e.mensaje;
+        });
+        return;
+      }
+      // Sin señal la revisión se guarda en el teléfono y el viaje continúa: si
+      // no, el conductor se quedaría atorado en un patio sin cobertura, que es
+      // justo donde se hacen estas revisiones.
+      await ref.read(pendientesProvider.notifier).encolar(
+            tipo: TipoPendiente.revision,
+            viajeId: widget.viajeId,
+            datos: {
+              'tipo': widget.tipo.api,
+              'odometro': odometro,
+              'nivelCombustiblePct': _combustible.round(),
+              if (_novedades.text.trim().isNotEmpty)
+                'novedades': _novedades.text.trim(),
+              'checklist': _estados.entries
+                  .map((e) => ItemChecklist(clave: e.key, estado: e.value).toJson())
+                  .toList(),
+            },
+            fotoPath: _fotoPath,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sin señal: la revisión se guardó y se enviará sola.'),
+        ),
+      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      // Sin señal el formulario NO se pierde: queda tal cual para reintentar.
       setState(() {
         _guardando = false;
         _error = 'No se pudo guardar: $e';

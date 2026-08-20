@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/api/api_exception.dart';
+import '../../../core/offline/operacion_pendiente.dart';
+import '../../../core/offline/pendientes_provider.dart';
 import '../../../core/providers.dart';
 import '../data/viajes_repository.dart';
 import '../domain/revision_viaje.dart';
@@ -182,9 +185,37 @@ class _SheetGastoState extends ConsumerState<_SheetGasto> {
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      if (!e.esSinConexion) {
+        setState(() {
+          _guardando = false;
+          _error = e.mensaje;
+        });
+        return;
+      }
+      // Las casetas se pagan justo donde no hay señal: el gasto se guarda y se
+      // envía solo, con su ticket.
+      await ref.read(pendientesProvider.notifier).encolar(
+            tipo: TipoPendiente.gasto,
+            viajeId: widget.viajeId,
+            datos: {
+              'tipo': _tipo,
+              'monto': monto,
+              if (_descripcion.text.trim().isNotEmpty)
+                'descripcion': _descripcion.text.trim(),
+              if (_tipo == 'COMBUSTIBLE')
+                'litros': double.tryParse(_litros.text.trim().replaceAll(',', '.')),
+            },
+            fotoPath: _ticketPath,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sin señal: el gasto se enviará solo.')),
+      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      // Se conserva lo capturado para reintentar en cuanto haya señal.
       setState(() {
         _guardando = false;
         _error = 'No se pudo guardar: $e';
